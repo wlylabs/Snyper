@@ -20,15 +20,9 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="relative z-10 min-h-dvh">
       <header className="shell-top">
         <div className="mx-auto flex h-full max-w-[1480px] items-center gap-3 px-3 md:px-4">
-          <Link
-            href="/"
-            className="group flex items-center gap-2.5"
-            aria-label={t("a11y.home")}
-          >
-            <Logo size={26} className="text-accent transition-opacity group-hover:opacity-80" />
-            <span className="hidden text-[15px] leading-none font-bold tracking-[0.26em] sm:block">
-              SNYPER
-            </span>
+          <Link href="/" className="brand group" aria-label={t("a11y.home")}>
+            <Logo size={28} className="transition-transform group-hover:scale-105" />
+            <span className="brand-word hidden sm:block">Snyper</span>
           </Link>
           <span className="chip hidden lg:inline-flex">{t("common.nonCustodial")}</span>
           <div className="ml-auto flex items-center gap-2">
@@ -56,9 +50,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               data-active={isActivePath(pathname, item.href)}
             >
               <Icon name={item.icon} size={19} />
-              <span className="text-[9px] font-semibold tracking-[0.1em] uppercase">
-                {t(item.label)}
-              </span>
+              <span className="rail-label">{t(item.label)}</span>
             </Link>
           ))}
           <div className="mt-auto px-2 pb-3">

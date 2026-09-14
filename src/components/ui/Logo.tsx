@@ -1,16 +1,41 @@
-"use client";
-
 /**
- * The Snyper mark: a broken scope ring around a crosshair whose north arm
- * resolves into a trend arrow. Drawn on a 512 grid so the component, the
- * favicon and the installed app icon are the same artwork at every size.
+ * The Snyper mark: a lock-on frame — four corner brackets closing on a centre
+ * block. It is one closed silhouette at any size, so it survives a 16px favicon
+ * the way the old hairline reticle did not.
+ *
+ * Two forms, same 512 grid as the installed app icon:
+ *   tile — the brand square (accent ground, mark knocked out). Use it wherever
+ *          the logo sits on a page; it carries its own contrast, so it reads on
+ *          a white header as well as a black one.
+ *   mark — the bare glyph in currentColor, for single-colour contexts.
  */
+
+const BRACKETS = "M112 190V112H190M322 112H400V190M400 322V400H322M190 400H112V322";
+
+function Glyph({ color }: { color: string }) {
+  return (
+    <>
+      <path
+        d={BRACKETS}
+        fill="none"
+        stroke={color}
+        strokeWidth={52}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <rect x="210" y="210" width="92" height="92" rx="24" fill={color} />
+    </>
+  );
+}
+
 export function Logo({
   size = 28,
+  variant = "tile",
   className,
   title,
 }: {
   size?: number;
+  variant?: "tile" | "mark";
   className?: string;
   title?: string;
 }) {
@@ -25,18 +50,28 @@ export function Logo({
       aria-hidden={title ? undefined : true}
       focusable="false"
     >
-      <g stroke="currentColor" strokeWidth={19} fill="none">
-        <circle
-          cx="256"
-          cy="256"
-          r="134"
-          strokeDasharray="140.3 70.2"
-          transform="rotate(15 256 256)"
-        />
-        <path d="M256 186V96M256 326v90M186 256H96M326 256h90" />
-      </g>
-      <path d="M256 52l42 56h-84z" fill="currentColor" />
-      <rect x="238" y="238" width="36" height="36" fill="currentColor" />
+      {variant === "tile" ? (
+        <>
+          <rect width="512" height="512" rx="114" fill="var(--color-accent)" />
+          {/* Keeps the tile edge defined where the accent sits on a pale ground. */}
+          <rect
+            x="1"
+            y="1"
+            width="510"
+            height="510"
+            rx="113"
+            fill="none"
+            stroke="var(--color-accent-ink)"
+            strokeOpacity={0.14}
+            strokeWidth={2}
+          />
+          <g transform="translate(256 256) scale(0.62) translate(-256 -256)">
+            <Glyph color="var(--color-accent-ink)" />
+          </g>
+        </>
+      ) : (
+        <Glyph color="currentColor" />
+      )}
     </svg>
   );
 }

@@ -64,7 +64,7 @@ export default function BotsPage() {
           ]}
           value={tab}
           onChange={setTab}
-          className="mb-3 w-full"
+          className="mb-3 w-full max-w-sm"
         />
 
         {mounted && (showingOrders ? orders : strategies).length === 0 ? (
@@ -94,7 +94,7 @@ export default function BotsPage() {
           <label className="flex items-start gap-3">
             <input
               type="checkbox"
-              className="mt-0.5 h-4 w-4 accent-[var(--color-accent)]"
+              className="check mt-0.5"
               checked={settings.autoDispatch}
               onChange={(event) => setSettings({ autoDispatch: event.target.checked })}
             />

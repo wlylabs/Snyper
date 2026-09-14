@@ -183,9 +183,11 @@ function GridLadder({ bot, price }: { bot: Bot; price?: number }) {
             <span
               className="h-[6px] flex-1"
               style={{
+                // An empty level still has to read as a level on a white panel.
                 background: filled.has(index)
-                  ? "var(--color-accent)"
-                  : "var(--color-raise)",
+                  ? "var(--color-accent-line)"
+                  : "var(--color-edge)",
+                borderRadius: 999,
                 opacity: filled.has(index) ? 0.85 : 1,
                 outline: active ? "1px solid var(--color-edge)" : undefined,
               }}
