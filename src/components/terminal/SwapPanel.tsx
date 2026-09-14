@@ -272,7 +272,7 @@ export function SwapPanel({
         </p>
       )}
 
-      {error && <p className="mt-3 text-[11px] leading-relaxed short">{error}</p>}
+      {error && <p className="wrap-any mt-3 text-[11px] leading-relaxed short">{error}</p>}
 
       <button
         type="button"

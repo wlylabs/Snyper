@@ -21,7 +21,7 @@ export default function BotsPage() {
 
   return (
     <div className="grid gap-3 lg:grid-cols-12">
-      <div className="lg:col-span-7 xl:col-span-8">
+      <div className="min-w-0 lg:col-span-7 xl:col-span-8">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
             <h1 className="text-[15px] font-bold tracking-[0.12em] uppercase">Strategies</h1>
@@ -62,7 +62,7 @@ export default function BotsPage() {
         )}
       </div>
 
-      <div className="flex flex-col gap-3 lg:col-span-5 xl:col-span-4">
+      <div className="flex min-w-0 flex-col gap-3 lg:col-span-5 xl:col-span-4">
         <Panel label="Dispatch mode" bodyClassName="p-3">
           <label className="flex items-start gap-3">
             <input

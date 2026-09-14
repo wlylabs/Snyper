@@ -138,8 +138,8 @@ export function TokenPicker({
 export function TokenBadge({ token, size = 28 }: { token: Token; size?: number }) {
   return (
     <span
-      className="flex shrink-0 items-center justify-center overflow-hidden border border-line bg-base text-[10px] font-bold"
-      style={{ width: size, height: size }}
+      className="flex shrink-0 items-center justify-center overflow-hidden border border-line bg-base font-bold leading-none"
+      style={{ width: size, height: size, fontSize: Math.max(7, Math.round(size * 0.3)) }}
     >
       {token.logoURI ? (
         // eslint-disable-next-line @next/next/no-img-element

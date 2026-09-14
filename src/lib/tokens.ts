@@ -99,7 +99,13 @@ export function mergeTokens(chainId: number, ...groups: Token[][]): Token[] {
     for (const token of group) {
       if (token.chainId !== chainId) continue;
       const key = token.address.toLowerCase();
-      if (!seen.has(key)) seen.set(key, token);
+      const existing = seen.get(key);
+      if (!existing) {
+        seen.set(key, token);
+      } else if (!existing.logoURI && token.logoURI) {
+        // Earlier groups win on identity; later ones still contribute artwork.
+        seen.set(key, { ...existing, logoURI: token.logoURI });
+      }
     }
   }
   return [...seen.values()];

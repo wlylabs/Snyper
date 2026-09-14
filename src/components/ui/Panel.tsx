@@ -39,7 +39,7 @@ export function Row({ k, v, tone }: { k: ReactNode; v: ReactNode; tone?: "long" 
   return (
     <div className="kv">
       <span className="kv-k">{k}</span>
-      <span className={`kv-v ${tone ?? ""}`}>{v}</span>
+      <span className={`kv-v wrap-any ${tone ?? ""}`}>{v}</span>
     </div>
   );
 }

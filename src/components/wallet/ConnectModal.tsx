@@ -179,7 +179,7 @@ export function ConnectModal({ open, onClose }: { open: boolean; onClose: () => 
 
           {isPending && <p className="lbl mt-4">Waiting for wallet…</p>}
           {error && (
-            <p className="mt-4 text-[11px] leading-relaxed short">{error.message}</p>
+            <p className="wrap-any mt-4 text-[11px] leading-relaxed short">{error.message}</p>
           )}
         </div>
       ) : (
@@ -247,7 +247,9 @@ export function ConnectModal({ open, onClose }: { open: boolean; onClose: () => 
             ))}
           </div>
 
-          {error && <p className="mt-3 text-[11px] leading-relaxed short">{error.message}</p>}
+          {error && (
+            <p className="wrap-any mt-3 text-[11px] leading-relaxed short">{error.message}</p>
+          )}
         </div>
       )}
     </Sheet>

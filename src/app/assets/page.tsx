@@ -55,7 +55,7 @@ export default function AssetsPage() {
 
   return (
     <div className="grid gap-3 lg:grid-cols-12">
-      <div className="lg:col-span-8">
+      <div className="min-w-0 lg:col-span-8">
         <Panel
           label="Holdings"
           ticked
@@ -139,7 +139,7 @@ export default function AssetsPage() {
         </Panel>
       </div>
 
-      <div className="flex flex-col gap-3 lg:col-span-4">
+      <div className="flex min-w-0 flex-col gap-3 lg:col-span-4">
         <Panel label="Address" bodyClassName="p-3">
           {address ? (
             <>

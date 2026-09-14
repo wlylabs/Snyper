@@ -157,7 +157,9 @@ function SignalRow({ signal, actionable }: { signal: Signal; actionable?: boolea
         )}
       </div>
 
-      {signal.error && <p className="mt-2 text-[11px] leading-relaxed short">{signal.error}</p>}
+      {signal.error && (
+        <p className="wrap-any mt-2 text-[11px] leading-relaxed short">{signal.error}</p>
+      )}
     </div>
   );
 }

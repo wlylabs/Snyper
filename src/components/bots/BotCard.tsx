@@ -91,7 +91,7 @@ export function BotCard({ bot }: { bot: Bot }) {
         </dl>
 
         {runtime.error && (
-          <p className="mt-3 flex items-start gap-1.5 text-[11px] leading-relaxed warn">
+          <p className="wrap-any mt-3 flex items-start gap-1.5 text-[11px] leading-relaxed warn">
             <Icon name="alert" size={12} className="mt-0.5 shrink-0" />
             {runtime.error}
           </p>

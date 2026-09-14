@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import { usePublicClient } from "wagmi";
 import { midPrice } from "@/lib/quote";
 import type { Token } from "@/lib/tokens";
+import type { PricePoint } from "@/lib/types";
 import { seriesKey, useAppStore } from "@/store/useAppStore";
 
 /**
@@ -42,8 +43,14 @@ export function usePairPrice(base?: Token, quote?: Token, intervalMs = 15_000) {
   };
 }
 
-export function usePairSeries(base?: Token, quote?: Token) {
-  return useAppStore((state) =>
-    base && quote ? (state.series[seriesKey(base.chainId, base, quote)] ?? []) : [],
-  );
+/**
+ * Shared empty result. The selector runs on every snapshot check, so returning a
+ * fresh `[]` for an untracked pair would hand React a new reference each time and
+ * spin `useSyncExternalStore` into an endless re-render.
+ */
+const NO_POINTS: PricePoint[] = [];
+
+export function usePairSeries(base?: Token, quote?: Token): PricePoint[] {
+  const key = base && quote ? seriesKey(base.chainId, base, quote) : undefined;
+  return useAppStore((state) => (key ? (state.series[key] ?? NO_POINTS) : NO_POINTS));
 }

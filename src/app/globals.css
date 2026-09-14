@@ -635,6 +635,14 @@
     }
   }
 
+  /*
+   * Addresses, tx hashes and RPC error strings have no spaces. Without this they
+   * set the min-content width of their column and push the whole page sideways.
+   */
+  .wrap-any {
+    overflow-wrap: anywhere;
+  }
+
   .long {
     color: var(--color-accent-text);
   }

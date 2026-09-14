@@ -61,7 +61,7 @@ export default function TerminalPage() {
 
   return (
     <div className="grid gap-3 lg:grid-cols-12">
-      <div className="order-2 flex flex-col gap-3 lg:order-1 lg:col-span-7">
+      <div className="order-2 flex min-w-0 flex-col gap-3 lg:order-1 lg:col-span-7">
         <Panel
           label={base && quote ? `${base.symbol} / ${quote.symbol}` : "Pair"}
           meta={
@@ -116,7 +116,7 @@ export default function TerminalPage() {
 
         <Panel label="Route detail" bodyClassName="p-3">
           {error ? (
-            <p className="flex items-start gap-2 text-[11px] leading-relaxed short">
+            <p className="wrap-any flex items-start gap-2 text-[11px] leading-relaxed short">
               <Icon name="alert" size={14} className="mt-0.5 shrink-0" />
               {error.message}
             </p>
@@ -155,7 +155,7 @@ export default function TerminalPage() {
         </Panel>
       </div>
 
-      <div className="order-1 lg:order-2 lg:col-span-5">
+      <div className="order-1 min-w-0 lg:order-2 lg:col-span-5">
         <SwapPanel
           tokens={tokens}
           tokenIn={tokenIn}
