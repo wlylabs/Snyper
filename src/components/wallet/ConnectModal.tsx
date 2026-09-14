@@ -6,6 +6,7 @@ import type { Connector } from "wagmi";
 import { Icon } from "@/components/ui/Icon";
 import { Sheet } from "@/components/ui/Sheet";
 import { WALLETCONNECT_PROJECT_ID } from "@/lib/wagmi";
+import { useI18n } from "@/hooks/useI18n";
 
 /**
  * Deep links published by each wallet for WalletConnect v2 pairing. The URI is
@@ -23,6 +24,7 @@ const WALLET_LINKS: { name: string; prefix: string }[] = [
 type Stage = "choose" | "pairing";
 
 export function ConnectModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { t } = useI18n();
   const connectors = useConnectors();
   const { connect, isPending, error, reset } = useConnect();
   const { isConnected } = useAccount();
@@ -121,18 +123,15 @@ export function ConnectModal({ open, onClose }: { open: boolean; onClose: () => 
   }, [uri]);
 
   return (
-    <Sheet open={open} title="Connect wallet" onClose={onClose}>
+    <Sheet open={open} title={t("wallet.connectTitle")} onClose={onClose}>
       {stage === "choose" ? (
         <div className="p-3">
-          <p className="mb-3 text-xs leading-relaxed text-dim">
-            Keys never leave your wallet. Snyper signs nothing on your behalf — every
-            strategy leg is a transaction you approve in your own app.
-          </p>
+          <p className="mb-3 text-xs leading-relaxed text-dim">{t("wallet.intro")}</p>
 
-          <p className="lbl mb-2">Installed</p>
+          <p className="lbl mb-2">{t("wallet.installed")}</p>
           <div className="mb-4 flex flex-col gap-1.5">
             {injectedConnectors.length === 0 && (
-              <p className="text-xs text-faint">No browser wallet detected.</p>
+              <p className="text-xs text-faint">{t("wallet.noBrowserWallet")}</p>
             )}
             {injectedConnectors.map((connector) => (
               <WalletRow
@@ -143,7 +142,7 @@ export function ConnectModal({ open, onClose }: { open: boolean; onClose: () => 
             ))}
           </div>
 
-          <p className="lbl mb-2">Mobile &amp; hardware</p>
+          <p className="lbl mb-2">{t("wallet.mobileHardware")}</p>
           <div className="flex flex-col gap-1.5">
             {walletConnectConnector ? (
               <button type="button" className="row-link panel flex items-center gap-3 p-3" onClick={startWalletConnect}>
@@ -153,7 +152,7 @@ export function ConnectModal({ open, onClose }: { open: boolean; onClose: () => 
                 <span className="flex-1 text-left">
                   <span className="block text-[13px] font-semibold">WalletConnect</span>
                   <span className="block text-[11px] text-faint">
-                    Scan or deep link into any mobile wallet
+                    {t("wallet.walletConnectSub")}
                   </span>
                 </span>
                 <Icon name="chevron" size={14} className="-rotate-90 text-faint" />
@@ -161,10 +160,10 @@ export function ConnectModal({ open, onClose }: { open: boolean; onClose: () => 
             ) : (
               <div className="panel flex items-start gap-3 p-3">
                 <Icon name="alert" size={16} className="mt-0.5 warn" />
-                <p className="text-[11px] leading-relaxed text-dim">
-                  Mobile pairing is disabled. Set{" "}
-                  <span className="num">NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID</span> to enable
-                  WalletConnect.
+                <p className="wrap-any text-[11px] leading-relaxed text-dim">
+                  {t("wallet.walletConnectDisabled", {
+                    env: "NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID",
+                  })}
                 </p>
               </div>
             )}
@@ -177,9 +176,9 @@ export function ConnectModal({ open, onClose }: { open: boolean; onClose: () => 
             )}
           </div>
 
-          {isPending && <p className="lbl mt-4">Waiting for wallet…</p>}
+          {isPending && <p className="lbl mt-4">{t("wallet.waiting")}</p>}
           {error && (
-            <p className="mt-4 text-[11px] leading-relaxed short">{error.message}</p>
+            <p className="wrap-any mt-4 text-[11px] leading-relaxed short">{error.message}</p>
           )}
         </div>
       ) : (
@@ -190,7 +189,7 @@ export function ConnectModal({ open, onClose }: { open: boolean; onClose: () => 
             onClick={() => setStage("choose")}
           >
             <Icon name="chevron" size={12} className="rotate-90" />
-            Back
+            {t("common.back")}
           </button>
 
           <div className="panel ticked mb-3 flex items-center justify-center p-4">
@@ -202,7 +201,7 @@ export function ConnectModal({ open, onClose }: { open: boolean; onClose: () => 
               />
             ) : (
               <div className="flex h-[210px] w-[210px] items-center justify-center">
-                <span className="lbl">Generating pairing code…</span>
+                <span className="lbl">{t("wallet.generatingCode")}</span>
               </div>
             )}
           </div>
@@ -215,7 +214,7 @@ export function ConnectModal({ open, onClose }: { open: boolean; onClose: () => 
               disabled={!uri}
             >
               <Icon name={copied ? "check" : "copy"} size={13} />
-              {copied ? "Copied" : "Copy URI"}
+              {copied ? t("common.copied") : t("wallet.copyUri")}
             </button>
             <button
               type="button"
@@ -224,11 +223,11 @@ export function ConnectModal({ open, onClose }: { open: boolean; onClose: () => 
               disabled={isPending && !uri}
             >
               <Icon name="refresh" size={13} />
-              New code
+              {t("wallet.newCode")}
             </button>
           </div>
 
-          <p className="lbl mb-2">Open in app</p>
+          <p className="lbl mb-2">{t("wallet.openInApp")}</p>
           <div className="grid grid-cols-2 gap-1.5">
             {WALLET_LINKS.map((wallet) => (
               <a
@@ -247,7 +246,9 @@ export function ConnectModal({ open, onClose }: { open: boolean; onClose: () => 
             ))}
           </div>
 
-          {error && <p className="mt-3 text-[11px] leading-relaxed short">{error.message}</p>}
+          {error && (
+            <p className="wrap-any mt-3 text-[11px] leading-relaxed short">{error.message}</p>
+          )}
         </div>
       )}
     </Sheet>

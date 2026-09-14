@@ -1,4 +1,6 @@
-import type { Bot, Strategy, StrategyKind } from "./types";
+import { formatPrice } from "./format";
+import type { TKey, TVars } from "./i18n";
+import type { Bot, Reason, Strategy, StrategyKind } from "./types";
 
 export type Intent = {
   side: "buy" | "sell";
@@ -6,22 +8,30 @@ export type Intent = {
   amountQuote?: number;
   /** Base currency to sell. */
   amountBase?: number;
-  reason: string;
+  /** Dictionary key plus values, so the log reads in whatever language is set. */
+  reason: Reason;
   level?: number;
 };
 
-export const STRATEGY_LABELS: Record<StrategyKind, string> = {
-  dca: "Interval accumulation",
-  grid: "Grid",
-  limit: "Trigger order",
-  trail: "Trailing stop",
+export const STRATEGY_LABELS: Record<StrategyKind, TKey> = {
+  dca: "strategy.dca",
+  grid: "strategy.grid",
+  limit: "strategy.limit",
+  trail: "strategy.trail",
 };
 
-export const STRATEGY_SUMMARY: Record<StrategyKind, string> = {
-  dca: "Buys a fixed quote amount on a timer, optionally only under a price ceiling.",
-  grid: "Places ladder legs between two bounds, buying each level down and unwinding it a step up.",
-  limit: "Fires once when price crosses the trigger in the chosen direction.",
-  trail: "Tracks the running peak and unwinds when price gives back the trail distance.",
+export const STRATEGY_SHORT: Record<StrategyKind, TKey> = {
+  dca: "strategy.dcaShort",
+  grid: "strategy.gridShort",
+  limit: "strategy.limitShort",
+  trail: "strategy.trailShort",
+};
+
+export const STRATEGY_SUMMARY: Record<StrategyKind, TKey> = {
+  dca: "strategy.dcaSummary",
+  grid: "strategy.gridSummary",
+  limit: "strategy.limitSummary",
+  trail: "strategy.trailSummary",
 };
 
 export function gridLevels(strategy: Extract<Strategy, { kind: "grid" }>): number[] {
@@ -67,8 +77,8 @@ export function evaluate(bot: Bot, price: number, now: number): Intent | undefin
         amountQuote: strategy.amountQuote,
         reason:
           strategy.priceCeiling > 0
-            ? `Interval leg due under ceiling ${strategy.priceCeiling}`
-            : "Interval leg due",
+            ? { key: "reason.dcaDueCeiling", vars: { ceiling: formatPrice(strategy.priceCeiling) } }
+            : { key: "reason.dcaDue" },
       };
     }
 
@@ -86,7 +96,10 @@ export function evaluate(bot: Bot, price: number, now: number): Intent | undefin
             side: "sell",
             amountBase: strategy.amountQuote / levels[i],
             level: i,
-            reason: `Level ${i + 1} reclaimed ${(levels[i] + step).toFixed(4)}`,
+            reason: {
+              key: "reason.gridSell",
+              vars: { level: i + 1, price: formatPrice(levels[i] + step) },
+            },
           };
         }
       }
@@ -99,7 +112,10 @@ export function evaluate(bot: Bot, price: number, now: number): Intent | undefin
             side: "buy",
             amountQuote: strategy.amountQuote,
             level: i,
-            reason: `Level ${i + 1} crossed at ${levels[i].toFixed(4)}`,
+            reason: {
+              key: "reason.gridBuy",
+              vars: { level: i + 1, price: formatPrice(levels[i]) },
+            },
           };
         }
       }
@@ -114,12 +130,18 @@ export function evaluate(bot: Bot, price: number, now: number): Intent | undefin
         ? {
             side: "buy",
             amountQuote: strategy.amount,
-            reason: `Price crossed under ${strategy.trigger}`,
+            reason: {
+              key: "reason.limitBuy",
+              vars: { trigger: formatPrice(strategy.trigger) },
+            },
           }
         : {
             side: "sell",
             amountBase: strategy.amount,
-            reason: `Price crossed over ${strategy.trigger}`,
+            reason: {
+              key: "reason.limitSell",
+              vars: { trigger: formatPrice(strategy.trigger) },
+            },
           };
     }
 
@@ -133,7 +155,10 @@ export function evaluate(bot: Bot, price: number, now: number): Intent | undefin
       return {
         side: "sell",
         amountBase: strategy.amountBase,
-        reason: `Gave back ${strategy.trailPercent}% from peak ${peak.toFixed(4)}`,
+        reason: {
+          key: "reason.trail",
+          vars: { percent: strategy.trailPercent, peak: formatPrice(peak) },
+        },
       };
     }
 
@@ -148,39 +173,70 @@ export function withinRiskLimits(
   intent: Intent,
   price: number,
   today: string,
-): { ok: true } | { ok: false; reason: string } {
+): { ok: true } | { ok: false; reason: TKey } {
   const notional =
     intent.side === "buy" ? (intent.amountQuote ?? 0) : (intent.amountBase ?? 0) * price;
 
-  if (notional <= 0) return { ok: false, reason: "Zero size" };
+  if (notional <= 0) return { ok: false, reason: "reason.zeroSize" };
 
   if (bot.dailyCapQuote > 0) {
     const spent = bot.runtime.spentDate === today ? bot.runtime.spentQuote : 0;
     if (spent + notional > bot.dailyCapQuote) {
-      return { ok: false, reason: "Daily cap reached" };
+      return { ok: false, reason: "reason.dailyCap" };
     }
   }
   return { ok: true };
 }
 
-export function describeStrategy(bot: Bot): string {
+export function describeStrategy(bot: Bot): Reason {
   const s = bot.strategy;
   const quote = bot.quote.symbol;
   const base = bot.base.symbol;
   switch (s.kind) {
     case "dca":
-      return `${s.amountQuote} ${quote} every ${s.intervalMin}m${
-        s.priceCeiling > 0 ? ` under ${s.priceCeiling}` : ""
-      }`;
+      return s.priceCeiling > 0
+        ? {
+            key: "strategy.dcaDescCeiling",
+            vars: {
+              amount: s.amountQuote,
+              quote,
+              interval: s.intervalMin,
+              ceiling: formatPrice(s.priceCeiling),
+            },
+          }
+        : {
+            key: "strategy.dcaDesc",
+            vars: { amount: s.amountQuote, quote, interval: s.intervalMin },
+          };
     case "grid":
-      return `${s.levels} levels ${s.lower}–${s.upper}, ${s.amountQuote} ${quote} each`;
+      return {
+        key: "strategy.gridDesc",
+        vars: {
+          levels: s.levels,
+          lower: formatPrice(s.lower),
+          upper: formatPrice(s.upper),
+          amount: s.amountQuote,
+          quote,
+        },
+      };
     case "limit":
       return s.side === "buy"
-        ? `Buy ${s.amount} ${quote} at ≤ ${s.trigger}`
-        : `Sell ${s.amount} ${base} at ≥ ${s.trigger}`;
+        ? {
+            key: "strategy.limitBuyDesc",
+            vars: { amount: s.amount, quote, trigger: formatPrice(s.trigger) },
+          }
+        : {
+            key: "strategy.limitSellDesc",
+            vars: { amount: s.amount, base, trigger: formatPrice(s.trigger) },
+          };
     case "trail":
-      return `Sell ${s.amountBase} ${base} on ${s.trailPercent}% giveback`;
+      return {
+        key: "strategy.trailDesc",
+        vars: { amount: s.amountBase, base, percent: s.trailPercent },
+      };
     default:
-      return "";
+      return { key: "common.none" };
   }
 }
+
+export type { TVars };

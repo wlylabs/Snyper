@@ -9,12 +9,19 @@ import { Icon } from "@/components/ui/Icon";
 import { usePairPrice, usePairSeries } from "@/hooks/usePairPrice";
 import { useTokenList } from "@/hooks/useTokenList";
 import { useMounted } from "@/hooks/useMounted";
+import { useI18n } from "@/hooks/useI18n";
+import { useFxRate } from "@/hooks/useFxRate";
+import { formatMoney } from "@/lib/currency";
+import { useAppStore } from "@/store/useAppStore";
 import { chainMeta } from "@/lib/chains";
 import { feeLabel, formatPrice, formatSigned, timeAgo } from "@/lib/format";
 import { baseTokens, nativeToken, sameToken, type Token } from "@/lib/tokens";
 
 export default function TerminalPage() {
   const mounted = useMounted();
+  const { t, locale } = useI18n();
+  const currency = useAppStore((state) => state.settings.currency);
+  const { fx } = useFxRate();
   const activeChainId = useChainId();
   const { chainId: accountChainId } = useAccount();
   const chainId = accountChainId ?? activeChainId;
@@ -54,6 +61,11 @@ export default function TerminalPage() {
     };
   }, [series]);
 
+  /** The quote side is the chain's USD unit, so a rupiah conversion is meaningful. */
+  const quotedInUsd = Boolean(
+    quote && meta && quote.address.toLowerCase() === meta.stable.toLowerCase(),
+  );
+
   const swapTokens = () => {
     setTokenIn(tokenOut);
     setTokenOut(tokenIn);
@@ -61,13 +73,13 @@ export default function TerminalPage() {
 
   return (
     <div className="grid gap-3 lg:grid-cols-12">
-      <div className="order-2 flex flex-col gap-3 lg:order-1 lg:col-span-7">
+      <div className="order-2 flex min-w-0 flex-col gap-3 lg:order-1 lg:col-span-7">
         <Panel
-          label={base && quote ? `${base.symbol} / ${quote.symbol}` : "Pair"}
+          label={base && quote ? `${base.symbol} / ${quote.symbol}` : t("terminal.pair")}
           meta={
             <span className={`chip ${isFetching ? "chip-live" : ""}`}>
               <span className={`dot ${isFetching ? "dot-live" : ""}`} />
-              {meta?.label ?? "Network"}
+              {meta?.label ?? t("common.network")}
             </span>
           }
           bodyClassName="p-0"
@@ -75,7 +87,7 @@ export default function TerminalPage() {
         >
           <div className="flex flex-wrap items-end justify-between gap-4 p-3">
             <div>
-              <p className="lbl mb-1.5">Pool mid</p>
+              <p className="lbl mb-1.5">{t("terminal.poolMid")}</p>
               {mounted ? (
                 <p className="num text-[30px] leading-none">
                   {price !== undefined ? formatPrice(price) : "—"}
@@ -86,9 +98,16 @@ export default function TerminalPage() {
               ) : (
                 <Skeleton className="h-8 w-40" />
               )}
+              {mounted && quotedInUsd && price !== undefined && currency === "IDR" && fx && (
+                <p className="num mt-1.5 text-[12px] text-faint">
+                  {t("terminal.approxFx", {
+                    value: formatMoney(price, { currency, fx, locale }),
+                  })}
+                </p>
+              )}
             </div>
             <div className="text-right">
-              <p className="lbl mb-1.5">Session change</p>
+              <p className="lbl mb-1.5">{t("terminal.sessionChange")}</p>
               <p
                 className={`num text-[18px] leading-none ${
                   stats && stats.change >= 0 ? "long" : stats ? "short" : "text-faint"
@@ -104,28 +123,28 @@ export default function TerminalPage() {
           </div>
 
           <div className="grid grid-cols-2 gap-x-4 border-t border-line p-3 sm:grid-cols-4">
-            <Stat label="Ticks" value={stats ? String(stats.ticks) : "0"} />
-            <Stat label="High" value={stats ? formatPrice(stats.high) : "—"} />
-            <Stat label="Low" value={stats ? formatPrice(stats.low) : "—"} />
+            <Stat label={t("terminal.ticks")} value={stats ? String(stats.ticks) : "0"} />
+            <Stat label={t("terminal.high")} value={stats ? formatPrice(stats.high) : "—"} />
+            <Stat label={t("terminal.low")} value={stats ? formatPrice(stats.low) : "—"} />
             <Stat
-              label="Last read"
-              value={stats ? `${timeAgo(stats.last)} ago` : "—"}
+              label={t("terminal.lastRead")}
+              value={stats ? t("common.ago", { value: timeAgo(stats.last) }) : "—"}
             />
           </div>
         </Panel>
 
-        <Panel label="Route detail" bodyClassName="p-3">
+        <Panel label={t("terminal.routeDetail")} bodyClassName="p-3">
           {error ? (
-            <p className="flex items-start gap-2 text-[11px] leading-relaxed short">
+            <p className="wrap-any flex items-start gap-2 text-[11px] leading-relaxed short">
               <Icon name="alert" size={14} className="mt-0.5 shrink-0" />
               {error.message}
             </p>
           ) : (
             <>
-              <Row k="Venue" v="Uniswap v3" />
-              <Row k="Deepest tier" v={pool ? feeLabel(pool.fee) : "—"} />
+              <Row k={t("terminal.venue")} v="Uniswap v3" />
+              <Row k={t("terminal.deepestTier")} v={pool ? feeLabel(pool.fee) : "—"} />
               <Row
-                k="Pool"
+                k={t("terminal.pool")}
                 v={
                   pool ? (
                     <a
@@ -143,19 +162,25 @@ export default function TerminalPage() {
                 }
               />
               <Row
-                k="Ticks recorded"
-                v={stats ? `${stats.ticks} since ${timeAgo(stats.since)} ago` : "0"}
+                k={t("terminal.ticksRecorded")}
+                v={
+                  stats
+                    ? t("terminal.ticksSince", {
+                        count: stats.ticks,
+                        time: timeAgo(stats.since),
+                      })
+                    : "0"
+                }
               />
               <p className="mt-3 text-[11px] leading-relaxed text-faint">
-                Prices come from the pool itself — sqrtPrice for the mid, QuoterV2 for
-                executable size. Nothing is cached from a third-party feed.
+                {t("terminal.sourceNote")}
               </p>
             </>
           )}
         </Panel>
       </div>
 
-      <div className="order-1 lg:order-2 lg:col-span-5">
+      <div className="order-1 min-w-0 lg:order-2 lg:col-span-5">
         <SwapPanel
           tokens={tokens}
           tokenIn={tokenIn}

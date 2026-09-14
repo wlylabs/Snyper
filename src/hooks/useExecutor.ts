@@ -10,6 +10,8 @@ import { applySlippage, buildSwap, swapRequest } from "@/lib/swap";
 import type { Token } from "@/lib/tokens";
 import { useToast } from "@/components/ui/Toast";
 import { useAppStore } from "@/store/useAppStore";
+import { useI18n } from "@/hooks/useI18n";
+import type { TKey, TVars } from "@/lib/i18n";
 
 export type ExecuteArgs = {
   tokenIn: Token;
@@ -31,16 +33,17 @@ export function useExecutor() {
   const pushTrade = useAppStore((state) => state.pushTrade);
   const updateTrade = useAppStore((state) => state.updateTrade);
   const toast = useToast();
+  const { t } = useI18n();
   const [phase, setPhase] = useState<ExecutePhase>("idle");
 
   const execute = useCallback(
     async (args: ExecuteArgs): Promise<`0x${string}`> => {
       const { tokenIn, tokenOut, amountIn, quote, slippageBps, deadlineMinutes } = args;
-      if (!address) throw new Error("Wallet not connected");
+      if (!address) throw new Error(t("error.notConnected"));
       const meta = chainMeta(tokenIn.chainId);
-      if (!meta) throw new Error("Unsupported chain");
+      if (!meta) throw new Error(t("error.unsupportedChain"));
       if (chainId !== tokenIn.chainId) {
-        throw new Error(`Switch the wallet to ${meta.label} first`);
+        throw new Error(t("error.switchFirst", { chain: meta.label }));
       }
 
       const amountOutMinimum = applySlippage(quote.amountOut, slippageBps);
@@ -78,7 +81,7 @@ export function useExecutor() {
           });
           toast.push({
             tone: "info",
-            message: `Approving ${tokenIn.symbol}`,
+            message: t("toast.approving", { symbol: tokenIn.symbol }),
             detail: approveHash,
             href: explorerTx(tokenIn.chainId, approveHash),
           });
@@ -89,7 +92,7 @@ export function useExecutor() {
           updateTrade(approveHash, {
             status: receipt.status === "success" ? "confirmed" : "failed",
           });
-          if (receipt.status !== "success") throw new Error("Approval reverted");
+          if (receipt.status !== "success") throw new Error(t("error.approvalReverted"));
         }
       }
 
@@ -130,7 +133,7 @@ export function useExecutor() {
       });
       toast.push({
         tone: "info",
-        message: `Swap submitted · ${tokenIn.symbol} → ${tokenOut.symbol}`,
+        message: t("toast.swapSubmitted", { from: tokenIn.symbol, to: tokenOut.symbol }),
         detail: hash,
         href: explorerTx(tokenIn.chainId, hash),
       });
@@ -144,15 +147,15 @@ export function useExecutor() {
       updateTrade(hash, { status: ok ? "confirmed" : "failed" });
       toast.push({
         tone: ok ? "ok" : "error",
-        message: ok ? "Swap confirmed" : "Swap reverted",
+        message: ok ? t("toast.swapConfirmed") : t("toast.swapReverted"),
         detail: hash,
         href: explorerTx(tokenIn.chainId, hash),
       });
       setPhase("idle");
-      if (!ok) throw new Error("Swap reverted");
+      if (!ok) throw new Error(t("error.swapReverted"));
       return hash;
     },
-    [address, chainId, config, pushTrade, toast, updateTrade, writeContractAsync],
+    [address, chainId, config, pushTrade, t, toast, updateTrade, writeContractAsync],
   );
 
   const run = useCallback(
@@ -169,14 +172,17 @@ export function useExecutor() {
   return { execute: run, phase };
 }
 
-export function readableError(error: unknown): string {
-  if (!error) return "Unknown error";
+type Translate = (key: TKey, vars?: TVars) => string;
+
+/** Maps the noisy wallet and RPC failures onto phrases a reader can act on. */
+export function readableError(error: unknown, t: Translate): string {
+  if (!error) return t("error.unknown");
   const message = error instanceof Error ? error.message : String(error);
   if (/User rejected|denied transaction|rejected the request/i.test(message)) {
-    return "Rejected in wallet";
+    return t("error.rejected");
   }
-  if (/insufficient funds/i.test(message)) return "Insufficient balance for gas";
-  if (/STF|TRANSFER_FROM_FAILED/i.test(message)) return "Token transfer failed";
-  if (/Too little received|slippage/i.test(message)) return "Slippage exceeded";
+  if (/insufficient funds/i.test(message)) return t("error.insufficientGas");
+  if (/STF|TRANSFER_FROM_FAILED/i.test(message)) return t("error.transferFailed");
+  if (/Too little received|slippage/i.test(message)) return t("error.slippage");
   return message.split("\n")[0].slice(0, 180);
 }

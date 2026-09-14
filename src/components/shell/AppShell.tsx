@@ -9,21 +9,23 @@ import { ChainControl } from "@/components/wallet/ChainControl";
 import { InstallChip } from "./InstallChip";
 import { StatusStrip } from "./StatusStrip";
 import { NAV_ITEMS, isActivePath } from "./nav";
+import { useI18n } from "@/hooks/useI18n";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const { t } = useI18n();
 
   return (
     <div className="relative z-10 min-h-dvh">
       <header className="shell-top">
         <div className="mx-auto flex h-full max-w-[1480px] items-center gap-3 px-3 md:px-4">
-          <Link href="/" className="flex items-center gap-2.5" aria-label="Snyper home">
+          <Link href="/" className="flex items-center gap-2.5" aria-label={t("a11y.home")}>
             <Mark />
             <span className="hidden text-[15px] font-bold tracking-[0.22em] sm:block">
               SNYPER
             </span>
           </Link>
-          <span className="chip hidden lg:inline-flex">Non-custodial</span>
+          <span className="chip hidden lg:inline-flex">{t("common.nonCustodial")}</span>
           <div className="ml-auto flex items-center gap-2">
             <InstallChip />
             <ChainControl />
@@ -38,7 +40,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <nav
           className="sticky top-[calc(var(--shell-top)+28px)] hidden h-[calc(100dvh-var(--shell-top)-28px)] shrink-0 flex-col border-r border-line md:flex"
           style={{ width: "var(--shell-rail)" }}
-          aria-label="Primary"
+          aria-label={t("a11y.primaryNav")}
         >
           {NAV_ITEMS.map((item) => (
             <Link
@@ -49,7 +51,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             >
               <Icon name={item.icon} size={19} />
               <span className="text-[9px] font-semibold tracking-[0.1em] uppercase">
-                {item.label}
+                {t(item.label)}
               </span>
             </Link>
           ))}
@@ -63,7 +65,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </main>
       </div>
 
-      <nav className="tab-bar md:hidden" aria-label="Primary">
+      <nav className="tab-bar md:hidden" aria-label={t("a11y.primaryNav")}>
         {NAV_ITEMS.map((item) => (
           <Link
             key={item.href}
@@ -73,7 +75,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           >
             <Icon name={item.icon} size={19} />
             <span className="text-[9px] font-semibold tracking-[0.08em] uppercase">
-              {item.label}
+              {t(item.label)}
             </span>
           </Link>
         ))}

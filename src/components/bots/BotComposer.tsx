@@ -10,17 +10,13 @@ import { usePairPrice } from "@/hooks/usePairPrice";
 import { useTokenList } from "@/hooks/useTokenList";
 import { chainMeta } from "@/lib/chains";
 import { formatPrice } from "@/lib/format";
-import { STRATEGY_SUMMARY } from "@/lib/strategies";
+import { STRATEGY_SHORT, STRATEGY_SUMMARY } from "@/lib/strategies";
+import { useI18n } from "@/hooks/useI18n";
 import { baseTokens, nativeToken, type Token } from "@/lib/tokens";
 import type { Bot, Strategy, StrategyKind } from "@/lib/types";
 import { emptyRuntime, useAppStore } from "@/store/useAppStore";
 
-const KINDS: { value: StrategyKind; label: string }[] = [
-  { value: "dca", label: "Interval" },
-  { value: "grid", label: "Grid" },
-  { value: "limit", label: "Trigger" },
-  { value: "trail", label: "Trail" },
-];
+const KIND_ORDER: StrategyKind[] = ["dca", "grid", "limit", "trail"];
 
 type Draft = {
   name: string;
@@ -72,6 +68,7 @@ function num(value: string, fallback = 0): number {
 }
 
 export function BotComposer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { t } = useI18n();
   const activeChainId = useChainId();
   const { chainId: accountChainId } = useAccount();
   const chainId = accountChainId ?? activeChainId;
@@ -144,25 +141,24 @@ export function BotComposer({ open, onClose }: { open: boolean; onClose: () => v
   }, [draft]);
 
   const validate = (): string | undefined => {
-    if (!base || !quote) return "Select both sides of the pair.";
+    if (!base || !quote) return t("composer.errPair");
     if (base.address.toLowerCase() === quote.address.toLowerCase())
-      return "Base and quote must differ.";
-    if (!strategy) return "Pick a strategy.";
-    if (strategy.kind === "dca" && strategy.amountQuote <= 0)
-      return "Set a positive amount per leg.";
+      return t("composer.errSame");
+    if (!strategy) return t("composer.errStrategy");
+    if (strategy.kind === "dca" && strategy.amountQuote <= 0) return t("composer.errAmount");
     if (strategy.kind === "grid") {
-      if (strategy.lower <= 0 || strategy.upper <= 0) return "Set both grid bounds.";
-      if (strategy.upper <= strategy.lower) return "Upper bound must exceed the lower bound.";
-      if (strategy.amountQuote <= 0) return "Set a positive amount per level.";
+      if (strategy.lower <= 0 || strategy.upper <= 0) return t("composer.errBounds");
+      if (strategy.upper <= strategy.lower) return t("composer.errUpper");
+      if (strategy.amountQuote <= 0) return t("composer.errLevelAmount");
     }
     if (strategy.kind === "limit") {
-      if (strategy.trigger <= 0) return "Set a trigger price.";
-      if (strategy.amount <= 0) return "Set a positive size.";
+      if (strategy.trigger <= 0) return t("composer.errTrigger");
+      if (strategy.amount <= 0) return t("composer.errSize");
     }
     if (strategy.kind === "trail") {
       if (strategy.trailPercent <= 0 || strategy.trailPercent >= 100)
-        return "Trail distance must be between 0 and 100%.";
-      if (strategy.amountBase <= 0) return `Set how much ${base.symbol} to unwind.`;
+        return t("composer.errTrail");
+      if (strategy.amountBase <= 0) return t("composer.errUnwind", { symbol: base.symbol });
     }
     return undefined;
   };
@@ -198,44 +194,58 @@ export function BotComposer({ open, onClose }: { open: boolean; onClose: () => v
   return (
     <Sheet
       open={open}
-      title="New strategy"
+      title={t("composer.title")}
       onClose={onClose}
       footer={
         <div className="flex gap-2">
           <button type="button" className="btn btn-sm flex-1" onClick={onClose}>
-            Cancel
+            {t("common.cancel")}
           </button>
           <button type="button" className="btn btn-accent btn-sm flex-1" onClick={save}>
-            Create strategy
+            {t("composer.create")}
           </button>
         </div>
       }
     >
       <div className="flex flex-col gap-4 p-3">
         <section>
-          <p className="lbl mb-2">Pair · {meta?.label ?? "network"}</p>
+          <p className="lbl mb-2">
+            {t("composer.pairOn", { chain: meta?.label ?? t("common.network") })}
+          </p>
           <div className="grid grid-cols-2 gap-2">
-            <PairButton token={base} caption="Base" onClick={() => setPicker("base")} />
-            <PairButton token={quote} caption="Quote" onClick={() => setPicker("quote")} />
+            <PairButton
+              token={base}
+              caption={t("token.base")}
+              placeholder={t("token.selectShort")}
+              onClick={() => setPicker("base")}
+            />
+            <PairButton
+              token={quote}
+              caption={t("token.quote")}
+              placeholder={t("token.selectShort")}
+              onClick={() => setPicker("quote")}
+            />
           </div>
           <div className="mt-2 flex items-center justify-between border border-line bg-base px-3 py-2">
-            <span className="lbl">Pool mid</span>
+            <span className="lbl">{t("composer.poolMid")}</span>
             <span className="num text-[13px]">
-              {price !== undefined ? `${formatPrice(price)} ${quote?.symbol ?? ""}` : "reading…"}
+              {price !== undefined
+                ? `${formatPrice(price)} ${quote?.symbol ?? ""}`
+                : t("composer.reading")}
             </span>
           </div>
         </section>
 
         <section>
-          <p className="lbl mb-2">Strategy</p>
+          <p className="lbl mb-2">{t("composer.strategy")}</p>
           <Segmented
-            options={KINDS}
+            options={KIND_ORDER.map((kind) => ({ value: kind, label: t(STRATEGY_SHORT[kind]) }))}
             value={draft.kind}
             onChange={(value) => patch("kind", value)}
             className="w-full"
           />
           <p className="mt-2 text-[11px] leading-relaxed text-faint">
-            {STRATEGY_SUMMARY[draft.kind]}
+            {t(STRATEGY_SUMMARY[draft.kind])}
           </p>
         </section>
 
@@ -243,23 +253,27 @@ export function BotComposer({ open, onClose }: { open: boolean; onClose: () => v
           {draft.kind === "dca" && (
             <>
               <Field
-                label={`Amount per leg (${quote?.symbol ?? "quote"})`}
+                label={t("composer.amountPerLeg", { symbol: quote?.symbol ?? "" })}
                 value={draft.amountQuote}
                 onChange={(value) => patch("amountQuote", value)}
               />
               <Field
-                label="Interval (minutes)"
+                label={t("composer.interval")}
                 value={draft.intervalMin}
                 onChange={(value) => patch("intervalMin", value)}
               />
               <Field
-                label="Price ceiling (0 = ignore)"
+                label={t("composer.priceCeiling")}
                 value={draft.priceCeiling}
                 onChange={(value) => patch("priceCeiling", value)}
-                hint={price !== undefined ? `Mid now ${formatPrice(price)}` : undefined}
+                hint={
+                  price !== undefined
+                    ? t("composer.midNow", { price: formatPrice(price) })
+                    : undefined
+                }
               />
               <Field
-                label="Total budget (0 = unlimited)"
+                label={t("composer.budget")}
                 value={draft.budgetQuote}
                 onChange={(value) => patch("budgetQuote", value)}
               />
@@ -270,30 +284,34 @@ export function BotComposer({ open, onClose }: { open: boolean; onClose: () => v
             <>
               <div className="grid grid-cols-2 gap-2">
                 <Field
-                  label="Lower bound"
+                  label={t("composer.lower")}
                   value={draft.lower}
                   onChange={(value) => patch("lower", value)}
                 />
                 <Field
-                  label="Upper bound"
+                  label={t("composer.upper")}
                   value={draft.upper}
                   onChange={(value) => patch("upper", value)}
                 />
               </div>
               <Field
-                label="Levels"
+                label={t("composer.levels")}
                 value={draft.levels}
                 onChange={(value) => patch("levels", value)}
               />
               <Field
-                label={`Amount per level (${quote?.symbol ?? "quote"})`}
+                label={t("composer.amountPerLevel", { symbol: quote?.symbol ?? "" })}
                 value={draft.amountQuote}
                 onChange={(value) => patch("amountQuote", value)}
                 hint={
                   price !== undefined
-                    ? `Mid ${formatPrice(price)} · total commitment ${(
-                        num(draft.amountQuote) * Math.max(2, num(draft.levels, 5))
-                      ).toFixed(2)} ${quote?.symbol ?? ""}`
+                    ? t("composer.gridHint", {
+                        price: formatPrice(price),
+                        total: (
+                          num(draft.amountQuote) * Math.max(2, num(draft.levels, 5))
+                        ).toFixed(2),
+                        symbol: quote?.symbol ?? "",
+                      })
                     : undefined
                 }
               />
@@ -304,24 +322,28 @@ export function BotComposer({ open, onClose }: { open: boolean; onClose: () => v
             <>
               <Segmented
                 options={[
-                  { value: "buy", label: "Buy below" },
-                  { value: "sell", label: "Sell above" },
+                  { value: "buy", label: t("composer.buyBelow") },
+                  { value: "sell", label: t("composer.sellAbove") },
                 ]}
                 value={draft.side}
                 onChange={(value) => patch("side", value)}
                 className="w-full"
               />
               <Field
-                label={`Trigger price (${quote?.symbol ?? "quote"})`}
+                label={t("composer.trigger", { symbol: quote?.symbol ?? "" })}
                 value={draft.trigger}
                 onChange={(value) => patch("trigger", value)}
-                hint={price !== undefined ? `Mid now ${formatPrice(price)}` : undefined}
+                hint={
+                  price !== undefined
+                    ? t("composer.midNow", { price: formatPrice(price) })
+                    : undefined
+                }
               />
               <Field
                 label={
                   draft.side === "buy"
-                    ? `Spend (${quote?.symbol ?? "quote"})`
-                    : `Sell (${base?.symbol ?? "base"})`
+                    ? t("composer.spend", { symbol: quote?.symbol ?? "" })
+                    : t("composer.sell", { symbol: base?.symbol ?? "" })
                 }
                 value={draft.amount}
                 onChange={(value) => patch("amount", value)}
@@ -332,42 +354,46 @@ export function BotComposer({ open, onClose }: { open: boolean; onClose: () => v
           {draft.kind === "trail" && (
             <>
               <Field
-                label="Trail distance (%)"
+                label={t("composer.trailDistance")}
                 value={draft.trailPercent}
                 onChange={(value) => patch("trailPercent", value)}
               />
               <Field
-                label={`Size to unwind (${base?.symbol ?? "base"})`}
+                label={t("composer.sizeToUnwind", { symbol: base?.symbol ?? "" })}
                 value={draft.amountBase}
                 onChange={(value) => patch("amountBase", value)}
               />
               <Field
-                label="Arm above price (0 = arm now)"
+                label={t("composer.activation")}
                 value={draft.activation}
                 onChange={(value) => patch("activation", value)}
-                hint={price !== undefined ? `Mid now ${formatPrice(price)}` : undefined}
+                hint={
+                  price !== undefined
+                    ? t("composer.midNow", { price: formatPrice(price) })
+                    : undefined
+                }
               />
             </>
           )}
         </section>
 
         <section>
-          <p className="lbl mb-2">Risk</p>
+          <p className="lbl mb-2">{t("composer.risk")}</p>
           <div className="grid grid-cols-2 gap-2">
             <Field
-              label="Max slippage (bps)"
+              label={t("composer.slippageBps")}
               value={draft.slippageBps}
               onChange={(value) => patch("slippageBps", value)}
             />
             <Field
-              label="Cooldown (seconds)"
+              label={t("composer.cooldown")}
               value={draft.cooldownSec}
               onChange={(value) => patch("cooldownSec", value)}
             />
           </div>
           <div className="mt-2">
             <Field
-              label={`Daily cap (${quote?.symbol ?? "quote"}, 0 = none)`}
+              label={t("composer.dailyCap", { symbol: quote?.symbol ?? "" })}
               value={draft.dailyCapQuote}
               onChange={(value) => patch("dailyCapQuote", value)}
             />
@@ -375,11 +401,11 @@ export function BotComposer({ open, onClose }: { open: boolean; onClose: () => v
         </section>
 
         <section>
-          <p className="lbl mb-2">Dispatch</p>
+          <p className="lbl mb-2">{t("composer.dispatch")}</p>
           <Segmented
             options={[
-              { value: "manual", label: "Review each" },
-              { value: "auto", label: "Auto submit" },
+              { value: "manual", label: t("composer.reviewEach") },
+              { value: "auto", label: t("composer.autoSubmit") },
             ]}
             value={draft.execution}
             onChange={(value) => patch("execution", value)}
@@ -387,14 +413,13 @@ export function BotComposer({ open, onClose }: { open: boolean; onClose: () => v
           />
           <p className="mt-2 flex items-start gap-2 text-[11px] leading-relaxed text-faint">
             <Icon name="alert" size={13} className="mt-0.5 shrink-0" />
-            Auto submit still opens your wallet for every signature. Nothing is pre-signed and
-            no key ever leaves your device.
+            {t("composer.autoNote")}
           </p>
         </section>
 
         <section>
           <Field
-            label="Name (optional)"
+            label={t("composer.name")}
             value={draft.name}
             onChange={(value) => patch("name", value)}
             numeric={false}
@@ -410,7 +435,7 @@ export function BotComposer({ open, onClose }: { open: boolean; onClose: () => v
         tokens={tokens}
         chainId={chainId}
         excludeAddress={picker === "base" ? quote?.address : base?.address}
-        title={picker === "base" ? "Base asset" : "Quote asset"}
+        title={picker === "base" ? t("token.base") : t("token.quote")}
         onSelect={(token) => (picker === "base" ? setBase(token) : setQuote(token))}
       />
     </Sheet>
@@ -420,10 +445,12 @@ export function BotComposer({ open, onClose }: { open: boolean; onClose: () => v
 function PairButton({
   token,
   caption,
+  placeholder,
   onClick,
 }: {
   token?: Token;
   caption: string;
+  placeholder: string;
   onClick: () => void;
 }) {
   return (
@@ -436,7 +463,7 @@ function PairButton({
       <span className="min-w-0 flex-1 text-left">
         <span className="lbl block">{caption}</span>
         <span className="block truncate text-[13px] font-semibold">
-          {token?.symbol ?? "Select"}
+          {token?.symbol ?? placeholder}
         </span>
       </span>
       <Icon name="chevron" size={12} className="text-faint" />

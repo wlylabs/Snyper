@@ -20,6 +20,7 @@ import {
 import { applySlippage } from "@/lib/swap";
 import type { Token } from "@/lib/tokens";
 import { useAppStore } from "@/store/useAppStore";
+import { useI18n } from "@/hooks/useI18n";
 import { TokenBadge, TokenPicker } from "./TokenPicker";
 
 const SLIPPAGE_PRESETS = [10, 50, 100];
@@ -46,10 +47,11 @@ export function SwapPanel({
   onTokenOut: (token: Token) => void;
   onSwitch: () => void;
 }) {
-  const { address, isConnected, chainId } = useAccount();
+  const { isConnected, chainId } = useAccount();
   const { switchChain } = useSwitchChain();
   const { execute, phase } = useExecutor();
   const toast = useToast();
+  const { t } = useI18n();
   const settings = useAppStore((state) => state.settings);
   const setSettings = useAppStore((state) => state.setSettings);
 
@@ -112,51 +114,57 @@ export function SwapPanel({
       void refetchOut();
       void quoteQuery.refetch();
     } catch (cause) {
-      const message = readableError(cause);
+      const message = readableError(cause, t);
       setError(message);
-      toast.push({ tone: "error", message: "Execution stopped", detail: message });
+      toast.push({ tone: "error", message: t("toast.executionStopped"), detail: message });
     }
   };
 
   const cta = (() => {
-    if (!isConnected) return { label: "Connect a wallet first", disabled: true };
+    if (!isConnected) return { label: t("swap.ctaConnect"), disabled: true };
     if (wrongNetwork) {
       const meta = chainMeta(tokenIn?.chainId);
       return {
-        label: `Switch to ${meta?.label ?? "network"}`,
+        label: t("swap.ctaSwitch", { chain: meta?.label ?? t("common.network") }),
         disabled: false,
         action: () => tokenIn && switchChain({ chainId: tokenIn.chainId }),
       };
     }
-    if (!amountIn || amountIn === 0n) return { label: "Enter an amount", disabled: true };
-    if (insufficient) return { label: `Insufficient ${tokenIn?.symbol ?? ""}`, disabled: true };
-    if (quoteQuery.isFetching && !quote) return { label: "Pricing route…", disabled: true };
-    if (!quote) return { label: "No route found", disabled: true };
-    if (phase === "approving") return { label: "Approving…", disabled: true };
-    if (phase === "signing") return { label: "Confirm in wallet…", disabled: true };
-    if (phase === "pending") return { label: "Settling…", disabled: true };
-    return { label: `Swap ${tokenIn?.symbol} for ${tokenOut?.symbol}`, disabled: false, action: submit };
+    if (!amountIn || amountIn === 0n) return { label: t("swap.ctaAmount"), disabled: true };
+    if (insufficient) {
+      return { label: t("swap.ctaInsufficient", { symbol: tokenIn?.symbol ?? "" }), disabled: true };
+    }
+    if (quoteQuery.isFetching && !quote) return { label: t("swap.ctaPricing"), disabled: true };
+    if (!quote) return { label: t("swap.ctaNoRoute"), disabled: true };
+    if (phase === "approving") return { label: t("swap.ctaApproving"), disabled: true };
+    if (phase === "signing") return { label: t("swap.ctaSigning"), disabled: true };
+    if (phase === "pending") return { label: t("swap.ctaSettling"), disabled: true };
+    return {
+      label: t("swap.ctaSwap", { from: tokenIn?.symbol ?? "", to: tokenOut?.symbol ?? "" }),
+      disabled: false,
+      action: submit,
+    };
   })();
 
   return (
     <Panel
-      label="Execute"
+      label={t("swap.execute")}
       ticked
       meta={
         quote ? (
           <span className="chip chip-live">
             <span className="dot dot-live" />
-            {feeLabel(quote.fee)} pool
+            {t("swap.poolTier", { fee: feeLabel(quote.fee) })}
           </span>
         ) : (
-          <span className="chip">Idle</span>
+          <span className="chip">{t("common.idle")}</span>
         )
       }
       bodyClassName="p-3"
     >
       <div className="panel bg-base p-3">
         <div className="flex items-center justify-between">
-          <span className="lbl">Pay</span>
+          <span className="lbl">{t("swap.pay")}</span>
           <span className="num text-[11px] text-faint">
             {tokenIn && balanceIn !== undefined
               ? `${formatUnitsFixed(balanceIn, tokenIn.decimals)} ${tokenIn.symbol}`
@@ -170,9 +178,13 @@ export function SwapPanel({
             placeholder="0.0"
             value={amount}
             onChange={(event) => setAmount(sanitiseAmount(event.target.value))}
-            aria-label="Amount to pay"
+            aria-label={t("swap.amountLabel")}
           />
-          <TokenButton token={tokenIn} onClick={() => setPicker("in")} />
+          <TokenButton
+            token={tokenIn}
+            onClick={() => setPicker("in")}
+            label={t("token.selectShort")}
+          />
         </div>
         <div className="mt-2 flex gap-1.5">
           {[0.25, 0.5, 1].map((fraction) => (
@@ -183,7 +195,7 @@ export function SwapPanel({
               onClick={() => setFraction(fraction)}
               disabled={balanceIn === undefined || balanceIn === 0n}
             >
-              {fraction === 1 ? "Max" : `${fraction * 100}%`}
+              {fraction === 1 ? t("swap.max") : `${fraction * 100}%`}
             </button>
           ))}
         </div>
@@ -198,7 +210,7 @@ export function SwapPanel({
             onSwitch();
             setAmount("");
           }}
-          aria-label="Invert pair"
+          aria-label={t("swap.invert")}
         >
           <Icon name="swap" size={15} />
         </button>
@@ -206,7 +218,7 @@ export function SwapPanel({
 
       <div className="panel bg-base p-3">
         <div className="flex items-center justify-between">
-          <span className="lbl">Receive</span>
+          <span className="lbl">{t("swap.receive")}</span>
           <span className="num text-[11px] text-faint">
             {tokenOut && balanceOut !== undefined
               ? `${formatUnitsFixed(balanceOut, tokenOut.decimals)} ${tokenOut.symbol}`
@@ -217,13 +229,17 @@ export function SwapPanel({
           <span className="num min-w-0 flex-1 truncate text-[22px] leading-[52px]">
             {quote && tokenOut ? formatUnitsFixed(quote.amountOut, tokenOut.decimals) : "0.0"}
           </span>
-          <TokenButton token={tokenOut} onClick={() => setPicker("out")} />
+          <TokenButton
+            token={tokenOut}
+            onClick={() => setPicker("out")}
+            label={t("token.selectShort")}
+          />
         </div>
       </div>
 
       <div className="mt-3">
         <div className="mb-2 flex items-center justify-between">
-          <span className="lbl">Max slippage</span>
+          <span className="lbl">{t("swap.maxSlippage")}</span>
           <div className="flex gap-1.5">
             {SLIPPAGE_PRESETS.map((bps) => (
               <button
@@ -245,7 +261,7 @@ export function SwapPanel({
         </div>
 
         <Row
-          k="Rate"
+          k={t("swap.rate")}
           v={
             quote && tokenIn && tokenOut
               ? `1 ${tokenIn.symbol} = ${formatPrice(quote.executionPrice)} ${tokenOut.symbol}`
@@ -253,26 +269,32 @@ export function SwapPanel({
           }
         />
         <Row
-          k="Price impact"
+          k={t("swap.priceImpact")}
           v={quote ? formatPercent(quote.priceImpact) : "—"}
           tone={quote && quote.priceImpact > 0.02 ? "short" : undefined}
         />
-        <Row k="Minimum received" v={tokenOut ? `${minReceived} ${tokenOut.symbol}` : "—"} />
         <Row
-          k="Route"
+          k={t("swap.minReceived")}
+          v={tokenOut ? `${minReceived} ${tokenOut.symbol}` : "—"}
+        />
+        <Row
+          k={t("swap.route")}
           v={quote && tokenIn && tokenOut ? `${tokenIn.symbol} → ${tokenOut.symbol} · v3 ${feeLabel(quote.fee)}` : "—"}
         />
-        <Row k="Deadline" v={`${settings.deadlineMinutes} min`} />
+        <Row
+          k={t("swap.deadline")}
+          v={t("swap.minutes", { count: settings.deadlineMinutes })}
+        />
       </div>
 
       {quote && quote.priceImpact > 0.05 && (
         <p className="mt-3 flex items-start gap-2 text-[11px] leading-relaxed short">
           <Icon name="alert" size={14} className="mt-0.5 shrink-0" />
-          This size moves the pool more than 5%. Consider splitting it across legs.
+          {t("swap.deepImpact")}
         </p>
       )}
 
-      {error && <p className="mt-3 text-[11px] leading-relaxed short">{error}</p>}
+      {error && <p className="wrap-any mt-3 text-[11px] leading-relaxed short">{error}</p>}
 
       <button
         type="button"
@@ -284,7 +306,7 @@ export function SwapPanel({
       </button>
 
       <p className="mt-2 text-center text-[10px] leading-relaxed text-faint">
-        Routed through Uniswap v3 · signed in your wallet · {address ? "keys stay local" : "no keys held"}
+        {t("swap.footnote")}
       </p>
 
       <TokenPicker
@@ -293,14 +315,22 @@ export function SwapPanel({
         tokens={tokens}
         chainId={tokenIn?.chainId ?? chainId}
         excludeAddress={picker === "in" ? tokenOut?.address : tokenIn?.address}
-        title={picker === "in" ? "Pay with" : "Receive"}
+        title={picker === "in" ? t("token.payWith") : t("token.receive")}
         onSelect={(token) => (picker === "in" ? onTokenIn(token) : onTokenOut(token))}
       />
     </Panel>
   );
 }
 
-function TokenButton({ token, onClick }: { token?: Token; onClick: () => void }) {
+function TokenButton({
+  token,
+  onClick,
+  label,
+}: {
+  token?: Token;
+  onClick: () => void;
+  label: string;
+}) {
   return (
     <button type="button" className="btn btn-sm shrink-0 gap-2" onClick={onClick}>
       {token ? (
@@ -309,7 +339,7 @@ function TokenButton({ token, onClick }: { token?: Token; onClick: () => void })
           <span className="normal-case tracking-normal">{token.symbol}</span>
         </>
       ) : (
-        <span>Select</span>
+        <span>{label}</span>
       )}
       <Icon name="chevron" size={12} />
     </button>

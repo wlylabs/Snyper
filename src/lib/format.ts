@@ -1,5 +1,20 @@
 import { formatUnits, parseUnits } from "viem";
 
+/**
+ * Active BCP 47 tag for every number and date rendered by the app. Kept module
+ * level so formatting helpers stay plain functions; the provider updates it
+ * whenever the reader changes language.
+ */
+let numberLocale = "en-US";
+
+export function setNumberLocale(tag: string): void {
+  numberLocale = tag;
+}
+
+export function activeNumberLocale(): string {
+  return numberLocale;
+}
+
 export function truncateAddress(address: string, lead = 6, tail = 4): string {
   if (address.length <= lead + tail) return address;
   return `${address.slice(0, lead)}…${address.slice(-tail)}`;
@@ -10,10 +25,10 @@ export function formatAmount(value: number, maxDecimals = 6): string {
   if (!Number.isFinite(value)) return "—";
   if (value === 0) return "0";
   const abs = Math.abs(value);
-  if (abs >= 1_000_000) return value.toLocaleString("en-US", { maximumFractionDigits: 0 });
-  if (abs >= 1000) return value.toLocaleString("en-US", { maximumFractionDigits: 2 });
-  if (abs >= 1) return value.toLocaleString("en-US", { maximumFractionDigits: 4 });
-  if (abs >= 0.0001) return value.toLocaleString("en-US", { maximumFractionDigits: maxDecimals });
+  if (abs >= 1_000_000) return value.toLocaleString(numberLocale, { maximumFractionDigits: 0 });
+  if (abs >= 1000) return value.toLocaleString(numberLocale, { maximumFractionDigits: 2 });
+  if (abs >= 1) return value.toLocaleString(numberLocale, { maximumFractionDigits: 4 });
+  if (abs >= 0.0001) return value.toLocaleString(numberLocale, { maximumFractionDigits: maxDecimals });
   return value.toExponential(2);
 }
 
@@ -25,7 +40,7 @@ export function formatUsd(value: number | undefined): string {
   if (value === undefined || !Number.isFinite(value)) return "—";
   const abs = Math.abs(value);
   const digits = abs >= 1000 ? 0 : abs >= 1 ? 2 : abs >= 0.01 ? 4 : 6;
-  return `$${value.toLocaleString("en-US", {
+  return `$${value.toLocaleString(numberLocale, {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   })}`;
@@ -35,7 +50,7 @@ export function formatPrice(value: number | undefined): string {
   if (value === undefined || !Number.isFinite(value) || value === 0) return "—";
   const abs = Math.abs(value);
   const digits = abs >= 1000 ? 2 : abs >= 1 ? 4 : abs >= 0.01 ? 6 : 8;
-  return value.toLocaleString("en-US", {
+  return value.toLocaleString(numberLocale, {
     minimumFractionDigits: 2,
     maximumFractionDigits: digits,
   });
@@ -79,7 +94,8 @@ export function timeAgo(timestamp: number): string {
 }
 
 export function formatClock(timestamp: number): string {
-  return new Date(timestamp).toLocaleTimeString("en-GB", {
+  return new Date(timestamp).toLocaleTimeString(numberLocale, {
+    hour12: false,
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",

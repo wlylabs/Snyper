@@ -5,9 +5,11 @@ import { useAccount, useChainId, useSwitchChain } from "wagmi";
 import { Icon } from "@/components/ui/Icon";
 import { CHAIN_META, SUPPORTED_CHAINS, chainMeta } from "@/lib/chains";
 import { useMounted } from "@/hooks/useMounted";
+import { useI18n } from "@/hooks/useI18n";
 
 export function ChainControl() {
   const mounted = useMounted();
+  const { t } = useI18n();
   const activeChainId = useChainId();
   const { chainId: accountChainId, isConnected } = useAccount();
   const { switchChain, isPending } = useSwitchChain();
@@ -48,7 +50,7 @@ export function ChainControl() {
       >
         <span className={`dot ${unsupported ? "dot-short" : "dot-live"}`} />
         <span className="hidden sm:inline">
-          {unsupported ? "Wrong network" : (meta?.mark ?? "Network")}
+          {unsupported ? t("wallet.wrongNetwork") : (meta?.mark ?? t("common.network"))}
         </span>
         <Icon name="chevron" size={12} />
       </button>
