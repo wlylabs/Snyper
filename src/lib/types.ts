@@ -2,7 +2,22 @@ import type { DisplayCurrency } from "./currency";
 import type { Locale, TKey, TVars } from "./i18n";
 import type { Token } from "./tokens";
 
-export type StrategyKind = "dca" | "grid" | "limit" | "trail";
+export type StrategyKind = "dca" | "grid" | "limit" | "trail" | "order";
+
+/**
+ * Lifecycle of a one-shot order. The entry stage is the only one that can time
+ * out — once the position exists, its protection runs until it is closed.
+ */
+export type OrderStage =
+  | "waiting"
+  | "entering"
+  | "holding"
+  | "exiting"
+  | "done"
+  | "expired"
+  | "cancelled";
+
+export type OrderLeg = "entry" | "tp" | "cl" | "manual";
 
 /**
  * A message stored as a dictionary key so it renders in the reader's language
@@ -39,6 +54,19 @@ export type Strategy =
       amount: number;
     }
   | {
+      kind: "order";
+      /** Quote currency spent once the entry fills. */
+      amountQuote: number;
+      /** The order buys at or below this price. */
+      entryPrice: number;
+      /** Take profit, percent above the price the entry actually filled at. */
+      takeProfitPct: number;
+      /** Cut loss, percent below the price the entry actually filled at. */
+      cutLossPct: number;
+      /** The entry stage gives up here. Exits are never time limited. */
+      expiresAt: number;
+    }
+  | {
       kind: "trail";
       /** Distance below the running peak that closes the position. */
       trailPercent: number;
@@ -61,6 +89,13 @@ export type BotRuntime = {
   fills: number;
   completed?: boolean;
   error?: string;
+  /** Order lifecycle. Undefined for every other strategy. */
+  stage?: OrderStage;
+  /** Price the entry actually filled at, which is what TP and CL hang off. */
+  fillPrice?: number;
+  /** Base units of the asset actually received, held as a string. */
+  positionBase?: string;
+  exitReason?: Exclude<OrderLeg, "entry">;
 };
 
 export type Bot = {
@@ -108,6 +143,8 @@ export type Signal = {
   error?: string;
   /** Grid level this signal belongs to, when applicable. */
   level?: number;
+  /** Which leg of an order this signal settles, when applicable. */
+  leg?: OrderLeg;
 };
 
 export type TradeKind = "swap" | "approval";

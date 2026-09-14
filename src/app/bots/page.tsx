@@ -3,12 +3,17 @@
 import { useState } from "react";
 import { BotCard } from "@/components/bots/BotCard";
 import { BotComposer } from "@/components/bots/BotComposer";
+import { OrderCard } from "@/components/bots/OrderCard";
+import { OrderComposer } from "@/components/bots/OrderComposer";
 import { SignalQueue } from "@/components/bots/SignalQueue";
 import { Icon } from "@/components/ui/Icon";
 import { Empty, Panel } from "@/components/ui/Panel";
+import { Segmented } from "@/components/ui/Segmented";
 import { useMounted } from "@/hooks/useMounted";
 import { useI18n } from "@/hooks/useI18n";
 import { useAppStore } from "@/store/useAppStore";
+
+type Tab = "bots" | "orders";
 
 export default function BotsPage() {
   const mounted = useMounted();
@@ -16,10 +21,19 @@ export default function BotsPage() {
   const bots = useAppStore((state) => state.bots);
   const settings = useAppStore((state) => state.settings);
   const setSettings = useAppStore((state) => state.setSettings);
+  const [tab, setTab] = useState<Tab>("bots");
   const [composerOpen, setComposerOpen] = useState(false);
+  const [orderOpen, setOrderOpen] = useState(false);
 
-  const armed = bots.filter((bot) => bot.status === "armed").length;
+  const orders = bots.filter((bot) => bot.strategy.kind === "order");
+  const strategies = bots.filter((bot) => bot.strategy.kind !== "order");
+
+  const armed = strategies.filter((bot) => bot.status === "armed").length;
   const autoBots = bots.filter((bot) => bot.execution === "auto").length;
+  const liveOrders = orders.filter((order) => !order.runtime.completed).length;
+
+  const showingOrders = tab === "orders";
+  const openComposer = () => (showingOrders ? setOrderOpen(true) : setComposerOpen(true));
 
   return (
     <div className="grid gap-3 lg:grid-cols-12">
@@ -30,40 +44,47 @@ export default function BotsPage() {
               {t("bots.title")}
             </h1>
             <p className="mt-0.5 text-[11px] text-faint">
-              {mounted
-                ? t("bots.summary", { total: bots.length, armed })
-                : t("common.loadingLocal")}
+              {!mounted
+                ? t("common.loadingLocal")
+                : showingOrders
+                  ? t("bots.ordersSummary", { total: orders.length, live: liveOrders })
+                  : t("bots.summary", { total: strategies.length, armed })}
             </p>
           </div>
-          <button
-            type="button"
-            className="btn btn-accent btn-sm"
-            onClick={() => setComposerOpen(true)}
-          >
+          <button type="button" className="btn btn-accent btn-sm" onClick={openComposer}>
             <Icon name="plus" size={13} />
-            {t("bots.new")}
+            {showingOrders ? t("order.new") : t("bots.new")}
           </button>
         </div>
 
-        {mounted && bots.length === 0 ? (
+        <Segmented
+          options={[
+            { value: "bots" as const, label: t("bots.tabBots") },
+            { value: "orders" as const, label: t("bots.tabOrders") },
+          ]}
+          value={tab}
+          onChange={setTab}
+          className="mb-3 w-full"
+        />
+
+        {mounted && (showingOrders ? orders : strategies).length === 0 ? (
           <Panel bodyClassName="p-0">
             <Empty
-              title={t("bots.emptyTitle")}
-              hint={t("bots.emptyHint")}
+              title={showingOrders ? t("order.emptyTitle") : t("bots.emptyTitle")}
+              hint={showingOrders ? t("order.emptyHint") : t("bots.emptyHint")}
               action={
-                <button
-                  type="button"
-                  className="btn btn-sm mt-1"
-                  onClick={() => setComposerOpen(true)}
-                >
-                  {t("bots.emptyAction")}
+                <button type="button" className="btn btn-sm mt-1" onClick={openComposer}>
+                  {showingOrders ? t("order.emptyAction") : t("bots.emptyAction")}
                 </button>
               }
             />
           </Panel>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
-            {mounted && bots.map((bot) => <BotCard key={bot.id} bot={bot} />)}
+            {mounted &&
+              (showingOrders
+                ? orders.map((order) => <OrderCard key={order.id} bot={order} />)
+                : strategies.map((bot) => <BotCard key={bot.id} bot={bot} />))}
           </div>
         )}
       </div>
@@ -90,6 +111,7 @@ export default function BotsPage() {
       </div>
 
       <BotComposer open={composerOpen} onClose={() => setComposerOpen(false)} />
+      <OrderComposer open={orderOpen} onClose={() => setOrderOpen(false)} />
     </div>
   );
 }

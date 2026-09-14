@@ -1,6 +1,6 @@
 import { formatPrice } from "./format";
 import type { TKey, TVars } from "./i18n";
-import type { Bot, Reason, Strategy, StrategyKind } from "./types";
+import type { Bot, OrderLeg, Reason, Strategy, StrategyKind } from "./types";
 
 export type Intent = {
   side: "buy" | "sell";
@@ -8,16 +8,26 @@ export type Intent = {
   amountQuote?: number;
   /** Base currency to sell. */
   amountBase?: number;
+  /**
+   * Exact base units to sell, bypassing the float round trip. A full exit has
+   * to send back precisely what came in, so an order always sets this.
+   */
+  amountBaseRaw?: string;
   /** Dictionary key plus values, so the log reads in whatever language is set. */
   reason: Reason;
   level?: number;
+  leg?: OrderLeg;
 };
+
+/** How long an order waits for its entry before giving up. */
+export const ORDER_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 export const STRATEGY_LABELS: Record<StrategyKind, TKey> = {
   dca: "strategy.dca",
   grid: "strategy.grid",
   limit: "strategy.limit",
   trail: "strategy.trail",
+  order: "strategy.order",
 };
 
 export const STRATEGY_SHORT: Record<StrategyKind, TKey> = {
@@ -25,6 +35,7 @@ export const STRATEGY_SHORT: Record<StrategyKind, TKey> = {
   grid: "strategy.gridShort",
   limit: "strategy.limitShort",
   trail: "strategy.trailShort",
+  order: "strategy.orderShort",
 };
 
 export const STRATEGY_SUMMARY: Record<StrategyKind, TKey> = {
@@ -32,6 +43,7 @@ export const STRATEGY_SUMMARY: Record<StrategyKind, TKey> = {
   grid: "strategy.gridSummary",
   limit: "strategy.limitSummary",
   trail: "strategy.trailSummary",
+  order: "strategy.orderSummary",
 };
 
 export function gridLevels(strategy: Extract<Strategy, { kind: "grid" }>): number[] {
@@ -39,6 +51,27 @@ export function gridLevels(strategy: Extract<Strategy, { kind: "grid" }>): numbe
   if (levels < 2 || upper <= lower) return [];
   const step = (upper - lower) / (levels - 1);
   return Array.from({ length: levels }, (_, i) => lower + step * i);
+}
+
+/** Prices the take profit and cut loss sit at, once the entry has filled. */
+export function orderTargets(
+  strategy: Extract<Strategy, { kind: "order" }>,
+  fillPrice: number | undefined,
+): { takeProfit: number; cutLoss: number } {
+  const base = fillPrice && fillPrice > 0 ? fillPrice : strategy.entryPrice;
+  return {
+    takeProfit: base * (1 + strategy.takeProfitPct / 100),
+    cutLoss: base * (1 - strategy.cutLossPct / 100),
+  };
+}
+
+/** Base units the order is still holding, or zero before the entry fills. */
+export function orderPosition(bot: Bot): bigint {
+  try {
+    return BigInt(bot.runtime.positionBase ?? "0");
+  } catch {
+    return 0n;
+  }
 }
 
 export function gridStep(strategy: Extract<Strategy, { kind: "grid" }>): number {
@@ -56,9 +89,13 @@ export function evaluate(bot: Bot, price: number, now: number): Intent | undefin
 
   if (runtime.completed) return undefined;
 
+  // A cooldown exists to space out entries. Letting it hold back the exit of a
+  // position under water would turn a cut loss into a suggestion, so an order
+  // that is already holding is exempt.
+  const protectingPosition = strategy.kind === "order" && runtime.stage === "holding";
   const cooledDown =
     !runtime.lastFireAt || now - runtime.lastFireAt >= bot.cooldownSec * 1000;
-  if (!cooledDown) return undefined;
+  if (!cooledDown && !protectingPosition) return undefined;
 
   switch (strategy.kind) {
     case "dca": {
@@ -145,6 +182,49 @@ export function evaluate(bot: Bot, price: number, now: number): Intent | undefin
           };
     }
 
+    case "order": {
+      const stage = runtime.stage ?? "waiting";
+
+      if (stage === "waiting") {
+        // Expiry closes the order in the engine; here it only stops it firing.
+        if (now >= strategy.expiresAt) return undefined;
+        if (price > strategy.entryPrice) return undefined;
+        return {
+          side: "buy",
+          amountQuote: strategy.amountQuote,
+          leg: "entry",
+          reason: {
+            key: "reason.orderEntry",
+            vars: { price: formatPrice(strategy.entryPrice) },
+          },
+        };
+      }
+
+      if (stage !== "holding") return undefined;
+
+      const position = orderPosition(bot);
+      if (position <= 0n) return undefined;
+
+      const { takeProfit, cutLoss } = orderTargets(strategy, runtime.fillPrice);
+      const leg: OrderLeg | undefined =
+        price >= takeProfit ? "tp" : price <= cutLoss ? "cl" : undefined;
+      if (!leg) return undefined;
+
+      return {
+        side: "sell",
+        // Exactly what came in, so nothing is left stranded behind rounding.
+        amountBaseRaw: position.toString(),
+        leg,
+        reason: {
+          key: leg === "tp" ? "reason.orderTakeProfit" : "reason.orderCutLoss",
+          vars: {
+            percent: leg === "tp" ? strategy.takeProfitPct : strategy.cutLossPct,
+            price: formatPrice(leg === "tp" ? takeProfit : cutLoss),
+          },
+        },
+      };
+    }
+
     case "trail": {
       if (strategy.activation > 0 && !runtime.activated && price < strategy.activation) {
         return undefined;
@@ -174,12 +254,19 @@ export function withinRiskLimits(
   price: number,
   today: string,
 ): { ok: true } | { ok: false; reason: TKey } {
-  const notional =
-    intent.side === "buy" ? (intent.amountQuote ?? 0) : (intent.amountBase ?? 0) * price;
+  const baseSize =
+    intent.amountBaseRaw !== undefined
+      ? Number(intent.amountBaseRaw) / 10 ** bot.base.decimals
+      : (intent.amountBase ?? 0);
+  const notional = intent.side === "buy" ? (intent.amountQuote ?? 0) : baseSize * price;
 
   if (notional <= 0) return { ok: false, reason: "reason.zeroSize" };
 
-  if (bot.dailyCapQuote > 0) {
+  // Closing an order is not spending. A daily cap that blocked the exit would
+  // hold a losing position open precisely when it needs to be let go.
+  const closingPosition = bot.strategy.kind === "order" && intent.side === "sell";
+
+  if (bot.dailyCapQuote > 0 && !closingPosition) {
     const spent = bot.runtime.spentDate === today ? bot.runtime.spentQuote : 0;
     if (spent + notional > bot.dailyCapQuote) {
       return { ok: false, reason: "reason.dailyCap" };
@@ -229,6 +316,17 @@ export function describeStrategy(bot: Bot): Reason {
             key: "strategy.limitSellDesc",
             vars: { amount: s.amount, base, trigger: formatPrice(s.trigger) },
           };
+    case "order":
+      return {
+        key: "strategy.orderDesc",
+        vars: {
+          amount: s.amountQuote,
+          quote,
+          entry: formatPrice(s.entryPrice),
+          tp: s.takeProfitPct,
+          cl: s.cutLossPct,
+        },
+      };
     case "trail":
       return {
         key: "strategy.trailDesc",

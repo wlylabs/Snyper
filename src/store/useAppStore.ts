@@ -6,6 +6,7 @@ import type { Token } from "@/lib/tokens";
 import type {
   Bot,
   BotRuntime,
+  OrderStage,
   PricePoint,
   Settings,
   Signal,
@@ -57,6 +58,7 @@ type AppState = {
   removeBot: (id: string) => void;
   setBotStatus: (id: string, status: Bot["status"]) => void;
   resetBot: (id: string) => void;
+  closeOrder: (id: string, stage: Extract<OrderStage, "expired" | "cancelled">) => void;
 
   pushSignal: (signal: Signal) => void;
   updateSignal: (id: string, patch: Partial<Signal>) => void;
@@ -114,6 +116,29 @@ export const useAppStore = create<AppState>()(
         set((state) => ({
           bots: state.bots.map((bot) =>
             bot.id === id ? { ...bot, status: "idle", runtime: emptyRuntime() } : bot,
+          ),
+        })),
+
+      /**
+       * Retires an order that never reached a position. Signals still waiting
+       * for a signature go with it — an order that has given up must not be
+       * able to buy later at a price nobody agreed to.
+       */
+      closeOrder: (id, stage) =>
+        set((state) => ({
+          bots: state.bots.map((bot) =>
+            bot.id === id
+              ? {
+                  ...bot,
+                  status: "idle",
+                  runtime: { ...bot.runtime, stage, completed: true, error: undefined },
+                }
+              : bot,
+          ),
+          signals: state.signals.map((signal) =>
+            signal.botId === id && signal.status === "pending"
+              ? { ...signal, status: "cancelled" }
+              : signal,
           ),
         })),
 

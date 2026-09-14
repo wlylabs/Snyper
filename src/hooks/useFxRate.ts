@@ -12,9 +12,11 @@ export function useFxRate(force = false) {
   const currency = useAppStore((state) => state.settings.currency);
   const enabled = force || currency === "IDR";
 
-  const query = useQuery<FxRate | undefined>({
+  const query = useQuery<FxRate | null>({
     queryKey: ["fx", "USD", "IDR"],
-    queryFn: fetchFxRate,
+    // A feed that did not answer is a result, not a failure: react-query rejects
+    // an `undefined` payload and would report its own error over the quiet one.
+    queryFn: async () => (await fetchFxRate()) ?? null,
     enabled,
     staleTime: 60 * 60 * 1000,
     gcTime: 6 * 60 * 60 * 1000,
@@ -22,5 +24,9 @@ export function useFxRate(force = false) {
     retry: 1,
   });
 
-  return { fx: query.data, isLoading: query.isLoading && enabled, refetch: query.refetch };
+  return {
+    fx: query.data ?? undefined,
+    isLoading: query.isLoading && enabled,
+    refetch: query.refetch,
+  };
 }
