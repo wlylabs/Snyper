@@ -1,0 +1,178 @@
+"use client";
+
+import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
+import type { Token } from "@/lib/tokens";
+import type {
+  Bot,
+  BotRuntime,
+  PricePoint,
+  Settings,
+  Signal,
+  Trade,
+} from "@/lib/types";
+
+const MAX_SERIES_POINTS = 360;
+const MAX_SIGNALS = 200;
+const MAX_TRADES = 200;
+
+export const DEFAULT_SETTINGS: Settings = {
+  slippageBps: 50,
+  deadlineMinutes: 20,
+  tickSeconds: 30,
+  theme: "dark",
+  autoDispatch: false,
+};
+
+export function seriesKey(chainId: number, base: Token, quote: Token): string {
+  return `${chainId}:${base.address.toLowerCase()}:${quote.address.toLowerCase()}`;
+}
+
+export function todayKey(now = Date.now()): string {
+  return new Date(now).toISOString().slice(0, 10);
+}
+
+export function emptyRuntime(): BotRuntime {
+  return { filledLevels: [], spentQuote: 0, deployedQuote: 0, fills: 0 };
+}
+
+type AppState = {
+  bots: Bot[];
+  signals: Signal[];
+  trades: Trade[];
+  series: Record<string, PricePoint[]>;
+  settings: Settings;
+  customTokens: Token[];
+  hydrated: boolean;
+
+  addBot: (bot: Bot) => void;
+  updateBot: (id: string, patch: Partial<Omit<Bot, "runtime">>) => void;
+  patchRuntime: (id: string, patch: Partial<BotRuntime>) => void;
+  removeBot: (id: string) => void;
+  setBotStatus: (id: string, status: Bot["status"]) => void;
+  resetBot: (id: string) => void;
+
+  pushSignal: (signal: Signal) => void;
+  updateSignal: (id: string, patch: Partial<Signal>) => void;
+  clearSignals: (filter?: (signal: Signal) => boolean) => void;
+
+  pushTrade: (trade: Trade) => void;
+  updateTrade: (hash: string, patch: Partial<Trade>) => void;
+
+  recordPrice: (key: string, point: PricePoint) => void;
+
+  setSettings: (patch: Partial<Settings>) => void;
+  addCustomToken: (token: Token) => void;
+  setHydrated: () => void;
+};
+
+export const useAppStore = create<AppState>()(
+  persist(
+    (set) => ({
+      bots: [],
+      signals: [],
+      trades: [],
+      series: {},
+      settings: DEFAULT_SETTINGS,
+      customTokens: [],
+      hydrated: false,
+
+      addBot: (bot) => set((state) => ({ bots: [bot, ...state.bots] })),
+
+      updateBot: (id, patch) =>
+        set((state) => ({
+          bots: state.bots.map((bot) => (bot.id === id ? { ...bot, ...patch } : bot)),
+        })),
+
+      patchRuntime: (id, patch) =>
+        set((state) => ({
+          bots: state.bots.map((bot) =>
+            bot.id === id ? { ...bot, runtime: { ...bot.runtime, ...patch } } : bot,
+          ),
+        })),
+
+      removeBot: (id) =>
+        set((state) => ({
+          bots: state.bots.filter((bot) => bot.id !== id),
+          signals: state.signals.filter((signal) => signal.botId !== id),
+        })),
+
+      setBotStatus: (id, status) =>
+        set((state) => ({
+          bots: state.bots.map((bot) => (bot.id === id ? { ...bot, status } : bot)),
+        })),
+
+      resetBot: (id) =>
+        set((state) => ({
+          bots: state.bots.map((bot) =>
+            bot.id === id ? { ...bot, status: "idle", runtime: emptyRuntime() } : bot,
+          ),
+        })),
+
+      pushSignal: (signal) =>
+        set((state) => ({ signals: [signal, ...state.signals].slice(0, MAX_SIGNALS) })),
+
+      updateSignal: (id, patch) =>
+        set((state) => ({
+          signals: state.signals.map((signal) =>
+            signal.id === id ? { ...signal, ...patch } : signal,
+          ),
+        })),
+
+      clearSignals: (filter) =>
+        set((state) => ({
+          signals: filter ? state.signals.filter((signal) => !filter(signal)) : [],
+        })),
+
+      pushTrade: (trade) =>
+        set((state) => ({ trades: [trade, ...state.trades].slice(0, MAX_TRADES) })),
+
+      updateTrade: (hash, patch) =>
+        set((state) => ({
+          trades: state.trades.map((trade) =>
+            trade.hash === hash ? { ...trade, ...patch } : trade,
+          ),
+        })),
+
+      recordPrice: (key, point) =>
+        set((state) => {
+          const previous = state.series[key] ?? [];
+          const last = previous[previous.length - 1];
+          if (last && point.t - last.t < 1000) return state;
+          const next = [...previous, point].slice(-MAX_SERIES_POINTS);
+          return { series: { ...state.series, [key]: next } };
+        }),
+
+      setSettings: (patch) =>
+        set((state) => ({ settings: { ...state.settings, ...patch } })),
+
+      addCustomToken: (token) =>
+        set((state) => {
+          const exists = state.customTokens.some(
+            (t) =>
+              t.chainId === token.chainId &&
+              t.address.toLowerCase() === token.address.toLowerCase(),
+          );
+          return exists ? state : { customTokens: [...state.customTokens, token] };
+        }),
+
+      setHydrated: () => set({ hydrated: true }),
+    }),
+    {
+      name: "snyper.state.v1",
+      version: 1,
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        bots: state.bots,
+        signals: state.signals,
+        trades: state.trades,
+        series: state.series,
+        settings: state.settings,
+        customTokens: state.customTokens,
+      }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHydrated();
+      },
+    },
+  ),
+);
