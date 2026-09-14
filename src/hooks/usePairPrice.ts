@@ -21,9 +21,11 @@ export function usePairPrice(base?: Token, quote?: Token, intervalMs = 15_000) {
     enabled: Boolean(client && base && quote),
     refetchInterval: intervalMs,
     staleTime: intervalMs / 2,
+    // A missing pool is a result, not a failure: react-query rejects an
+    // `undefined` payload, which would surface its own internal error instead.
     queryFn: async () => {
-      if (!client || !base || !quote) return undefined;
-      return midPrice(client, base, quote);
+      if (!client || !base || !quote) return null;
+      return (await midPrice(client, base, quote)) ?? null;
     },
   });
 

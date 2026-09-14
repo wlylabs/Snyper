@@ -20,7 +20,7 @@ export function useQuote({
 }) {
   const client = usePublicClient({ chainId: tokenIn?.chainId });
 
-  return useQuery<Quote | undefined>({
+  return useQuery<Quote | null>({
     queryKey: [
       "quote",
       tokenIn?.chainId,
@@ -31,9 +31,11 @@ export function useQuote({
     enabled: Boolean(enabled && client && tokenIn && tokenOut && amountIn && amountIn > 0n),
     refetchInterval,
     staleTime: 8_000,
+    // Null stands for "no route": react-query treats an undefined payload as a
+    // programming error and reports it as a query failure.
     queryFn: async () => {
-      if (!client || !tokenIn || !tokenOut || !amountIn) return undefined;
-      return quoteExactIn(client, tokenIn, tokenOut, amountIn);
+      if (!client || !tokenIn || !tokenOut || !amountIn) return null;
+      return (await quoteExactIn(client, tokenIn, tokenOut, amountIn)) ?? null;
     },
   });
 }

@@ -1,6 +1,6 @@
 import { createConfig, http } from "wagmi";
 import { coinbaseWallet, injected, walletConnect } from "wagmi/connectors";
-import { arbitrum, base, mainnet, optimism, polygon } from "viem/chains";
+import { arbitrum, base, mainnet, optimism, polygon, robinhood } from "viem/chains";
 import { SUPPORTED_CHAINS } from "./chains";
 
 export const WALLETCONNECT_PROJECT_ID =
@@ -21,6 +21,7 @@ const rpcOverrides: Record<number, string | undefined> = {
   137: process.env.NEXT_PUBLIC_RPC_137,
   8453: process.env.NEXT_PUBLIC_RPC_8453,
   42161: process.env.NEXT_PUBLIC_RPC_42161,
+  4663: process.env.NEXT_PUBLIC_RPC_4663,
 };
 
 function endpoint(chainId: number) {
@@ -68,6 +69,7 @@ export const config = createConfig({
     [arbitrum.id]: endpoint(arbitrum.id),
     [optimism.id]: endpoint(optimism.id),
     [polygon.id]: endpoint(polygon.id),
+    [robinhood.id]: endpoint(robinhood.id),
   },
   ssr: true,
 });

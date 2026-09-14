@@ -1,25 +1,80 @@
 {
+  "id": "/",
   "name": "Snyper — On-chain execution terminal",
   "short_name": "Snyper",
-  "id": "/",
-  "start_url": "/",
+  "description": "Non-custodial execution terminal: connect a wallet, price routes on-chain and run interval, grid, trigger and trailing strategies from any device.",
+  "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",
-  "display_override": ["standalone", "minimal-ui"],
-  "orientation": "portrait-primary",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui", "browser"],
+  "orientation": "any",
   "background_color": "#07080a",
   "theme_color": "#07080a",
-  "description": "Non-custodial execution terminal: connect a wallet, price routes on-chain and run interval, grid, trigger and trailing strategies from any device.",
+  "lang": "en",
+  "dir": "ltr",
   "categories": ["finance", "productivity", "utilities"],
+  "prefer_related_applications": false,
+  "launch_handler": { "client_mode": ["navigate-existing", "auto"] },
+  "handle_links": "preferred",
+  "edge_side_panel": { "preferred_width": 420 },
   "icons": [
     { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
     { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
+  "screenshots": [
+    {
+      "src": "/screenshots/terminal-wide.png",
+      "sizes": "1440x900",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Execution terminal with live pool pricing"
+    },
+    {
+      "src": "/screenshots/assets-wide.png",
+      "sizes": "1440x900",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Holdings read straight from the chain"
+    },
+    {
+      "src": "/screenshots/terminal-narrow.png",
+      "sizes": "430x932",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Execution terminal on mobile"
+    },
+    {
+      "src": "/screenshots/strategies-narrow.png",
+      "sizes": "430x932",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Strategy list on mobile"
+    }
+  ],
   "shortcuts": [
-    { "name": "Strategies", "short_name": "Strategies", "url": "/bots", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
-    { "name": "Assets", "short_name": "Assets", "url": "/assets", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
-    { "name": "Activity", "short_name": "Activity", "url": "/activity", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
+    {
+      "name": "Strategies",
+      "short_name": "Strategies",
+      "description": "Review and arm running strategies",
+      "url": "/bots?source=pwa",
+      "icons": [{ "src": "/icons/shortcuts/strategies.png", "sizes": "96x96", "type": "image/png" }]
+    },
+    {
+      "name": "Assets",
+      "short_name": "Assets",
+      "description": "Balances read straight from the chain",
+      "url": "/assets?source=pwa",
+      "icons": [{ "src": "/icons/shortcuts/assets.png", "sizes": "96x96", "type": "image/png" }]
+    },
+    {
+      "name": "Activity",
+      "short_name": "Activity",
+      "description": "Local ledger of submitted transactions",
+      "url": "/activity?source=pwa",
+      "icons": [{ "src": "/icons/shortcuts/activity.png", "sizes": "96x96", "type": "image/png" }]
+    }
   ]
 }

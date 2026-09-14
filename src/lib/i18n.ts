@@ -55,6 +55,12 @@ const en = {
   "wallet.openInApp": "Open in app",
   "wallet.unsupportedNetwork": "Unsupported network",
   "wallet.wrongNetwork": "Wrong network",
+  "wallet.balancesOnly": "Balances only — no routing venue",
+  "wallet.errNoProvider":
+    "That wallet did not answer. It may be disabled for this site, or another extension took over the injected provider — enable it and reload, or pair from your phone with WalletConnect.",
+  "wallet.errRejected": "You rejected the connection in your wallet.",
+  "wallet.errPending": "A connection request is already open — finish it in your wallet.",
+  "wallet.errChain": "Your wallet could not switch to that network. Add it there first.",
 
   "token.select": "Select asset",
   "token.payWith": "Pay with",
@@ -65,6 +71,8 @@ const en = {
   "token.searchLabel": "Search assets",
   "token.native": "NATIVE",
   "token.unlisted": "Unlisted contract. Details are read directly from the chain.",
+  "token.unlistedRisk":
+    "Nobody vetted this contract. Check the address against a source you trust before trading it.",
   "token.import": "Import token",
   "token.importing": "Reading contract…",
   "token.importFailed": "Could not read this contract as an ERC-20 token.",
@@ -95,6 +103,9 @@ const en = {
   "swap.ctaInsufficient": "Insufficient {symbol}",
   "swap.ctaPricing": "Pricing route…",
   "swap.ctaNoRoute": "No route found",
+  "swap.ctaNoVenue": "No routing venue on {chain}",
+  "swap.noVenueNote":
+    "{chain} has no Uniswap v3 deployment configured, so nothing can be priced or executed here. Balances and token detection still work.",
   "swap.ctaApproving": "Approving…",
   "swap.ctaSigning": "Confirm in wallet…",
   "swap.ctaSettling": "Settling…",
@@ -116,6 +127,7 @@ const en = {
   "terminal.sourceNote":
     "Prices come from the pool itself — sqrtPrice for the mid, QuoterV2 for executable size. Nothing is cached from a third-party feed.",
   "terminal.awaitingTicks": "Awaiting ticks",
+  "terminal.noVenue": "Not deployed on this chain",
   "terminal.approxFx": "≈ {value} at the rate in Settings",
 
   "bots.title": "Strategies",
@@ -228,6 +240,15 @@ const en = {
   "assets.address": "Address",
   "assets.openExplorer": "Open in explorer",
   "assets.connectHint": "Connect a wallet to read balances.",
+  "assets.detect": "Detect wallet tokens",
+  "assets.detecting": "Scanning transfers…",
+  "assets.detectNote":
+    "Reads the transfer log for this address and picks up every ERC-20 you hold, memecoins included. No indexer — just your own history.",
+  "assets.detectResult": "{count} token(s) found across the last {blocks} blocks.",
+  "assets.detectPartial": "The window was cut short by the endpoint; run it again to reach further back.",
+  "assets.detected": "Detected tokens",
+  "assets.noneDetected": "Nothing detected yet",
+  "assets.noneDetectedHint": "Run a wallet scan to pull in tokens no curated list carries.",
   "assets.imported": "Imported tokens",
   "assets.noneImported": "None imported",
   "assets.noneImportedHint": "Paste a contract address in any asset picker to add one.",
@@ -275,10 +296,6 @@ const en = {
   "settings.installIntro":
     "Install Snyper to run it fullscreen with its own launcher entry. It keeps working offline for anything already cached; live prices still need a connection.",
   "settings.installAction": "Install app",
-  "settings.installIos":
-    "On iOS: open the share sheet in Safari and choose Add to Home Screen.",
-  "settings.installNone":
-    "Your browser has not offered an install prompt yet. Chromium browsers surface it after a short visit; desktop Chrome also shows an install icon in the address bar.",
   "settings.connectivity": "Connectivity",
   "settings.walletConnect": "WalletConnect",
   "settings.configured": "Configured",
@@ -334,6 +351,7 @@ const en = {
 
   "error.notConnected": "Wallet not connected",
   "error.unsupportedChain": "Unsupported chain",
+  "error.noVenue": "No routing venue on {chain}",
   "error.switchFirst": "Switch the wallet to {chain} first",
   "error.approvalReverted": "Approval reverted",
   "error.swapReverted": "Swap reverted",
@@ -344,6 +362,36 @@ const en = {
   "error.transferFailed": "Token transfer failed",
   "error.slippage": "Slippage exceeded",
   "error.unknown": "Unknown error",
+
+  "install.title": "Install Snyper",
+  "install.short": "Install",
+  "install.action": "Install app",
+  "install.working": "Opening installer…",
+  "install.installed": "Already running as an installed app.",
+  "install.tagline": "Non-custodial execution terminal, on your home screen.",
+  "install.benefitLauncher": "Its own launcher entry and window, no browser chrome.",
+  "install.benefitFullscreen": "Fullscreen layout with the tab bar where your thumb is.",
+  "install.benefitOffline": "The shell keeps loading offline; live prices still need a connection.",
+  "install.benefitKeys": "Nothing changes about custody — keys stay in your wallet.",
+  "install.iosTitle": "Add to Home Screen",
+  "install.iosStep1": "Tap the Share button in Safari's toolbar.",
+  "install.iosStep2": "Scroll down and choose Add to Home Screen.",
+  "install.iosStep3": "Confirm the name, then tap Add.",
+  "install.androidHint":
+    "Open your browser menu and choose Install app or Add to Home screen.",
+  "install.desktopHint":
+    "Your browser has not offered an install prompt yet. Chromium browsers surface an install icon in the address bar after a short visit.",
+  "install.note": "Installing changes nothing on-chain and stores no keys.",
+  "install.bannerTitle": "Install Snyper",
+  "install.bannerHint": "Run it fullscreen from your home screen.",
+
+  "meme.tagMeme": "Meme",
+  "meme.tagUnlisted": "Unlisted",
+  "meme.reasonUnlisted": "Not on the curated token list",
+  "meme.reasonName": "Name follows the meme genre",
+  "meme.reasonGlyphs": "Non-standard characters in the ticker",
+  "meme.reasonHype": "Multiplier or version hype in the name",
+  "meme.reasonSupply": "Trillion-plus supply",
 
   "a11y.home": "Snyper home",
   "a11y.primaryNav": "Primary",
@@ -399,6 +447,12 @@ const id: Record<TKey, string> = {
   "wallet.openInApp": "Buka di aplikasi",
   "wallet.unsupportedNetwork": "Jaringan tidak didukung",
   "wallet.wrongNetwork": "Jaringan salah",
+  "wallet.balancesOnly": "Hanya saldo — belum ada tempat routing",
+  "wallet.errNoProvider":
+    "Dompet itu tidak merespons. Bisa jadi dimatikan untuk situs ini, atau ekstensi lain mengambil alih provider-nya — aktifkan lalu muat ulang, atau sambungkan dari ponsel lewat WalletConnect.",
+  "wallet.errRejected": "Kamu menolak permintaan sambungan di dompet.",
+  "wallet.errPending": "Permintaan sambungan sudah terbuka — selesaikan dulu di dompetmu.",
+  "wallet.errChain": "Dompetmu tidak bisa pindah ke jaringan itu. Tambahkan dulu di sana.",
 
   "token.select": "Pilih aset",
   "token.payWith": "Bayar dengan",
@@ -409,6 +463,8 @@ const id: Record<TKey, string> = {
   "token.searchLabel": "Cari aset",
   "token.native": "NATIF",
   "token.unlisted": "Kontrak tidak terdaftar. Detailnya dibaca langsung dari chain.",
+  "token.unlistedRisk":
+    "Tidak ada yang memverifikasi kontrak ini. Cocokkan alamatnya dengan sumber yang kamu percaya sebelum bertransaksi.",
   "token.import": "Impor token",
   "token.importing": "Membaca kontrak…",
   "token.importFailed": "Kontrak ini tidak bisa dibaca sebagai token ERC-20.",
@@ -440,6 +496,9 @@ const id: Record<TKey, string> = {
   "swap.ctaInsufficient": "{symbol} tidak cukup",
   "swap.ctaPricing": "Menghitung rute…",
   "swap.ctaNoRoute": "Rute tidak ditemukan",
+  "swap.ctaNoVenue": "Belum ada tempat routing di {chain}",
+  "swap.noVenueNote":
+    "{chain} belum punya deployment Uniswap v3 yang dikonfigurasi, jadi harga dan eksekusi tidak tersedia di sini. Saldo dan deteksi token tetap jalan.",
   "swap.ctaApproving": "Menyetujui…",
   "swap.ctaSigning": "Konfirmasi di dompet…",
   "swap.ctaSettling": "Menyelesaikan…",
@@ -461,6 +520,7 @@ const id: Record<TKey, string> = {
   "terminal.sourceNote":
     "Harga diambil dari pool itu sendiri — sqrtPrice untuk harga tengah, QuoterV2 untuk ukuran yang bisa dieksekusi. Tidak ada data dari feed pihak ketiga.",
   "terminal.awaitingTicks": "Menunggu tick",
+  "terminal.noVenue": "Belum ada di chain ini",
   "terminal.approxFx": "≈ {value} dengan kurs di Pengaturan",
 
   "bots.title": "Strategi",
@@ -573,6 +633,15 @@ const id: Record<TKey, string> = {
   "assets.address": "Alamat",
   "assets.openExplorer": "Buka di explorer",
   "assets.connectHint": "Hubungkan dompet untuk membaca saldo.",
+  "assets.detect": "Deteksi token di dompet",
+  "assets.detecting": "Memindai transfer…",
+  "assets.detectNote":
+    "Membaca log transfer alamat ini dan mengambil semua ERC-20 yang kamu pegang, termasuk memecoin. Tanpa indexer — murni dari riwayatmu sendiri.",
+  "assets.detectResult": "{count} token ditemukan dalam {blocks} blok terakhir.",
+  "assets.detectPartial": "Jangkauan dipotong oleh endpoint; jalankan lagi untuk menelusuri lebih jauh.",
+  "assets.detected": "Token terdeteksi",
+  "assets.noneDetected": "Belum ada yang terdeteksi",
+  "assets.noneDetectedHint": "Jalankan pemindaian dompet untuk menarik token yang tidak ada di daftar kurasi.",
   "assets.imported": "Token terimpor",
   "assets.noneImported": "Belum ada",
   "assets.noneImportedHint":
@@ -621,10 +690,6 @@ const id: Record<TKey, string> = {
   "settings.installIntro":
     "Pasang Snyper agar berjalan layar penuh dengan ikon sendiri. Bagian yang sudah tersimpan tetap bisa dibuka offline; harga langsung tetap butuh koneksi.",
   "settings.installAction": "Pasang aplikasi",
-  "settings.installIos":
-    "Di iOS: buka menu bagikan di Safari lalu pilih Tambahkan ke Layar Utama.",
-  "settings.installNone":
-    "Browser kamu belum menawarkan pemasangan. Browser berbasis Chromium biasanya menawarkannya setelah beberapa kali kunjungan; Chrome desktop juga menampilkan ikon pasang di bilah alamat.",
   "settings.connectivity": "Konektivitas",
   "settings.walletConnect": "WalletConnect",
   "settings.configured": "Terkonfigurasi",
@@ -680,6 +745,7 @@ const id: Record<TKey, string> = {
 
   "error.notConnected": "Dompet belum terhubung",
   "error.unsupportedChain": "Chain tidak didukung",
+  "error.noVenue": "Belum ada tempat routing di {chain}",
   "error.switchFirst": "Pindahkan dompet ke {chain} dulu",
   "error.approvalReverted": "Persetujuan gagal di chain",
   "error.swapReverted": "Penukaran gagal di chain",
@@ -690,6 +756,36 @@ const id: Record<TKey, string> = {
   "error.transferFailed": "Transfer token gagal",
   "error.slippage": "Slippage terlampaui",
   "error.unknown": "Kesalahan tidak dikenal",
+
+  "install.title": "Pasang Snyper",
+  "install.short": "Pasang",
+  "install.action": "Pasang aplikasi",
+  "install.working": "Membuka pemasang…",
+  "install.installed": "Sudah berjalan sebagai aplikasi terpasang.",
+  "install.tagline": "Terminal eksekusi non-kustodial, langsung di layar utamamu.",
+  "install.benefitLauncher": "Punya ikon dan jendela sendiri, tanpa tampilan browser.",
+  "install.benefitFullscreen": "Tata letak layar penuh dengan tab bar tepat di jangkauan jempol.",
+  "install.benefitOffline": "Tampilan tetap terbuka saat offline; harga live tetap butuh koneksi.",
+  "install.benefitKeys": "Soal kustodi tidak berubah — kunci tetap di dompetmu.",
+  "install.iosTitle": "Tambah ke Layar Utama",
+  "install.iosStep1": "Ketuk tombol Bagikan di bilah Safari.",
+  "install.iosStep2": "Gulir ke bawah dan pilih Add to Home Screen.",
+  "install.iosStep3": "Pastikan namanya, lalu ketuk Add.",
+  "install.androidHint":
+    "Buka menu browser lalu pilih Install app atau Add to Home screen.",
+  "install.desktopHint":
+    "Browser-mu belum menawarkan pemasangan. Browser berbasis Chromium memunculkan ikon install di bilah alamat setelah beberapa kunjungan.",
+  "install.note": "Memasang aplikasi tidak mengubah apa pun on-chain dan tidak menyimpan kunci.",
+  "install.bannerTitle": "Pasang Snyper",
+  "install.bannerHint": "Jalankan layar penuh dari layar utamamu.",
+
+  "meme.tagMeme": "Meme",
+  "meme.tagUnlisted": "Tak terdaftar",
+  "meme.reasonUnlisted": "Tidak ada di daftar token kurasi",
+  "meme.reasonName": "Penamaannya khas memecoin",
+  "meme.reasonGlyphs": "Ada karakter tidak standar di tickernya",
+  "meme.reasonHype": "Ada embel-embel pengganda atau versi di namanya",
+  "meme.reasonSupply": "Suplai di atas satu triliun",
 
   "a11y.home": "Beranda Snyper",
   "a11y.primaryNav": "Navigasi utama",

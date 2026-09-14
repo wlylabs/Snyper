@@ -1,6 +1,6 @@
 import { encodeFunctionData, type Address } from "viem";
 import { swapRouter02Abi } from "./abi";
-import { CHAIN_META } from "./chains";
+import { dexMeta } from "./chains";
 import { routingAddress, type Token } from "./tokens";
 
 /** SwapRouter02 constant meaning "leave the output inside the router". */
@@ -40,8 +40,8 @@ export function buildSwap(params: {
   deadlineMinutes: number;
 }): SwapPlan {
   const { tokenIn, tokenOut, amountIn, amountOutMinimum, fee, recipient } = params;
-  const meta = CHAIN_META[tokenIn.chainId];
-  if (!meta) throw new Error("Unsupported chain");
+  const dex = dexMeta(tokenIn.chainId);
+  if (!dex) throw new Error("No routing venue on this chain");
 
   const nativeIn = Boolean(tokenIn.native);
   const nativeOut = Boolean(tokenOut.native);
@@ -80,7 +80,7 @@ export function buildSwap(params: {
   }
 
   return {
-    router: meta.router,
+    router: dex.router,
     deadline: deadlineFrom(params.deadlineMinutes),
     calls,
     value: nativeIn ? amountIn : 0n,

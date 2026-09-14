@@ -2,14 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { formatUnits } from "viem";
-import { useAccount, useSwitchChain } from "wagmi";
+import { useAccount, useChainId, useSwitchChain } from "wagmi";
 import { Icon } from "@/components/ui/Icon";
 import { Panel, Row } from "@/components/ui/Panel";
 import { useToast } from "@/components/ui/Toast";
 import { readableError, useExecutor } from "@/hooks/useExecutor";
 import { useQuote } from "@/hooks/useQuote";
 import { useTokenBalance } from "@/hooks/useTokenBalance";
-import { chainMeta } from "@/lib/chains";
+import { chainMeta, hasRouting } from "@/lib/chains";
 import {
   feeLabel,
   formatPercent,
@@ -34,6 +34,7 @@ function sanitiseAmount(input: string): string {
 
 export function SwapPanel({
   tokens,
+  listed,
   tokenIn,
   tokenOut,
   onTokenIn,
@@ -41,6 +42,7 @@ export function SwapPanel({
   onSwitch,
 }: {
   tokens: Token[];
+  listed?: Set<string>;
   tokenIn?: Token;
   tokenOut?: Token;
   onTokenIn: (token: Token) => void;
@@ -48,6 +50,7 @@ export function SwapPanel({
   onSwitch: () => void;
 }) {
   const { isConnected, chainId } = useAccount();
+  const activeChainId = useChainId();
   const { switchChain } = useSwitchChain();
   const { execute, phase } = useExecutor();
   const toast = useToast();
@@ -75,6 +78,11 @@ export function SwapPanel({
   });
   const quote = quoteQuery.data;
 
+  // Before a wallet is connected the config's active chain is the one on show.
+  const pairChainId = tokenIn?.chainId ?? chainId ?? activeChainId;
+  /** Chains with no Uniswap deployment price nothing and execute nothing. */
+  const routable = hasRouting(pairChainId);
+  const pairChainLabel = chainMeta(pairChainId)?.label ?? t("common.network");
   const wrongNetwork = isConnected && tokenIn && chainId !== tokenIn.chainId;
   const insufficient = Boolean(amountIn && balanceIn !== undefined && amountIn > balanceIn);
   const busy = phase !== "idle";
@@ -129,6 +137,9 @@ export function SwapPanel({
         disabled: false,
         action: () => tokenIn && switchChain({ chainId: tokenIn.chainId }),
       };
+    }
+    if (!routable) {
+      return { label: t("swap.ctaNoVenue", { chain: pairChainLabel }), disabled: true };
     }
     if (!amountIn || amountIn === 0n) return { label: t("swap.ctaAmount"), disabled: true };
     if (insufficient) {
@@ -287,6 +298,13 @@ export function SwapPanel({
         />
       </div>
 
+      {!routable && (
+        <p className="mt-3 flex items-start gap-2 text-[11px] leading-relaxed warn">
+          <Icon name="alert" size={14} className="mt-0.5 shrink-0" />
+          {t("swap.noVenueNote", { chain: pairChainLabel })}
+        </p>
+      )}
+
       {quote && quote.priceImpact > 0.05 && (
         <p className="mt-3 flex items-start gap-2 text-[11px] leading-relaxed short">
           <Icon name="alert" size={14} className="mt-0.5 shrink-0" />
@@ -313,6 +331,7 @@ export function SwapPanel({
         open={picker !== null}
         onClose={() => setPicker(null)}
         tokens={tokens}
+        listed={listed}
         chainId={tokenIn?.chainId ?? chainId}
         excludeAddress={picker === "in" ? tokenOut?.address : tokenIn?.address}
         title={picker === "in" ? t("token.payWith") : t("token.receive")}

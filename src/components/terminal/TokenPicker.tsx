@@ -6,6 +6,7 @@ import { usePublicClient } from "wagmi";
 import { Icon } from "@/components/ui/Icon";
 import { Sheet } from "@/components/ui/Sheet";
 import { truncateAddress } from "@/lib/format";
+import { memeSignal } from "@/lib/memecoin";
 import { readToken, searchTokens, type Token } from "@/lib/tokens";
 import { useAppStore } from "@/store/useAppStore";
 import { useI18n } from "@/hooks/useI18n";
@@ -18,6 +19,7 @@ export function TokenPicker({
   onSelect,
   excludeAddress,
   title,
+  listed,
 }: {
   open: boolean;
   onClose: () => void;
@@ -26,6 +28,8 @@ export function TokenPicker({
   onSelect: (token: Token) => void;
   excludeAddress?: string;
   title?: string;
+  /** Curated-list addresses; anything outside them is tagged in the row. */
+  listed?: Set<string>;
 }) {
   const { t } = useI18n();
   const [query, setQuery] = useState("");
@@ -99,7 +103,10 @@ export function TokenPicker({
           >
             <TokenBadge token={token} />
             <span className="min-w-0 flex-1 text-left">
-              <span className="block text-[13px] font-semibold">{token.symbol}</span>
+              <span className="flex items-center gap-1.5">
+                <span className="truncate text-[13px] font-semibold">{token.symbol}</span>
+                <TokenTags token={token} listed={listed} />
+              </span>
               <span className="block truncate text-[11px] text-faint">{token.name}</span>
             </span>
             <span className="num text-[10px] text-faint">
@@ -113,6 +120,10 @@ export function TokenPicker({
             {canImport ? (
               <div className="panel p-3">
                 <p className="text-xs text-dim">{t("token.unlisted")}</p>
+                <p className="mt-2 flex items-start gap-2 text-[11px] leading-relaxed warn">
+                  <Icon name="alert" size={13} className="mt-0.5 shrink-0" />
+                  {t("token.unlistedRisk")}
+                </p>
                 <button
                   type="button"
                   className="btn btn-sm mt-3 w-full"
@@ -147,6 +158,34 @@ export function TokenBadge({ token, size = 28 }: { token: Token; size?: number }
       ) : (
         token.symbol.slice(0, 3).toUpperCase()
       )}
+    </span>
+  );
+}
+
+/**
+ * Flags assets the curated token list does not carry. Meme tokens are the usual
+ * reason one shows up here, so the heuristic label says so — as a hint, never as
+ * a safety judgement.
+ */
+export function TokenTags({
+  token,
+  listed,
+}: {
+  token: Token & { totalSupply?: bigint };
+  listed?: Set<string>;
+}) {
+  const { t } = useI18n();
+  if (!listed || listed.size === 0 || token.native) return null;
+
+  const signal = memeSignal(token, listed);
+  if (!signal.unlisted) return null;
+
+  return (
+    <span
+      className={`chip chip-xs ${signal.meme ? "chip-warn" : ""}`}
+      title={signal.reasons.map((reason) => t(reason)).join(" · ")}
+    >
+      {signal.meme ? t("meme.tagMeme") : t("meme.tagUnlisted")}
     </span>
   );
 }

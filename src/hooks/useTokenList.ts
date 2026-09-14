@@ -7,6 +7,7 @@ import { useAppStore } from "@/store/useAppStore";
 
 export function useTokenList(chainId: number | undefined) {
   const customTokens = useAppStore((state) => state.customTokens);
+  const discoveredTokens = useAppStore((state) => state.discoveredTokens);
 
   const query = useQuery({
     queryKey: ["uniswap-token-list"],
@@ -18,8 +19,30 @@ export function useTokenList(chainId: number | undefined) {
 
   const tokens = useMemo<Token[]>(() => {
     if (!chainId) return [];
-    return mergeTokens(chainId, baseTokens(chainId), customTokens, query.data ?? []);
-  }, [chainId, customTokens, query.data]);
+    return mergeTokens(
+      chainId,
+      baseTokens(chainId),
+      customTokens,
+      discoveredTokens,
+      query.data ?? [],
+    );
+  }, [chainId, customTokens, discoveredTokens, query.data]);
 
-  return { tokens, isLoading: query.isLoading, error: query.error as Error | null };
+  /** Addresses the curated list carries, used to flag everything else. */
+  const listed = useMemo(
+    () =>
+      new Set(
+        (query.data ?? [])
+          .filter((token) => token.chainId === chainId)
+          .map((token) => token.address.toLowerCase()),
+      ),
+    [chainId, query.data],
+  );
+
+  return {
+    tokens,
+    listed,
+    isLoading: query.isLoading,
+    error: query.error as Error | null,
+  };
 }

@@ -57,7 +57,7 @@ export function ChainControl() {
 
       {open && (
         <div
-          className="panel absolute right-0 top-[calc(100%+6px)] z-50 w-52 p-1"
+          className="panel absolute right-0 top-[calc(100%+6px)] z-50 w-56 p-1"
           role="listbox"
         >
           {SUPPORTED_CHAINS.map((chain) => {
@@ -76,7 +76,14 @@ export function ChainControl() {
                 }}
               >
                 <span className={`dot ${active ? "dot-live" : ""}`} />
-                <span className="flex-1 text-left text-[12px]">{item.label}</span>
+                <span className="min-w-0 flex-1 text-left">
+                  <span className="block text-[12px]">{item.label}</span>
+                  {!item.dex && (
+                    <span className="block text-[10px] text-faint">
+                      {t("wallet.balancesOnly")}
+                    </span>
+                  )}
+                </span>
                 <span className="lbl">{item.mark}</span>
               </button>
             );

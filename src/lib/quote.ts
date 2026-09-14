@@ -1,7 +1,7 @@
 import type { PublicClient } from "viem";
 import { zeroAddress } from "viem";
 import { quoterV2Abi, v3FactoryAbi, v3PoolAbi } from "./abi";
-import { CHAIN_META } from "./chains";
+import { dexMeta } from "./chains";
 import { routingAddress, type Token } from "./tokens";
 
 export type PoolRef = {
@@ -40,8 +40,8 @@ export async function findPools(
   tokenA: `0x${string}`,
   tokenB: `0x${string}`,
 ): Promise<PoolRef[]> {
-  const meta = CHAIN_META[chainId];
-  if (!meta) return [];
+  const dex = dexMeta(chainId);
+  if (!dex) return [];
 
   const key = pairKey(chainId, tokenA, tokenB);
   const hit = poolCache.get(key);
@@ -49,8 +49,8 @@ export async function findPools(
 
   const addresses = await client.multicall({
     allowFailure: true,
-    contracts: meta.feeTiers.map((fee) => ({
-      address: meta.factory,
+    contracts: dex.feeTiers.map((fee) => ({
+      address: dex.factory,
       abi: v3FactoryAbi,
       functionName: "getPool" as const,
       args: [tokenA, tokenB, fee] as const,
@@ -62,7 +62,7 @@ export async function findPools(
     if (entry.status !== "success") return;
     const address = entry.result as `0x${string}`;
     if (!address || address === zeroAddress) return;
-    candidates.push({ address, fee: meta.feeTiers[index] });
+    candidates.push({ address, fee: dex.feeTiers[index] });
   });
   if (candidates.length === 0) return [];
 
@@ -153,8 +153,8 @@ export async function quoteExactIn(
 ): Promise<Quote | undefined> {
   if (amountIn <= 0n) return undefined;
   const chainId = tokenIn.chainId;
-  const meta = CHAIN_META[chainId];
-  if (!meta) return undefined;
+  const dex = dexMeta(chainId);
+  if (!dex) return undefined;
 
   const inAddress = routingAddress(tokenIn);
   const outAddress = routingAddress(tokenOut);
@@ -166,7 +166,7 @@ export async function quoteExactIn(
   const attempts = await Promise.allSettled(
     pools.slice(0, 4).map((pool) =>
       client.simulateContract({
-        address: meta.quoter,
+        address: dex.quoter,
         abi: quoterV2Abi,
         functionName: "quoteExactInputSingle",
         args: [
