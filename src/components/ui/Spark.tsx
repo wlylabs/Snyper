@@ -37,7 +37,7 @@ export function Spark({
   const span = max - min || max || 1;
   const step = width / (points.length - 1 || 1);
   const rising = values[values.length - 1] >= values[0];
-  const stroke = rising ? "var(--color-accent)" : "var(--color-short)";
+  const stroke = rising ? "var(--color-accent-line)" : "var(--color-short-line)";
 
   const path = points
     .map((point, index) => {

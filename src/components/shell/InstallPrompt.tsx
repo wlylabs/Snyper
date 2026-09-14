@@ -48,9 +48,7 @@ export function InstallBanner() {
   return (
     <div className="mx-auto max-w-[1480px] px-3 pt-3 md:px-4">
       <div className="panel flex items-center gap-3 p-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center border border-edge bg-base">
-          <Logo size={22} className="text-accent" />
-        </span>
+        <Logo size={40} className="shrink-0" />
         <div className="min-w-0 flex-1">
           <p className="text-[12px] font-semibold">{t("install.bannerTitle")}</p>
           <p className="truncate text-[11px] text-faint">{t("install.bannerHint")}</p>
@@ -91,11 +89,9 @@ export function InstallSheet({ open, onClose }: { open: boolean; onClose: () => 
     <Sheet open={open} title={t("install.title")} onClose={onClose}>
       <div className="p-3">
         <div className="panel ticked flex items-center gap-3 p-4">
-          <span className="flex h-14 w-14 shrink-0 items-center justify-center border border-edge bg-base">
-            <Logo size={30} className="text-accent" />
-          </span>
+          <Logo size={56} className="shrink-0" />
           <div className="min-w-0">
-            <p className="text-[15px] leading-none font-bold tracking-[0.22em]">SNYPER</p>
+            <p className="brand-word">Snyper</p>
             <p className="mt-2 text-[11px] leading-relaxed text-faint">{t("install.tagline")}</p>
           </div>
         </div>

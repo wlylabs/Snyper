@@ -14,7 +14,8 @@ function ThemeSync() {
   const theme = useAppStore((state) => state.settings.theme);
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
-    const color = theme === "dark" ? "#07080a" : "#e9eae4";
+    // Keep in step with --color-void in globals.css for each theme.
+    const color = theme === "dark" ? "#07080a" : "#eef1f5";
     document
       .querySelectorAll('meta[name="theme-color"]')
       .forEach((tag) => tag.setAttribute("content", color));

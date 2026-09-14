@@ -151,7 +151,7 @@ export default function SettingsPage() {
         <label className="mt-4 flex items-start gap-3">
           <input
             type="checkbox"
-            className="mt-0.5 h-4 w-4 accent-[var(--color-accent)]"
+            className="check mt-0.5"
             checked={settings.autoDispatch}
             onChange={(event) => setSettings({ autoDispatch: event.target.checked })}
           />

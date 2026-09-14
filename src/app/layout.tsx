@@ -56,7 +56,7 @@ export const viewport: Viewport = {
   viewportFit: "cover",
   // Matches the manifest background so the shell never flashes white on launch.
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#e9eae4" },
+    { media: "(prefers-color-scheme: light)", color: "#eef1f5" },
     { media: "(prefers-color-scheme: dark)", color: "#07080a" },
   ],
 };

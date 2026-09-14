@@ -260,7 +260,7 @@ export function SwapPanel({
                 data-active={settings.slippageBps === bps}
                 style={
                   settings.slippageBps === bps
-                    ? { borderColor: "var(--color-accent)", color: "var(--color-accent-text)" }
+                    ? { borderColor: "var(--color-accent-line)", color: "var(--color-accent-text)" }
                     : undefined
                 }
                 onClick={() => setSettings({ slippageBps: bps })}
