@@ -375,6 +375,19 @@
     border-color: color-mix(in srgb, var(--color-short) 40%, transparent);
   }
 
+  .chip-warn {
+    color: var(--color-warn);
+    border-color: color-mix(in srgb, var(--color-warn) 45%, transparent);
+  }
+
+  /* Inline token tags sit inside dense rows, so they run shorter than a chip. */
+  .chip-xs {
+    height: 17px;
+    padding: 0 5px;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+  }
+
   .dot {
     width: 6px;
     height: 6px;

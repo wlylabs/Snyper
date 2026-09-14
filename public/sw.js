@@ -1,5 +1,5 @@
 /* Snyper service worker — shell caching only. */
-const VERSION = "snyper-v1";
+const VERSION = "snyper-v2";
 const SHELL = `${VERSION}-shell`;
 const STATIC = `${VERSION}-static`;
 const OFFLINE_URL = "/";
@@ -7,9 +7,14 @@ const OFFLINE_URL = "/";
 const PRECACHE = [
   "/",
   "/manifest.webmanifest",
+  "/favicon.ico",
   "/icons/icon.svg",
+  "/icons/icon-32.png",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
+  "/icons/maskable-192.png",
+  "/icons/maskable-512.png",
+  "/icons/apple-touch-icon.png",
 ];
 
 self.addEventListener("install", (event) => {
@@ -39,6 +44,8 @@ function isStaticAsset(url) {
   return (
     url.pathname.startsWith("/_next/static/") ||
     url.pathname.startsWith("/icons/") ||
+    url.pathname.startsWith("/screenshots/") ||
+    url.pathname === "/favicon.ico" ||
     url.pathname === "/manifest.webmanifest"
   );
 }

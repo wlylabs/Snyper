@@ -47,6 +47,22 @@ export const erc20Abi = [
     inputs: [],
     outputs: [{ type: "string" }],
   },
+  {
+    type: "function",
+    name: "totalSupply",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "uint256" }],
+  },
+  {
+    type: "event",
+    name: "Transfer",
+    inputs: [
+      { name: "from", type: "address", indexed: true },
+      { name: "to", type: "address", indexed: true },
+      { name: "value", type: "uint256", indexed: false },
+    ],
+  },
 ] as const;
 
 export const quoterV2Abi = [

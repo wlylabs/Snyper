@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useAccount, usePublicClient } from "wagmi";
 import { erc20Abi } from "@/lib/abi";
-import { CHAIN_META } from "@/lib/chains";
+import { dexMeta } from "@/lib/chains";
 import { midPrice } from "@/lib/quote";
 import type { Token } from "@/lib/tokens";
 
@@ -38,7 +38,7 @@ export function usePortfolio(chainId: number | undefined, tokens: Token[]) {
     staleTime: 20_000,
     queryFn: async () => {
       if (!client || !address || !chainId) return [];
-      const meta = CHAIN_META[chainId];
+      const dex = dexMeta(chainId);
 
       const erc20Tokens = tokens.filter((token) => !token.native);
       const nativeTokens = tokens.filter((token) => token.native);
@@ -82,9 +82,10 @@ export function usePortfolio(chainId: number | undefined, tokens: Token[]) {
         });
       });
 
-      if (!meta) return holdings;
+      // Without a routing venue there is nothing to price against; balances stand alone.
+      if (!dex) return holdings;
 
-      const stableAddress = meta.stable.toLowerCase();
+      const stableAddress = dex.stable.toLowerCase();
       const priced = await Promise.all(
         holdings.slice(0, MAX_PRICED).map(async (holding) => {
           if (holding.token.address.toLowerCase() === stableAddress) {

@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 import { useAccount, useConfig, useWriteContract } from "wagmi";
 import { readContract, waitForTransactionReceipt } from "wagmi/actions";
 import { erc20Abi } from "@/lib/abi";
-import { chainMeta, explorerTx } from "@/lib/chains";
+import { chainMeta, dexMeta, explorerTx } from "@/lib/chains";
 import type { Quote } from "@/lib/quote";
 import { applySlippage, buildSwap, swapRequest } from "@/lib/swap";
 import type { Token } from "@/lib/tokens";
@@ -42,6 +42,8 @@ export function useExecutor() {
       if (!address) throw new Error(t("error.notConnected"));
       const meta = chainMeta(tokenIn.chainId);
       if (!meta) throw new Error(t("error.unsupportedChain"));
+      const dex = dexMeta(tokenIn.chainId);
+      if (!dex) throw new Error(t("error.noVenue", { chain: meta.label }));
       if (chainId !== tokenIn.chainId) {
         throw new Error(t("error.switchFirst", { chain: meta.label }));
       }
@@ -55,7 +57,7 @@ export function useExecutor() {
           address: tokenIn.address,
           abi: erc20Abi,
           functionName: "allowance",
-          args: [address, meta.router],
+          args: [address, dex.router],
           chainId: tokenIn.chainId,
         })) as bigint;
 
@@ -64,7 +66,7 @@ export function useExecutor() {
             address: tokenIn.address,
             abi: erc20Abi,
             functionName: "approve",
-            args: [meta.router, amountIn],
+            args: [dex.router, amountIn],
             chainId: tokenIn.chainId,
           });
           pushTrade({

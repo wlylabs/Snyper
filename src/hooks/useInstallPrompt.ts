@@ -7,11 +7,36 @@ type BeforeInstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 };
 
-/** Wraps the platform install flow, including the iOS manual path. */
+export type InstallPlatform = "ios" | "android" | "desktop";
+
+const DISMISS_KEY = "snyper.install.dismissed.v1";
+
+function readDismissed(): boolean {
+  try {
+    return localStorage.getItem(DISMISS_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function detectPlatform(): InstallPlatform {
+  const ua = navigator.userAgent;
+  // iPadOS 13+ reports as a Mac, so touch points disambiguate it.
+  const iPadOS = /Macintosh/.test(ua) && navigator.maxTouchPoints > 1;
+  if (/iphone|ipad|ipod/i.test(ua) || iPadOS) return "ios";
+  if (/android/i.test(ua)) return "android";
+  return "desktop";
+}
+
+/**
+ * Wraps the platform install flow. Chromium hands us a deferred prompt; iOS has
+ * no such event, so the UI falls back to the documented Add to Home Screen path.
+ */
 export function useInstallPrompt() {
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
   const [standalone, setStandalone] = useState(false);
-  const [ios, setIos] = useState(false);
+  const [platform, setPlatform] = useState<InstallPlatform>("desktop");
+  const [dismissed, setDismissed] = useState(true);
 
   useEffect(() => {
     const onPrompt = (event: Event) => {
@@ -30,7 +55,8 @@ export function useInstallPrompt() {
     const navigatorStandalone = (window.navigator as unknown as { standalone?: boolean })
       .standalone;
     setStandalone(media.matches || navigatorStandalone === true);
-    setIos(/iphone|ipad|ipod/i.test(window.navigator.userAgent));
+    setPlatform(detectPlatform());
+    setDismissed(readDismissed());
 
     const onDisplayChange = (event: MediaQueryListEvent) => setStandalone(event.matches);
     media.addEventListener("change", onDisplayChange);
@@ -50,5 +76,27 @@ export function useInstallPrompt() {
     return choice.outcome;
   }, [deferred]);
 
-  return { canInstall: Boolean(deferred), install, standalone, ios };
+  /** Hides the banner for good; the header button stays available. */
+  const dismiss = useCallback(() => {
+    setDismissed(true);
+    try {
+      localStorage.setItem(DISMISS_KEY, "1");
+    } catch {
+      /* private mode: the banner simply returns next session */
+    }
+  }, []);
+
+  const ios = platform === "ios";
+  return {
+    /** A native prompt is held and ready to fire. */
+    canInstall: Boolean(deferred),
+    /** Anything worth offering an install surface for, prompt or manual path. */
+    canOffer: Boolean(deferred) || ios,
+    install,
+    dismiss,
+    dismissed,
+    standalone,
+    platform,
+    ios,
+  };
 }

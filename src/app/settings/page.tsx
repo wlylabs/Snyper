@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { Panel, Row } from "@/components/ui/Panel";
 import { Segmented } from "@/components/ui/Segmented";
+import { InstallSheet } from "@/components/shell/InstallPrompt";
 import { useInstallPrompt } from "@/hooks/useInstallPrompt";
 import { useMounted } from "@/hooks/useMounted";
 import { CHAIN_META, SUPPORTED_CHAINS } from "@/lib/chains";
@@ -21,6 +22,7 @@ const RPC_ENV: Record<number, string | undefined> = {
   137: process.env.NEXT_PUBLIC_RPC_137,
   8453: process.env.NEXT_PUBLIC_RPC_8453,
   42161: process.env.NEXT_PUBLIC_RPC_42161,
+  4663: process.env.NEXT_PUBLIC_RPC_4663,
 };
 
 export default function SettingsPage() {
@@ -30,8 +32,9 @@ export default function SettingsPage() {
   const setSettings = useAppStore((state) => state.setSettings);
   // Forced on: the reader is here to look at the rate, whichever currency is active.
   const { fx, isLoading: fxLoading } = useFxRate(true);
-  const { canInstall, install, standalone, ios } = useInstallPrompt();
+  const { standalone } = useInstallPrompt();
   const [wipeArmed, setWipeArmed] = useState(false);
+  const [installOpen, setInstallOpen] = useState(false);
 
   const wipe = () => {
     useAppStore.setState({
@@ -40,6 +43,7 @@ export default function SettingsPage() {
       trades: [],
       series: {},
       customTokens: [],
+      discoveredTokens: [],
       settings: {
         ...DEFAULT_SETTINGS,
         locale: settings.locale,
@@ -161,26 +165,27 @@ export default function SettingsPage() {
       </Panel>
 
       <Panel label={t("settings.install")} bodyClassName="p-3">
-        {standalone ? (
+        {mounted && standalone ? (
           <p className="flex items-center gap-2 text-[12px] long">
             <Icon name="check" size={14} />
             {t("settings.installed")}
           </p>
-        ) : canInstall ? (
+        ) : (
           <>
             <p className="text-[11px] leading-relaxed text-dim">
               {t("settings.installIntro")}
             </p>
-            <button type="button" className="btn btn-accent btn-sm mt-3 w-full" onClick={() => void install()}>
+            <button
+              type="button"
+              className="btn btn-accent btn-sm mt-3 w-full"
+              onClick={() => setInstallOpen(true)}
+            >
               <Icon name="download" size={13} />
               {t("settings.installAction")}
             </button>
           </>
-        ) : ios ? (
-          <p className="text-[11px] leading-relaxed text-dim">{t("settings.installIos")}</p>
-        ) : (
-          <p className="text-[11px] leading-relaxed text-dim">{t("settings.installNone")}</p>
         )}
+        <InstallSheet open={installOpen} onClose={() => setInstallOpen(false)} />
       </Panel>
 
       <Panel label={t("settings.connectivity")} bodyClassName="p-3">

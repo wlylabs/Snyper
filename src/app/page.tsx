@@ -13,7 +13,7 @@ import { useI18n } from "@/hooks/useI18n";
 import { useFxRate } from "@/hooks/useFxRate";
 import { formatMoney } from "@/lib/currency";
 import { useAppStore } from "@/store/useAppStore";
-import { chainMeta } from "@/lib/chains";
+import { chainMeta, dexMeta, hasRouting } from "@/lib/chains";
 import { feeLabel, formatPrice, formatSigned, timeAgo } from "@/lib/format";
 import { baseTokens, nativeToken, sameToken, type Token } from "@/lib/tokens";
 
@@ -27,7 +27,7 @@ export default function TerminalPage() {
   const chainId = accountChainId ?? activeChainId;
   const meta = chainMeta(chainId);
 
-  const { tokens } = useTokenList(chainId);
+  const { tokens, listed } = useTokenList(chainId);
   const [tokenIn, setTokenIn] = useState<Token>();
   const [tokenOut, setTokenOut] = useState<Token>();
 
@@ -36,7 +36,8 @@ export default function TerminalPage() {
     if (!chainId || !meta) return;
     const defaults = baseTokens(chainId);
     const native = nativeToken(chainId);
-    const stable = defaults.find((token) => token.address === meta.stable);
+    const stableAddress = dexMeta(chainId)?.stable;
+    const stable = defaults.find((token) => token.address === stableAddress);
     setTokenIn((current) => (current?.chainId === chainId ? current : native));
     setTokenOut((current) => (current?.chainId === chainId ? current : stable));
   }, [chainId, meta]);
@@ -62,8 +63,9 @@ export default function TerminalPage() {
   }, [series]);
 
   /** The quote side is the chain's USD unit, so a rupiah conversion is meaningful. */
+  const stableAddress = meta?.dex?.stable.toLowerCase();
   const quotedInUsd = Boolean(
-    quote && meta && quote.address.toLowerCase() === meta.stable.toLowerCase(),
+    quote && stableAddress && quote.address.toLowerCase() === stableAddress,
   );
 
   const swapTokens = () => {
@@ -137,11 +139,16 @@ export default function TerminalPage() {
           {error ? (
             <p className="wrap-any flex items-start gap-2 text-[11px] leading-relaxed short">
               <Icon name="alert" size={14} className="mt-0.5 shrink-0" />
-              {error.message}
+              {/* RPC failures arrive as multi-paragraph viem reports. */}
+              {error.message.split("\n")[0].slice(0, 160)}
             </p>
           ) : (
             <>
-              <Row k={t("terminal.venue")} v="Uniswap v3" />
+              <Row
+                k={t("terminal.venue")}
+                v={hasRouting(chainId) ? "Uniswap v3" : t("terminal.noVenue")}
+                tone={hasRouting(chainId) ? undefined : "warn"}
+              />
               <Row k={t("terminal.deepestTier")} v={pool ? feeLabel(pool.fee) : "—"} />
               <Row
                 k={t("terminal.pool")}
@@ -183,6 +190,7 @@ export default function TerminalPage() {
       <div className="order-1 min-w-0 lg:order-2 lg:col-span-5">
         <SwapPanel
           tokens={tokens}
+          listed={listed}
           tokenIn={tokenIn}
           tokenOut={tokenOut}
           onTokenIn={(token) => {

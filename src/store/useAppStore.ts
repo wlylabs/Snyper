@@ -15,6 +15,7 @@ import type {
 const MAX_SERIES_POINTS = 360;
 const MAX_SIGNALS = 200;
 const MAX_TRADES = 200;
+const MAX_DISCOVERED = 300;
 
 export const DEFAULT_SETTINGS: Settings = {
   locale: "en",
@@ -46,6 +47,8 @@ type AppState = {
   series: Record<string, PricePoint[]>;
   settings: Settings;
   customTokens: Token[];
+  /** Tokens found by scanning the wallet's own transfer history. */
+  discoveredTokens: Token[];
   hydrated: boolean;
 
   addBot: (bot: Bot) => void;
@@ -66,6 +69,7 @@ type AppState = {
 
   setSettings: (patch: Partial<Settings>) => void;
   addCustomToken: (token: Token) => void;
+  addDiscoveredTokens: (tokens: Token[]) => void;
   setHydrated: () => void;
 };
 
@@ -78,6 +82,7 @@ export const useAppStore = create<AppState>()(
       series: {},
       settings: DEFAULT_SETTINGS,
       customTokens: [],
+      discoveredTokens: [],
       hydrated: false,
 
       addBot: (bot) => set((state) => ({ bots: [bot, ...state.bots] })),
@@ -159,11 +164,32 @@ export const useAppStore = create<AppState>()(
           return exists ? state : { customTokens: [...state.customTokens, token] };
         }),
 
+      addDiscoveredTokens: (tokens) =>
+        set((state) => {
+          const seen = new Set(
+            state.discoveredTokens.map(
+              (token) => `${token.chainId}:${token.address.toLowerCase()}`,
+            ),
+          );
+          const additions = tokens.filter((token) => {
+            const key = `${token.chainId}:${token.address.toLowerCase()}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+          if (additions.length === 0) return state;
+          return {
+            discoveredTokens: [...state.discoveredTokens, ...additions].slice(
+              -MAX_DISCOVERED,
+            ),
+          };
+        }),
+
       setHydrated: () => set({ hydrated: true }),
     }),
     {
       name: "snyper.state.v1",
-      version: 2,
+      version: 3,
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         bots: state.bots,
@@ -172,6 +198,7 @@ export const useAppStore = create<AppState>()(
         series: state.series,
         settings: state.settings,
         customTokens: state.customTokens,
+        discoveredTokens: state.discoveredTokens,
       }),
       /**
        * Persisted state is merged key by key, and `settings` is merged one level

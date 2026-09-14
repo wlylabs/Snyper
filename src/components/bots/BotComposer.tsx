@@ -8,7 +8,7 @@ import { Sheet } from "@/components/ui/Sheet";
 import { TokenBadge, TokenPicker } from "@/components/terminal/TokenPicker";
 import { usePairPrice } from "@/hooks/usePairPrice";
 import { useTokenList } from "@/hooks/useTokenList";
-import { chainMeta } from "@/lib/chains";
+import { chainMeta, dexMeta } from "@/lib/chains";
 import { formatPrice } from "@/lib/format";
 import { STRATEGY_SHORT, STRATEGY_SUMMARY } from "@/lib/strategies";
 import { useI18n } from "@/hooks/useI18n";
@@ -73,7 +73,7 @@ export function BotComposer({ open, onClose }: { open: boolean; onClose: () => v
   const { chainId: accountChainId } = useAccount();
   const chainId = accountChainId ?? activeChainId;
   const meta = chainMeta(chainId);
-  const { tokens } = useTokenList(chainId);
+  const { tokens, listed } = useTokenList(chainId);
   const addBot = useAppStore((state) => state.addBot);
 
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
@@ -85,9 +85,12 @@ export function BotComposer({ open, onClose }: { open: boolean; onClose: () => v
   useEffect(() => {
     if (!chainId || !meta) return;
     const defaults = baseTokens(chainId);
+    const stable = dexMeta(chainId)?.stable;
     setBase((current) => (current?.chainId === chainId ? current : nativeToken(chainId)));
     setQuote((current) =>
-      current?.chainId === chainId ? current : defaults.find((t) => t.address === meta.stable),
+      current?.chainId === chainId
+        ? current
+        : defaults.find((token) => token.address === stable),
     );
   }, [chainId, meta]);
 
@@ -433,6 +436,7 @@ export function BotComposer({ open, onClose }: { open: boolean; onClose: () => v
         open={picker !== null}
         onClose={() => setPicker(null)}
         tokens={tokens}
+        listed={listed}
         chainId={chainId}
         excludeAddress={picker === "base" ? quote?.address : base?.address}
         title={picker === "base" ? t("token.base") : t("token.quote")}

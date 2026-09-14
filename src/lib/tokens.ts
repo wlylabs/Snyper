@@ -1,7 +1,7 @@
 import type { PublicClient } from "viem";
 import { getAddress, isAddress } from "viem";
 import { erc20Abi } from "./abi";
-import { CHAIN_META, NATIVE } from "./chains";
+import { CHAIN_META, NATIVE, dexMeta } from "./chains";
 
 export type Token = {
   chainId: number;
@@ -33,26 +33,31 @@ export function nativeToken(chainId: number): Token | undefined {
   };
 }
 
-/** Wrapped native + the chain's USD unit are always available offline of the list. */
+/**
+ * Native currency plus, where the chain has a Uniswap deployment, its wrapped
+ * token and USD unit. These are always available offline of the token list.
+ */
 export function baseTokens(chainId: number): Token[] {
   const meta = CHAIN_META[chainId];
   if (!meta) return [];
   const native = nativeToken(chainId);
+  const dex = meta.dex;
+  if (!dex) return native ? [native] : [];
   return [
     ...(native ? [native] : []),
     {
       chainId,
-      address: meta.wrapped,
-      symbol: meta.wrappedSymbol,
+      address: dex.wrapped,
+      symbol: dex.wrappedSymbol,
       name: `Wrapped ${meta.chain.nativeCurrency.name}`,
       decimals: meta.chain.nativeCurrency.decimals,
     },
     {
       chainId,
-      address: meta.stable,
-      symbol: meta.stableSymbol,
+      address: dex.stable,
+      symbol: dex.stableSymbol,
       name: "USD Coin",
-      decimals: meta.stableDecimals,
+      decimals: dex.stableDecimals,
     },
   ];
 }
@@ -138,8 +143,8 @@ export function sameToken(a: Token | undefined, b: Token | undefined): boolean {
 
 /** Address used for routing: native currency routes through its wrapper. */
 export function routingAddress(token: Token): `0x${string}` {
-  const meta = CHAIN_META[token.chainId];
-  if (token.native && meta) return meta.wrapped;
+  const dex = dexMeta(token.chainId);
+  if (token.native && dex) return dex.wrapped;
   return token.address;
 }
 

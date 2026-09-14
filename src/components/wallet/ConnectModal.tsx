@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useAccount, useConnect, useConnectors } from "wagmi";
+import { useCallback, useEffect, useState } from "react";
+import { useAccount, useConnect } from "wagmi";
 import type { Connector } from "wagmi";
 import { Icon } from "@/components/ui/Icon";
 import { Sheet } from "@/components/ui/Sheet";
-import { WALLETCONNECT_PROJECT_ID } from "@/lib/wagmi";
+import { useWalletConnectors } from "@/hooks/useWalletConnectors";
+import { walletErrorMessage } from "@/lib/walletErrors";
 import { useI18n } from "@/hooks/useI18n";
 
 /**
@@ -21,36 +22,29 @@ const WALLET_LINKS: { name: string; prefix: string }[] = [
   { name: "Ledger Live", prefix: "ledgerlive://wc?uri=" },
 ];
 
+/** Where to send someone who has no wallet at all on this device. */
+const WALLET_DOWNLOADS: { name: string; href: string }[] = [
+  { name: "MetaMask", href: "https://metamask.io/download/" },
+  { name: "Rabby", href: "https://rabby.io/" },
+  { name: "Coinbase Wallet", href: "https://www.coinbase.com/wallet/downloads" },
+];
+
 type Stage = "choose" | "pairing";
 
 export function ConnectModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { t } = useI18n();
-  const connectors = useConnectors();
+  const {
+    injected: injectedConnectors,
+    walletConnect: walletConnectConnector,
+    coinbase: coinbaseConnector,
+    probed,
+  } = useWalletConnectors();
   const { connect, isPending, error, reset } = useConnect();
   const { isConnected } = useAccount();
   const [stage, setStage] = useState<Stage>("choose");
   const [uri, setUri] = useState<string>("");
   const [qr, setQr] = useState<string>("");
   const [copied, setCopied] = useState(false);
-
-  const walletConnectConnector = useMemo(
-    () => connectors.find((connector) => connector.id === "walletConnect"),
-    [connectors],
-  );
-
-  /** EIP-6963 announced wallets, deduplicated against the generic shim. */
-  const injectedConnectors = useMemo(() => {
-    const discovered = connectors.filter(
-      (connector) => connector.type === "injected" && connector.id !== "injected",
-    );
-    if (discovered.length > 0) return discovered;
-    return connectors.filter((connector) => connector.id === "injected");
-  }, [connectors]);
-
-  const coinbaseConnector = useMemo(
-    () => connectors.find((connector) => connector.id === "coinbaseWalletSDK"),
-    [connectors],
-  );
 
   useEffect(() => {
     if (!open) {
@@ -130,8 +124,27 @@ export function ConnectModal({ open, onClose }: { open: boolean; onClose: () => 
 
           <p className="lbl mb-2">{t("wallet.installed")}</p>
           <div className="mb-4 flex flex-col gap-1.5">
-            {injectedConnectors.length === 0 && (
-              <p className="text-xs text-faint">{t("wallet.noBrowserWallet")}</p>
+            {!probed && <div className="skel h-[58px] w-full" />}
+            {probed && injectedConnectors.length === 0 && (
+              <div className="panel p-3">
+                <p className="text-[11px] leading-relaxed text-dim">
+                  {t("wallet.noBrowserWallet")}
+                </p>
+                <div className="mt-2.5 flex flex-wrap gap-1.5">
+                  {WALLET_DOWNLOADS.map((wallet) => (
+                    <a
+                      key={wallet.name}
+                      href={wallet.href}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="btn btn-sm"
+                    >
+                      {wallet.name}
+                      <Icon name="external" size={11} className="text-faint" />
+                    </a>
+                  ))}
+                </div>
+              </div>
             )}
             {injectedConnectors.map((connector) => (
               <WalletRow
@@ -178,7 +191,10 @@ export function ConnectModal({ open, onClose }: { open: boolean; onClose: () => 
 
           {isPending && <p className="lbl mt-4">{t("wallet.waiting")}</p>}
           {error && (
-            <p className="wrap-any mt-4 text-[11px] leading-relaxed short">{error.message}</p>
+            <p className="wrap-any mt-4 flex items-start gap-2 text-[11px] leading-relaxed short">
+              <Icon name="alert" size={13} className="mt-0.5 shrink-0" />
+              {walletErrorMessage(error, t)}
+            </p>
           )}
         </div>
       ) : (
@@ -247,7 +263,10 @@ export function ConnectModal({ open, onClose }: { open: boolean; onClose: () => 
           </div>
 
           {error && (
-            <p className="wrap-any mt-3 text-[11px] leading-relaxed short">{error.message}</p>
+            <p className="wrap-any mt-3 flex items-start gap-2 text-[11px] leading-relaxed short">
+              <Icon name="alert" size={13} className="mt-0.5 shrink-0" />
+              {walletErrorMessage(error, t)}
+            </p>
           )}
         </div>
       )}

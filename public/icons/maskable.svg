@@ -11,17 +11,14 @@
     </radialGradient>
   </defs>
 
-  <rect width="512" height="512" rx="114" fill="url(#tile)"/>
-  <rect width="512" height="512" rx="114" fill="url(#glow)"/>
-  <rect x="1.5" y="1.5" width="509" height="509" rx="112.5" fill="none" stroke="#d7fe4b" stroke-opacity="0.16" stroke-width="3"/>
-
+  <rect width="512" height="512" fill="url(#tile)"/>
+  <rect width="512" height="512" fill="url(#glow)"/>
+  <g transform="translate(256 256) scale(0.7) translate(-256 -256)">
   <g stroke="#d7fe4b" stroke-width="19" fill="none">
-    <!-- scope ring, broken at the four poles so the crosshair reads through it -->
     <circle cx="256" cy="256" r="134" stroke-dasharray="140.3 70.2" transform="rotate(15 256 256)"/>
-    <!-- crosshair: the north arm runs long and turns into the trend arrow -->
     <path d="M256 186V96M256 326v90M186 256H96M326 256h90"/>
   </g>
-
   <path d="M256 52l42 56h-84z" fill="#d7fe4b"/>
   <rect x="238" y="238" width="36" height="36" fill="#d7fe4b"/>
+  </g>
 </svg>

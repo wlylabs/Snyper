@@ -2,12 +2,13 @@
 
 import { useMemo, useState } from "react";
 import { useAccount, useChainId } from "wagmi";
-import { TokenBadge } from "@/components/terminal/TokenPicker";
+import { TokenBadge, TokenTags } from "@/components/terminal/TokenPicker";
 import { Icon } from "@/components/ui/Icon";
 import { Empty, Panel, Skeleton } from "@/components/ui/Panel";
 import { useMounted } from "@/hooks/useMounted";
 import { usePortfolio } from "@/hooks/usePortfolio";
 import { useTokenList } from "@/hooks/useTokenList";
+import { useTokenDiscovery } from "@/hooks/useTokenDiscovery";
 import { useI18n } from "@/hooks/useI18n";
 import { useFxRate } from "@/hooks/useFxRate";
 import { chainMeta, explorerAddress } from "@/lib/chains";
@@ -26,11 +27,13 @@ export default function AssetsPage() {
   const chainId = accountChainId ?? activeChainId;
   const meta = chainMeta(chainId);
 
-  const { tokens: listTokens } = useTokenList(chainId);
+  const { tokens: listTokens, listed } = useTokenList(chainId);
   const customTokens = useAppStore((state) => state.customTokens);
+  const discoveredTokens = useAppStore((state) => state.discoveredTokens);
   const bots = useAppStore((state) => state.bots);
   const trades = useAppStore((state) => state.trades);
   const [deepScan, setDeepScan] = useState(false);
+  const discovery = useTokenDiscovery(chainId);
 
   /** Default scope stays small: held defaults, imports and anything traded. */
   const scope = useMemo<Token[]>(() => {
@@ -44,9 +47,15 @@ export default function AssetsPage() {
       if (trade.tokenIn) touched.push(trade.tokenIn);
       if (trade.tokenOut) touched.push(trade.tokenOut);
     }
-    const core = mergeTokens(chainId, baseTokens(chainId), customTokens, touched);
+    const core = mergeTokens(
+      chainId,
+      baseTokens(chainId),
+      customTokens,
+      discoveredTokens,
+      touched,
+    );
     return deepScan ? mergeTokens(chainId, core, listTokens) : core;
-  }, [chainId, bots, trades, customTokens, deepScan, listTokens]);
+  }, [chainId, bots, trades, customTokens, discoveredTokens, deepScan, listTokens]);
 
   const { data: holdings, isFetching, refetch } = usePortfolio(chainId, scope);
 
@@ -111,7 +120,10 @@ export default function AssetsPage() {
                 >
                   <TokenBadge token={holding.token} />
                   <div className="min-w-0 flex-1">
-                    <p className="text-[13px] font-semibold">{holding.token.symbol}</p>
+                    <p className="flex items-center gap-1.5 text-[13px] font-semibold">
+                      <span className="truncate">{holding.token.symbol}</span>
+                      <TokenTags token={holding.token} listed={listed} />
+                    </p>
                     <p className="truncate text-[11px] text-faint">
                       {holding.price !== undefined
                         ? formatMoney(holding.price, { currency, fx, locale })
@@ -134,7 +146,34 @@ export default function AssetsPage() {
           <div className="border-t border-line p-3">
             <button
               type="button"
-              className="btn btn-sm w-full"
+              className="btn btn-accent btn-sm w-full"
+              onClick={() => void discovery.scan()}
+              disabled={!discovery.canScan || discovery.isScanning}
+            >
+              <Icon name="crosshair" size={13} />
+              {discovery.isScanning ? t("assets.detecting") : t("assets.detect")}
+            </button>
+            <p className="mt-2 text-[10px] leading-relaxed text-faint">
+              {t("assets.detectNote")}
+            </p>
+            {discovery.found && (
+              <p className="mt-2 text-[10px] leading-relaxed text-dim">
+                {t("assets.detectResult", {
+                  count: discovery.found.length,
+                  blocks: discovery.scannedBlocks ?? 0,
+                })}
+                {discovery.partial ? ` ${t("assets.detectPartial")}` : ""}
+              </p>
+            )}
+            {discovery.error && (
+              <p className="wrap-any mt-2 text-[10px] leading-relaxed short">
+                {discovery.error}
+              </p>
+            )}
+
+            <button
+              type="button"
+              className="btn btn-sm mt-2 w-full"
               onClick={() => setDeepScan((value) => !value)}
               disabled={!address}
             >
@@ -165,6 +204,34 @@ export default function AssetsPage() {
             </>
           ) : (
             <p className="text-[11px] text-faint">{t("assets.connectHint")}</p>
+          )}
+        </Panel>
+
+        <Panel label={t("assets.detected")} bodyClassName="p-0">
+          {discoveredTokens.filter((token) => token.chainId === chainId).length === 0 ? (
+            <Empty title={t("assets.noneDetected")} hint={t("assets.noneDetectedHint")} />
+          ) : (
+            discoveredTokens
+              .filter((token) => token.chainId === chainId)
+              .map((token) => (
+                <div
+                  key={token.address}
+                  className="flex items-center justify-between gap-3 border-b border-line px-3 py-2.5 last:border-b-0"
+                >
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <span className="truncate text-[12px] font-semibold">{token.symbol}</span>
+                    <TokenTags token={token} listed={listed} />
+                  </span>
+                  <a
+                    href={chainId ? explorerAddress(chainId, token.address) : undefined}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="num shrink-0 text-[10px] text-faint hover:text-accent-text"
+                  >
+                    {truncateAddress(token.address, 6, 4)}
+                  </a>
+                </div>
+              ))
           )}
         </Panel>
 
