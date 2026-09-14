@@ -1,27 +1,44 @@
 /* Snyper service worker — shell caching only. */
-const VERSION = "snyper-v2";
+const VERSION = "snyper-v3";
 const SHELL = `${VERSION}-shell`;
 const STATIC = `${VERSION}-static`;
 const OFFLINE_URL = "/";
 
+/*
+ * Branded artwork lives at stable URLs but its contents change with the mark,
+ * so every icon carries a version query. Bump it in step with `?v=` in the
+ * manifest and in the metadata icons whenever the artwork is redrawn — that is
+ * what makes an already-installed app refetch its launcher icon.
+ */
+const ASSET_VERSION = "?v=2";
+
 const PRECACHE = [
   "/",
   "/manifest.webmanifest",
-  "/favicon.ico",
-  "/icons/icon.svg",
-  "/icons/icon-32.png",
-  "/icons/icon-192.png",
-  "/icons/icon-512.png",
-  "/icons/maskable-192.png",
-  "/icons/maskable-512.png",
-  "/icons/apple-touch-icon.png",
+  `/favicon.ico${ASSET_VERSION}`,
+  `/icons/icon.svg${ASSET_VERSION}`,
+  `/icons/icon-32.png${ASSET_VERSION}`,
+  `/icons/icon-192.png${ASSET_VERSION}`,
+  `/icons/icon-512.png${ASSET_VERSION}`,
+  `/icons/maskable-192.png${ASSET_VERSION}`,
+  `/icons/maskable-512.png${ASSET_VERSION}`,
+  `/icons/apple-touch-icon.png${ASSET_VERSION}`,
 ];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
       .open(SHELL)
-      .then((cache) => cache.addAll(PRECACHE))
+      // `reload` keeps a stale HTTP-cached copy from being precached as fresh.
+      .then((cache) =>
+        Promise.all(
+          PRECACHE.map((path) =>
+            fetch(new Request(path, { cache: "reload" }))
+              .then((response) => (response.ok ? cache.put(path, response) : undefined))
+              .catch(() => undefined),
+          ),
+        ),
+      )
       .catch(() => undefined)
       .then(() => self.skipWaiting()),
   );
@@ -40,14 +57,31 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-function isStaticAsset(url) {
+/** Content-hashed URLs: a change ships a new path, so the cache can never go stale. */
+function isImmutableAsset(url) {
+  return url.pathname.startsWith("/_next/static/");
+}
+
+/**
+ * Icons, screenshots and the manifest keep their path across releases, so these
+ * are read from the network first. Serving them cache-first is what pinned the
+ * install prompt to the previous mark.
+ */
+function isBrandedAsset(url) {
   return (
-    url.pathname.startsWith("/_next/static/") ||
     url.pathname.startsWith("/icons/") ||
     url.pathname.startsWith("/screenshots/") ||
     url.pathname === "/favicon.ico" ||
     url.pathname === "/manifest.webmanifest"
   );
+}
+
+function cachePut(request, response) {
+  const copy = response.clone();
+  caches
+    .open(STATIC)
+    .then((cache) => cache.put(request, copy))
+    .catch(() => undefined);
 }
 
 self.addEventListener("fetch", (event) => {
@@ -75,15 +109,29 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (isStaticAsset(url)) {
+  if (isBrandedAsset(url)) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response.ok) cachePut(request, response);
+          return response;
+        })
+        .catch(async () => {
+          // Offline: any cached copy beats no icon at all.
+          const cached =
+            (await caches.match(request)) || (await caches.match(request, { ignoreSearch: true }));
+          return cached || Response.error();
+        }),
+    );
+    return;
+  }
+
+  if (isImmutableAsset(url)) {
     event.respondWith(
       caches.match(request).then((cached) => {
         if (cached) return cached;
         return fetch(request).then((response) => {
-          if (response.ok) {
-            const copy = response.clone();
-            caches.open(STATIC).then((cache) => cache.put(request, copy)).catch(() => undefined);
-          }
+          if (response.ok) cachePut(request, response);
           return response;
         });
       }),
