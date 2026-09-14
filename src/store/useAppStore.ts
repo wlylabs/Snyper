@@ -17,6 +17,9 @@ const MAX_SIGNALS = 200;
 const MAX_TRADES = 200;
 
 export const DEFAULT_SETTINGS: Settings = {
+  locale: "en",
+  localeChosen: false,
+  currency: "USD",
   slippageBps: 50,
   deadlineMinutes: 20,
   tickSeconds: 30,
@@ -160,7 +163,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: "snyper.state.v1",
-      version: 1,
+      version: 2,
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         bots: state.bots,
@@ -170,6 +173,19 @@ export const useAppStore = create<AppState>()(
         settings: state.settings,
         customTokens: state.customTokens,
       }),
+      /**
+       * Persisted state is merged key by key, and `settings` is merged one level
+       * deeper, so a release that adds a setting does not leave it undefined for
+       * anyone who already has state in this browser.
+       */
+      merge: (persisted, current) => {
+        const saved = (persisted ?? {}) as Partial<AppState>;
+        return {
+          ...current,
+          ...saved,
+          settings: { ...current.settings, ...(saved.settings ?? {}) },
+        };
+      },
       onRehydrateStorage: () => (state) => {
         state?.setHydrated();
       },

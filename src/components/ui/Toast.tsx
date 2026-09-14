@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { Icon } from "./Icon";
+import { useI18n } from "@/hooks/useI18n";
 
 type Tone = "info" | "ok" | "error";
 
@@ -27,6 +28,7 @@ type ToastApi = {
 const ToastContext = createContext<ToastApi | undefined>(undefined);
 
 export function ToastProvider({ children }: { children: ReactNode }) {
+  const { t } = useI18n();
   const [items, setItems] = useState<ToastItem[]>([]);
 
   const push = useCallback((toast: Omit<ToastItem, "id">) => {
@@ -66,7 +68,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                   rel="noreferrer"
                   className="lbl mt-2 inline-flex items-center gap-1 text-accent-text"
                 >
-                  Explorer
+                  {t("common.explorer")}
                   <Icon name="external" size={11} />
                 </a>
               )}
@@ -75,7 +77,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               type="button"
               className="text-faint transition-colors hover:text-ink"
               onClick={() => setItems((current) => current.filter((i) => i.id !== item.id))}
-              aria-label="Dismiss"
+              aria-label={t("toast.dismiss")}
             >
               <Icon name="close" size={14} />
             </button>

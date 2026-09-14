@@ -8,6 +8,7 @@ import { Sheet } from "@/components/ui/Sheet";
 import { truncateAddress } from "@/lib/format";
 import { readToken, searchTokens, type Token } from "@/lib/tokens";
 import { useAppStore } from "@/store/useAppStore";
+import { useI18n } from "@/hooks/useI18n";
 
 export function TokenPicker({
   open,
@@ -16,7 +17,7 @@ export function TokenPicker({
   chainId,
   onSelect,
   excludeAddress,
-  title = "Select asset",
+  title,
 }: {
   open: boolean;
   onClose: () => void;
@@ -26,6 +27,7 @@ export function TokenPicker({
   excludeAddress?: string;
   title?: string;
 }) {
+  const { t } = useI18n();
   const [query, setQuery] = useState("");
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string>();
@@ -56,17 +58,17 @@ export function TokenPicker({
       setQuery("");
       onClose();
     } catch {
-      setImportError("Could not read this contract as an ERC-20 token.");
+      setImportError(t("token.importFailed"));
     } finally {
       setImporting(false);
     }
   };
 
   return (
-    <Sheet open={open} title={title} onClose={onClose}>
+    <Sheet open={open} title={title ?? t("token.select")} onClose={onClose}>
       <div className="border-b border-line p-3">
         <label className="relative block">
-          <span className="sr-only">Search assets</span>
+          <span className="sr-only">{t("token.searchLabel")}</span>
           <Icon
             name="search"
             size={15}
@@ -74,7 +76,7 @@ export function TokenPicker({
           />
           <input
             className="field pl-9"
-            placeholder="Symbol, name or address"
+            placeholder={t("token.search")}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             autoComplete="off"
@@ -101,7 +103,7 @@ export function TokenPicker({
               <span className="block truncate text-[11px] text-faint">{token.name}</span>
             </span>
             <span className="num text-[10px] text-faint">
-              {token.native ? "NATIVE" : truncateAddress(token.address, 6, 4)}
+              {token.native ? t("token.native") : truncateAddress(token.address, 6, 4)}
             </span>
           </button>
         ))}
@@ -110,22 +112,20 @@ export function TokenPicker({
           <div className="p-4">
             {canImport ? (
               <div className="panel p-3">
-                <p className="text-xs text-dim">
-                  Unlisted contract. Details are read directly from the chain.
-                </p>
+                <p className="text-xs text-dim">{t("token.unlisted")}</p>
                 <button
                   type="button"
                   className="btn btn-sm mt-3 w-full"
                   onClick={importToken}
                   disabled={importing}
                 >
-                  {importing ? "Reading contract…" : "Import token"}
+                  {importing ? t("token.importing") : t("token.import")}
                 </button>
                 {importError && <p className="mt-2 text-[11px] short">{importError}</p>}
               </div>
             ) : (
               <p className="text-center text-xs text-faint">
-                {query ? "Nothing matched that search." : "No assets available."}
+                {query ? t("token.noMatch") : t("token.noneAvailable")}
               </p>
             )}
           </div>

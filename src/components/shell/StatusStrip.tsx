@@ -5,9 +5,11 @@ import { chainMeta } from "@/lib/chains";
 import { formatPrice, timeAgo } from "@/lib/format";
 import { useAppStore } from "@/store/useAppStore";
 import { useMounted } from "@/hooks/useMounted";
+import { useI18n } from "@/hooks/useI18n";
 
 export function StatusStrip() {
   const mounted = useMounted();
+  const { t } = useI18n();
   const { chainId, isConnected } = useAccount();
   const meta = chainMeta(chainId);
   const { data: blockNumber } = useBlockNumber({
@@ -42,16 +44,18 @@ export function StatusStrip() {
       <div className="mx-auto flex h-full max-w-[1480px] items-center gap-4 overflow-hidden px-3 md:px-4">
         <span className="flex shrink-0 items-center gap-1.5">
           <span className={`dot ${armed > 0 ? "dot-live" : ""}`} />
-          <span className="lbl">{armed > 0 ? `${armed} armed` : "Idle"}</span>
+          <span className="lbl">
+            {armed > 0 ? t("common.armedCount", { count: armed }) : t("common.idle")}
+          </span>
         </span>
 
         <span className="hidden shrink-0 items-center gap-1.5 sm:flex">
-          <span className="lbl">Queue</span>
+          <span className="lbl">{t("common.queue")}</span>
           <span className="num text-[11px]">{open}</span>
         </span>
 
         <span className="hidden shrink-0 items-center gap-1.5 md:flex">
-          <span className="lbl">{meta ? meta.label : "Network"}</span>
+          <span className="lbl">{meta ? meta.label : t("common.network")}</span>
           <span className="num text-[11px] text-dim">
             {mounted && blockNumber ? `#${blockNumber.toString()}` : "—"}
           </span>
@@ -74,7 +78,9 @@ export function StatusStrip() {
                       {(feed.change * 100).toFixed(2)}%
                     </span>
                   )}
-                  {feed.at && <span className="lbl hidden lg:inline">{timeAgo(feed.at)}</span>}
+                  {feed.at && (
+                    <span className="lbl hidden lg:inline">{timeAgo(feed.at)}</span>
+                  )}
                 </span>
               ))}
         </div>

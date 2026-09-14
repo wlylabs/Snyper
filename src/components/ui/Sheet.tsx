@@ -3,6 +3,7 @@
 import { useEffect, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "./Icon";
+import { useI18n } from "@/hooks/useI18n";
 
 type SheetProps = {
   open: boolean;
@@ -13,6 +14,8 @@ type SheetProps = {
 };
 
 export function Sheet({ open, title, onClose, children, footer }: SheetProps) {
+  const { t } = useI18n();
+
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => {
@@ -36,7 +39,12 @@ export function Sheet({ open, title, onClose, children, footer }: SheetProps) {
         <div className="grab md:hidden" />
         <header className="panel-head shrink-0">
           <span className="lbl">{title}</span>
-          <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={onClose}
+            aria-label={t("common.close")}
+          >
             <Icon name="close" size={16} />
           </button>
         </header>

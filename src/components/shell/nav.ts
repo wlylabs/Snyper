@@ -1,17 +1,18 @@
 import type { IconName } from "@/components/ui/Icon";
+import type { TKey } from "@/lib/i18n";
 
 export type NavItem = {
   href: string;
-  label: string;
+  label: TKey;
   icon: IconName;
 };
 
 export const NAV_ITEMS: NavItem[] = [
-  { href: "/", label: "Terminal", icon: "crosshair" },
-  { href: "/bots", label: "Strategies", icon: "grid" },
-  { href: "/assets", label: "Assets", icon: "stack" },
-  { href: "/activity", label: "Activity", icon: "pulse" },
-  { href: "/settings", label: "Settings", icon: "sliders" },
+  { href: "/", label: "nav.terminal", icon: "crosshair" },
+  { href: "/bots", label: "nav.bots", icon: "grid" },
+  { href: "/assets", label: "nav.assets", icon: "stack" },
+  { href: "/activity", label: "nav.activity", icon: "pulse" },
+  { href: "/settings", label: "nav.settings", icon: "sliders" },
 ];
 
 export function isActivePath(pathname: string, href: string): boolean {

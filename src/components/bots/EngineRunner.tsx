@@ -10,6 +10,7 @@ import type { Bot, Signal } from "@/lib/types";
 import { seriesKey, todayKey, useAppStore } from "@/store/useAppStore";
 import { readableError } from "@/hooks/useExecutor";
 import { useDispatchSignal } from "@/hooks/useDispatchSignal";
+import { useI18n } from "@/hooks/useI18n";
 
 function newId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -51,10 +52,17 @@ export function EngineRunner() {
   const config = useConfig();
   const { address, chainId } = useAccount();
   const tickSeconds = useAppStore((state) => state.settings.tickSeconds);
+  const { t } = useI18n();
+  // Held in a ref so switching language does not restart the strategy interval.
+  const tRef = useRef(t);
   const running = useRef(false);
   const dispatching = useRef(false);
 
   const dispatch = useDispatchSignal();
+
+  useEffect(() => {
+    tRef.current = t;
+  }, [t]);
 
   useEffect(() => {
     const interval = Math.max(10, Math.min(600, tickSeconds)) * 1000;
@@ -80,13 +88,18 @@ export function EngineRunner() {
             const mid = await midPrice(client, bot.base, bot.quote);
             price = mid?.price;
           } catch (error) {
-            useAppStore.getState().patchRuntime(bot.id, { error: readableError(error) });
+            useAppStore
+              .getState()
+              .patchRuntime(bot.id, { error: readableError(error, tRef.current) });
             continue;
           }
           if (!price) {
             useAppStore
               .getState()
-              .patchRuntime(bot.id, { lastTickAt: now, error: "No pool for this pair" });
+              .patchRuntime(bot.id, {
+                lastTickAt: now,
+                error: tRef.current("error.noPool"),
+              });
             continue;
           }
 
@@ -126,7 +139,9 @@ export function EngineRunner() {
 
           const gate = withinRiskLimits(current, intent, price, today);
           if (!gate.ok) {
-            useAppStore.getState().patchRuntime(bot.id, { error: gate.reason });
+            useAppStore
+              .getState()
+              .patchRuntime(bot.id, { error: tRef.current(gate.reason) });
             continue;
           }
 

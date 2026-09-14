@@ -8,13 +8,19 @@ import { Empty, Panel, Skeleton } from "@/components/ui/Panel";
 import { useMounted } from "@/hooks/useMounted";
 import { usePortfolio } from "@/hooks/usePortfolio";
 import { useTokenList } from "@/hooks/useTokenList";
+import { useI18n } from "@/hooks/useI18n";
+import { useFxRate } from "@/hooks/useFxRate";
 import { chainMeta, explorerAddress } from "@/lib/chains";
-import { formatAmount, formatPrice, formatUsd, truncateAddress } from "@/lib/format";
+import { formatAmount, truncateAddress } from "@/lib/format";
+import { formatMoney } from "@/lib/currency";
 import { baseTokens, mergeTokens, type Token } from "@/lib/tokens";
 import { useAppStore } from "@/store/useAppStore";
 
 export default function AssetsPage() {
   const mounted = useMounted();
+  const { t, locale } = useI18n();
+  const currency = useAppStore((state) => state.settings.currency);
+  const { fx } = useFxRate();
   const activeChainId = useChainId();
   const { address, chainId: accountChainId } = useAccount();
   const chainId = accountChainId ?? activeChainId;
@@ -57,15 +63,15 @@ export default function AssetsPage() {
     <div className="grid gap-3 lg:grid-cols-12">
       <div className="min-w-0 lg:col-span-8">
         <Panel
-          label="Holdings"
+          label={t("assets.holdings")}
           ticked
-          meta={<span className="chip">{meta?.label ?? "Network"}</span>}
+          meta={<span className="chip">{meta?.label ?? t("common.network")}</span>}
           action={
             <button
               type="button"
               className="icon-btn"
               onClick={() => void refetch()}
-              aria-label="Refresh balances"
+              aria-label={t("assets.refresh")}
             >
               <Icon name="refresh" size={14} />
             </button>
@@ -74,25 +80,27 @@ export default function AssetsPage() {
         >
           <div className="flex items-end justify-between gap-4 p-3">
             <div>
-              <p className="lbl mb-1.5">Priced value</p>
+              <p className="lbl mb-1.5">{t("assets.pricedValue")}</p>
               <p className="num text-[30px] leading-none">
-                {address ? formatUsd(total) : "—"}
+                {address ? formatMoney(total, { currency, fx, locale }) : "—"}
               </p>
             </div>
             <p className="lbl">
-              {isFetching ? "Reading chain…" : `${holdings?.length ?? 0} assets`}
+              {isFetching
+                ? t("assets.reading")
+                : t("assets.count", { count: holdings?.length ?? 0 })}
             </p>
           </div>
 
           {!address ? (
             <Empty
-              title="Wallet not connected"
-              hint="Balances are read from the chain for the connected address only."
+              title={t("assets.noWallet")}
+              hint={t("assets.noWalletHint")}
             />
           ) : (holdings?.length ?? 0) === 0 ? (
             <Empty
-              title={isFetching ? "Scanning balances…" : "No balances in scope"}
-              hint="Scope covers your defaults, imported tokens and anything you have traded here. Run a deep scan to sweep the full Uniswap list."
+              title={isFetching ? t("assets.scanning") : t("assets.emptyTitle")}
+              hint={t("assets.emptyHint")}
             />
           ) : (
             <div>
@@ -106,14 +114,16 @@ export default function AssetsPage() {
                     <p className="text-[13px] font-semibold">{holding.token.symbol}</p>
                     <p className="truncate text-[11px] text-faint">
                       {holding.price !== undefined
-                        ? `${formatPrice(holding.price)} ${meta?.stableSymbol ?? ""}`
+                        ? formatMoney(holding.price, { currency, fx, locale })
                         : holding.token.name}
                     </p>
                   </div>
                   <div className="text-right">
                     <p className="num text-[13px]">{formatAmount(holding.amount, 5)}</p>
                     <p className="num text-[11px] text-faint">
-                      {holding.value !== undefined ? formatUsd(holding.value) : "unpriced"}
+                      {holding.value !== undefined
+                        ? formatMoney(holding.value, { currency, fx, locale })
+                        : t("assets.unpriced")}
                     </p>
                   </div>
                 </div>
@@ -129,18 +139,17 @@ export default function AssetsPage() {
               disabled={!address}
             >
               <Icon name="search" size={13} />
-              {deepScan ? "Deep scan on — tap to narrow" : "Deep scan full token list"}
+              {deepScan ? t("assets.deepScanOn") : t("assets.deepScanOff")}
             </button>
             <p className="mt-2 text-[10px] leading-relaxed text-faint">
-              A deep scan multicalls every listed token on this chain. It is heavier on your
-              RPC endpoint and off by default.
+              {t("assets.deepScanNote")}
             </p>
           </div>
         </Panel>
       </div>
 
       <div className="flex min-w-0 flex-col gap-3 lg:col-span-4">
-        <Panel label="Address" bodyClassName="p-3">
+        <Panel label={t("assets.address")} bodyClassName="p-3">
           {address ? (
             <>
               <p className="num text-[12px] break-all">{address}</p>
@@ -151,17 +160,20 @@ export default function AssetsPage() {
                 className="btn btn-sm mt-3 w-full"
               >
                 <Icon name="external" size={13} />
-                Open in explorer
+                {t("assets.openExplorer")}
               </a>
             </>
           ) : (
-            <p className="text-[11px] text-faint">Connect a wallet to read balances.</p>
+            <p className="text-[11px] text-faint">{t("assets.connectHint")}</p>
           )}
         </Panel>
 
-        <Panel label="Imported tokens" bodyClassName="p-0">
+        <Panel label={t("assets.imported")} bodyClassName="p-0">
           {customTokens.filter((token) => token.chainId === chainId).length === 0 ? (
-            <Empty title="None imported" hint="Paste a contract address in any asset picker to add one." />
+            <Empty
+              title={t("assets.noneImported")}
+              hint={t("assets.noneImportedHint")}
+            />
           ) : (
             customTokens
               .filter((token) => token.chainId === chainId)

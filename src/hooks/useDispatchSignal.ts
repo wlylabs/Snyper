@@ -7,6 +7,7 @@ import { quoteExactIn } from "@/lib/quote";
 import type { Signal } from "@/lib/types";
 import { todayKey, useAppStore } from "@/store/useAppStore";
 import { readableError, useExecutor } from "./useExecutor";
+import { useI18n } from "./useI18n";
 
 /**
  * Turns a strategy signal into a wallet transaction and folds the result back
@@ -15,6 +16,7 @@ import { readableError, useExecutor } from "./useExecutor";
 export function useDispatchSignal() {
   const config = useConfig();
   const { execute } = useExecutor();
+  const { t } = useI18n();
 
   return useCallback(
     async (signal: Signal) => {
@@ -30,7 +32,7 @@ export function useDispatchSignal() {
       try {
         const amountIn = BigInt(signal.amountIn);
         const quote = await quoteExactIn(client, signal.tokenIn, signal.tokenOut, amountIn);
-        if (!quote) throw new Error("No route for this size");
+        if (!quote) throw new Error(t("error.noRoute"));
 
         const hash = await execute({
           tokenIn: signal.tokenIn,
@@ -74,11 +76,11 @@ export function useDispatchSignal() {
         if (oneShot) useAppStore.getState().setBotStatus(bot.id, "idle");
         useAppStore.getState().updateSignal(signal.id, { status: "confirmed", hash });
       } catch (error) {
-        const message = readableError(error);
+        const message = readableError(error, t);
         useAppStore.getState().updateSignal(signal.id, { status: "failed", error: message });
         useAppStore.getState().patchRuntime(bot.id, { error: message });
       }
     },
-    [config, execute],
+    [config, execute, t],
   );
 }

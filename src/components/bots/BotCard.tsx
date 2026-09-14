@@ -7,8 +7,10 @@ import { formatDuration, formatPrice, formatSigned, timeAgo } from "@/lib/format
 import { describeStrategy, gridLevels } from "@/lib/strategies";
 import type { Bot } from "@/lib/types";
 import { useAppStore } from "@/store/useAppStore";
+import { useI18n } from "@/hooks/useI18n";
 
 export function BotCard({ bot }: { bot: Bot }) {
+  const { t, r } = useI18n();
   const setBotStatus = useAppStore((state) => state.setBotStatus);
   const resetBot = useAppStore((state) => state.resetBot);
   const removeBot = useAppStore((state) => state.removeBot);
@@ -52,39 +54,43 @@ export function BotCard({ bot }: { bot: Bot }) {
           </span>
         </div>
 
-        <p className="mt-1 text-[11px] text-dim">{describeStrategy(bot)}</p>
+        <p className="mt-1 text-[11px] text-dim">{r(describeStrategy(bot))}</p>
 
         {bot.strategy.kind === "grid" && (
           <GridLadder bot={bot} price={price} />
         )}
 
         <dl className="mt-3 grid grid-cols-3 gap-x-3 gap-y-2">
-          <Metric label="Fills" value={String(runtime.fills)} />
+          <Metric label={t("bots.fills")} value={String(runtime.fills)} />
           <Metric
-            label="Deployed"
+            label={t("bots.deployed")}
             value={`${runtime.deployedQuote.toFixed(2)} ${bot.quote.symbol}`}
           />
           <Metric
-            label={bot.strategy.kind === "trail" ? "Peak" : "Last tick"}
+            label={bot.strategy.kind === "trail" ? t("bots.peak") : t("bots.lastTick")}
             value={
               bot.strategy.kind === "trail"
                 ? runtime.peak
                   ? formatPrice(runtime.peak)
                   : "—"
                 : runtime.lastTickAt
-                  ? `${timeAgo(runtime.lastTickAt)} ago`
+                  ? t("common.ago", { value: timeAgo(runtime.lastTickAt) })
                   : "—"
             }
           />
           {nextLeg !== undefined && (
-            <Metric label="Next leg" value={formatDuration(nextLeg)} />
+            <Metric label={t("bots.nextLeg")} value={formatDuration(nextLeg)} />
           )}
           {drawdown !== undefined && (
-            <Metric label="From peak" value={formatSigned(drawdown)} tone={drawdown < 0 ? "short" : "long"} />
+            <Metric
+              label={t("bots.fromPeak")}
+              value={formatSigned(drawdown)}
+              tone={drawdown < 0 ? "short" : "long"}
+            />
           )}
           {bot.dailyCapQuote > 0 && (
             <Metric
-              label="Day spend"
+              label={t("bots.daySpend")}
               value={`${runtime.spentQuote.toFixed(0)}/${bot.dailyCapQuote} ${bot.quote.symbol}`}
             />
           )}
@@ -98,9 +104,7 @@ export function BotCard({ bot }: { bot: Bot }) {
         )}
 
         {runtime.completed && (
-          <p className="mt-3 text-[11px] text-faint">
-            Strategy completed. Reset to run it again.
-          </p>
+          <p className="mt-3 text-[11px] text-faint">{t("bots.completed")}</p>
         )}
       </div>
 
@@ -112,14 +116,14 @@ export function BotCard({ bot }: { bot: Bot }) {
           disabled={runtime.completed && !armed}
         >
           <Icon name={armed ? "pause" : "play"} size={12} />
-          {armed ? "Disarm" : "Arm"}
+          {armed ? t("bots.disarm") : t("bots.arm")}
         </button>
         <button
           type="button"
           className="icon-btn"
           onClick={() => resetBot(bot.id)}
-          aria-label="Reset runtime"
-          title="Reset runtime"
+          aria-label={t("bots.resetRuntime")}
+          title={t("bots.resetRuntime")}
         >
           <Icon name="refresh" size={14} />
         </button>
@@ -133,8 +137,8 @@ export function BotCard({ bot }: { bot: Bot }) {
               window.setTimeout(() => setConfirmDelete(false), 3000);
             }
           }}
-          aria-label={confirmDelete ? "Confirm delete" : "Delete strategy"}
-          title={confirmDelete ? "Tap again to delete" : "Delete"}
+          aria-label={confirmDelete ? t("bots.deleteConfirm") : t("bots.delete")}
+          title={confirmDelete ? t("bots.deleteConfirm") : t("bots.delete")}
         >
           <Icon name={confirmDelete ? "check" : "trash"} size={14} />
         </button>

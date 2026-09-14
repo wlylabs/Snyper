@@ -1,6 +1,7 @@
 "use client";
 
 import { useId } from "react";
+import { useI18n } from "@/hooks/useI18n";
 import type { PricePoint } from "@/lib/types";
 
 /**
@@ -17,13 +18,14 @@ export function Spark({
   className?: string;
 }) {
   const gradientId = useId();
+  const { t } = useI18n();
   if (points.length < 2) {
     return (
       <div
         className={`flex items-center justify-center border border-dashed border-line ${className}`}
         style={{ height }}
       >
-        <span className="lbl">Awaiting ticks</span>
+        <span className="lbl">{t("terminal.awaitingTicks")}</span>
       </div>
     );
   }
@@ -54,7 +56,7 @@ export function Spark({
       className={className}
       style={{ height, width: "100%" }}
       role="img"
-      aria-label="Observed price ticks"
+      aria-label={t("a11y.priceTicks")}
     >
       <defs>
         <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">

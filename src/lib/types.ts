@@ -1,6 +1,15 @@
+import type { DisplayCurrency } from "./currency";
+import type { Locale, TKey, TVars } from "./i18n";
 import type { Token } from "./tokens";
 
 export type StrategyKind = "dca" | "grid" | "limit" | "trail";
+
+/**
+ * A message stored as a dictionary key so it renders in the reader's language
+ * whenever it is shown. Plain strings are accepted for entries written before
+ * the app was translated.
+ */
+export type Reason = { key: TKey; vars?: TVars };
 
 export type Strategy =
   | {
@@ -88,7 +97,7 @@ export type Signal = {
   chainId: number;
   createdAt: number;
   side: "buy" | "sell";
-  reason: string;
+  reason: Reason | string;
   tokenIn: Token;
   tokenOut: Token;
   /** Base-unit amount held as a string so it survives persistence. */
@@ -121,6 +130,10 @@ export type Trade = {
 export type PricePoint = { t: number; p: number };
 
 export type Settings = {
+  locale: Locale;
+  /** Whether the reader picked a language, as opposed to it being detected. */
+  localeChosen: boolean;
+  currency: DisplayCurrency;
   slippageBps: number;
   deadlineMinutes: number;
   tickSeconds: number;

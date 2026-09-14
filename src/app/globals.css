@@ -489,10 +489,14 @@
   .tab-link {
     display: flex;
     flex: 1;
+    min-width: 0;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 4px;
+    /* Longer translated labels must not run into the screen edge. */
+    padding-inline: 4px;
+    text-align: center;
     color: var(--color-faint);
     border-top: 2px solid transparent;
     transition: color 120ms ease, border-color 120ms ease;
