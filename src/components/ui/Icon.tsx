@@ -1,6 +1,7 @@
 import type { SVGProps } from "react";
 
 export type IconName =
+  | "candles"
   | "crosshair"
   | "grid"
   | "stack"
@@ -30,6 +31,7 @@ export type IconName =
   | "arrow-down";
 
 const PATHS: Record<IconName, string> = {
+  candles: "M8 4v3M8 15v5M5.5 7h5v8h-5zM16 4v5M16 17v3M13.5 9h5v8h-5z",
   crosshair: "M12 3v4M12 17v4M3 12h4M17 12h4M12 9.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5Z",
   grid: "M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z",
   stack: "M12 3 3 7.5 12 12l9-4.5L12 3ZM3 12.5 12 17l9-4.5M3 17 12 21.5 21 17",

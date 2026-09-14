@@ -18,36 +18,36 @@
   "handle_links": "preferred",
   "edge_side_panel": { "preferred_width": 420 },
   "icons": [
-    { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
-    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
-    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    { "src": "/icons/icon.svg?v=2", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icons/icon-192.png?v=2", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png?v=2", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/maskable-192.png?v=2", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/maskable-512.png?v=2", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "screenshots": [
     {
-      "src": "/screenshots/terminal-wide.png",
+      "src": "/screenshots/terminal-wide.png?v=2",
       "sizes": "1440x900",
       "type": "image/png",
       "form_factor": "wide",
       "label": "Execution terminal with live pool pricing"
     },
     {
-      "src": "/screenshots/assets-wide.png",
+      "src": "/screenshots/assets-wide.png?v=2",
       "sizes": "1440x900",
       "type": "image/png",
       "form_factor": "wide",
       "label": "Holdings read straight from the chain"
     },
     {
-      "src": "/screenshots/terminal-narrow.png",
+      "src": "/screenshots/terminal-narrow.png?v=2",
       "sizes": "430x932",
       "type": "image/png",
       "form_factor": "narrow",
       "label": "Execution terminal on mobile"
     },
     {
-      "src": "/screenshots/strategies-narrow.png",
+      "src": "/screenshots/strategies-narrow.png?v=2",
       "sizes": "430x932",
       "type": "image/png",
       "form_factor": "narrow",
@@ -60,21 +60,21 @@
       "short_name": "Strategies",
       "description": "Review and arm running strategies",
       "url": "/bots?source=pwa",
-      "icons": [{ "src": "/icons/shortcuts/strategies.png", "sizes": "96x96", "type": "image/png" }]
+      "icons": [{ "src": "/icons/shortcuts/strategies.png?v=2", "sizes": "96x96", "type": "image/png" }]
     },
     {
       "name": "Assets",
       "short_name": "Assets",
       "description": "Balances read straight from the chain",
       "url": "/assets?source=pwa",
-      "icons": [{ "src": "/icons/shortcuts/assets.png", "sizes": "96x96", "type": "image/png" }]
+      "icons": [{ "src": "/icons/shortcuts/assets.png?v=2", "sizes": "96x96", "type": "image/png" }]
     },
     {
       "name": "Activity",
       "short_name": "Activity",
       "description": "Local ledger of submitted transactions",
       "url": "/activity?source=pwa",
-      "icons": [{ "src": "/icons/shortcuts/activity.png", "sizes": "96x96", "type": "image/png" }]
+      "icons": [{ "src": "/icons/shortcuts/activity.png?v=2", "sizes": "96x96", "type": "image/png" }]
     }
   ]
 }
