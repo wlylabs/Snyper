@@ -20,10 +20,24 @@ function intentToSignal(bot: Bot, intent: Intent, price: number): Signal | undef
   const buying = intent.side === "buy";
   const tokenIn = buying ? bot.quote : bot.base;
   const tokenOut = buying ? bot.base : bot.quote;
-  const amount = buying ? intent.amountQuote : intent.amountBase;
-  if (!amount || amount <= 0) return undefined;
 
-  const amountIn = safeParseUnits(amount.toFixed(Math.min(tokenIn.decimals, 12)), tokenIn.decimals);
+  let amountIn: bigint | undefined;
+  if (!buying && intent.amountBaseRaw !== undefined) {
+    // Already in base units. Routing a full exit through a float would shave
+    // digits off the size and leave dust the next leg cannot spend.
+    try {
+      amountIn = BigInt(intent.amountBaseRaw);
+    } catch {
+      return undefined;
+    }
+  } else {
+    const amount = buying ? intent.amountQuote : intent.amountBase;
+    if (!amount || amount <= 0) return undefined;
+    amountIn = safeParseUnits(
+      amount.toFixed(Math.min(tokenIn.decimals, 12)),
+      tokenIn.decimals,
+    );
+  }
   if (!amountIn || amountIn <= 0n) return undefined;
 
   return {
@@ -40,6 +54,7 @@ function intentToSignal(bot: Bot, intent: Intent, price: number): Signal | undef
     price,
     status: "pending",
     level: intent.level,
+    leg: intent.leg,
   };
 }
 
@@ -80,6 +95,18 @@ export function EngineRunner() {
         const today = todayKey(now);
 
         for (const bot of armed) {
+          // An order that never traded down to its entry gives up on its own.
+          // Only the waiting stage is timed: once a position exists, its take
+          // profit and cut loss run until one of them closes it.
+          if (
+            bot.strategy.kind === "order" &&
+            (bot.runtime.stage ?? "waiting") === "waiting" &&
+            now >= bot.strategy.expiresAt
+          ) {
+            useAppStore.getState().closeOrder(bot.id, "expired");
+            continue;
+          }
+
           const client = getPublicClient(config, { chainId: bot.chainId });
           if (!client) continue;
 
@@ -133,6 +160,21 @@ export function EngineRunner() {
                 (signal.status === "pending" || signal.status === "executing"),
             );
           if (hasOpen) continue;
+
+          // A dispatch interrupted mid-signature (tab closed, wallet dismissed
+          // without an error) leaves the order parked in a stage nothing
+          // evaluates. With no signal left open, hand it back to where it was.
+          const stalled = current.strategy.kind === "order" && !current.runtime.completed
+            ? current.runtime.stage === "entering"
+              ? "waiting"
+              : current.runtime.stage === "exiting"
+                ? "holding"
+                : undefined
+            : undefined;
+          if (stalled) {
+            useAppStore.getState().patchRuntime(bot.id, { stage: stalled });
+            continue;
+          }
 
           const intent = evaluate(current, price, now);
           if (!intent) continue;
