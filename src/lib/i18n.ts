@@ -249,6 +249,10 @@ const en = {
   "settings.feeOff": "This build takes nothing. No fee is attached to any trade it sends.",
   "settings.feeNote":
     "Taken by the router itself, in the same transaction as the trade — Snyper never holds it. A snype is charged on the way out and only on what it made; a cut loss costs nothing. Launchpad curve trades carry no fee at all.",
+  "settings.feeVia": "Collected by",
+  "settings.feeViaDex": "The DEX router",
+  "settings.feeNoRouter":
+    "Without Snyper's own router deployed the charge rides on the DEX router's split, which caps it at 1% and cannot reach a launchpad curve at all — so a snype that ran a long way pays under the headline share, and a curve trade pays nothing.",
   "settings.execDefaults": "Execution defaults",
   "settings.slippage": "Slippage (bps)",
   "settings.deadline": "Deadline (min)",
@@ -682,6 +686,10 @@ const id: Record<TKey, string> = {
   "settings.feeOff": "Build ini tidak mengambil apa pun. Tidak ada biaya yang ditempelkan ke transaksi mana pun.",
   "settings.feeNote":
     "Diambil oleh router-nya sendiri, di transaksi yang sama dengan trade-nya — Snyper tidak pernah memegangnya. Snype ditagih saat keluar dan hanya atas yang dihasilkannya; cut loss tidak kena biaya. Trade di curve launchpad tidak dikenakan biaya sama sekali.",
+  "settings.feeVia": "Dipungut oleh",
+  "settings.feeViaDex": "Router DEX-nya",
+  "settings.feeNoRouter":
+    "Tanpa router Snyper sendiri, biayanya menumpang split milik router DEX — terbatas 1% dan sama sekali tidak menjangkau curve launchpad. Jadi snype yang untung besar membayar di bawah angka utamanya, dan trade curve tidak membayar apa pun.",
   "settings.execDefaults": "Bawaan eksekusi",
   "settings.slippage": "Slippage (bps)",
   "settings.deadline": "Batas waktu (mnt)",

@@ -8,7 +8,7 @@ import { Segmented } from "@/components/ui/Segmented";
 import { useMounted } from "@/hooks/useMounted";
 import { CHAIN_ID, CHAIN_META } from "@/lib/chains";
 import { CURRENCIES, formatRate } from "@/lib/currency";
-import { feePolicy, MAX_FEE_BPS, swapFeeBps } from "@/lib/fees";
+import { feePolicy, feeRouter, maxFeeBps, swapFeeBps } from "@/lib/fees";
 import { LOCALES, type TKey } from "@/lib/i18n";
 import { useI18n } from "@/hooks/useI18n";
 import { useFxRate } from "@/hooks/useFxRate";
@@ -215,6 +215,7 @@ function FeesPanel() {
   const policy = feePolicy();
   const swapBps = swapFeeBps();
   const charging = Boolean(policy.recipient);
+  const router = feeRouter();
 
   return (
     <Panel label={t("settings.fees")} bodyClassName="p-3">
@@ -230,10 +231,19 @@ function FeesPanel() {
             : t("settings.feeNone")
         }
       />
-      {charging && <Row k={t("settings.feeCap")} v={`${MAX_FEE_BPS / 100}%`} />}
+      {charging && <Row k={t("settings.feeCap")} v={`${maxFeeBps() / 100}%`} />}
+      {charging && (
+        <Row
+          k={t("settings.feeVia")}
+          v={router ? truncateAddress(router) : t("settings.feeViaDex")}
+        />
+      )}
       <p className="mt-3 text-[11px] leading-relaxed text-dim">
         {charging ? t("settings.feeNote") : t("settings.feeOff")}
       </p>
+      {charging && !router && (
+        <p className="mt-2 text-[11px] leading-relaxed text-faint">{t("settings.feeNoRouter")}</p>
+      )}
     </Panel>
   );
 }

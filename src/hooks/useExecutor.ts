@@ -17,7 +17,7 @@ import {
 } from "wagmi/actions";
 import { erc20Abi } from "@/lib/abi";
 import { chainMeta, explorerTx } from "@/lib/chains";
-import { feeChargeable, netOfFee, swapFeeBps } from "@/lib/fees";
+import { feeChargeable, feeSide, netOfFee, swapFeeBps } from "@/lib/fees";
 import type { Quote } from "@/lib/quote";
 import { formatPercent } from "@/lib/format";
 import { applySlippage, buildSwap, swapRequest } from "@/lib/swap";
@@ -43,6 +43,12 @@ export type ExecuteArgs = {
    * to nothing, because a snype is charged on its exit rather than its entry.
    */
   feeBps?: number;
+  /**
+   * Which end of the trade the fee comes off, for the callers that know. A
+   * snype names it — its exit is charged in the currency it was funded in —
+   * and everything else falls back to the asset the pair itself is priced in.
+   */
+  feeOnInput?: boolean;
 };
 
 export type ExecutePhase = "idle" | "approving" | "signing" | "pending";
@@ -150,6 +156,7 @@ export function useExecutor() {
         recipient: address,
         deadlineMinutes,
         feeBps,
+        feeOnInput: args.feeOnInput ?? feeSide(tokenIn, tokenOut).feeOnInput,
       });
 
       // ERC-20 inputs need an allowance before the trade can settle.

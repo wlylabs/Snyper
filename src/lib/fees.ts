@@ -1,4 +1,6 @@
 import { getAddress, isAddress, zeroAddress, type Address } from "viem";
+import type { Token } from "./tokens";
+import { activeVenue } from "./venue";
 
 /**
  * What Snyper charges, and where the charge is allowed to come from.
@@ -15,8 +17,15 @@ import { getAddress, isAddress, zeroAddress, type Address } from "viem";
  * this way, whatever a policy asks for.
  */
 
-/** The router's ceiling, and therefore Snyper's. */
-export const MAX_FEE_BPS = 100;
+/** SwapRouter02's ceiling, which binds whenever the trade goes through it. */
+export const ROUTER_MAX_FEE_BPS = 100;
+
+/**
+ * SnyperRouter's ceiling, which is where the intended charge actually fits: a
+ * snype owes a tenth of its profit, a profit is never larger than the sale it
+ * came out of, so a tenth of a profit is never more than a tenth of a sale.
+ */
+export const SNYPER_MAX_FEE_BPS = 1_000;
 
 export type FeePolicy = {
   /**
@@ -48,6 +57,26 @@ function bps(value: string | undefined, fallback: number, ceiling: number): numb
   return Math.max(0, Math.min(ceiling, Math.round(chosen)));
 }
 
+/**
+ * Snyper's own router, when one has been deployed and the build points at it.
+ *
+ * Without it the fee rides on SwapRouter02's split, which is the lighter
+ * arrangement — no contract of Snyper's in the path — and comes with the two
+ * limits that arrangement has: 1% of a trade, and nothing at all on a launchpad
+ * curve. With it, both lift.
+ */
+export function feeRouter(): Address | undefined {
+  routerCached ??= { value: address(process.env.NEXT_PUBLIC_SNYPER_ROUTER) };
+  return routerCached.value;
+}
+
+let routerCached: { value: Address | undefined } | undefined;
+
+/** The most that can be charged on one trade, given how it will be routed. */
+export function maxFeeBps(): number {
+  return feeRouter() ? SNYPER_MAX_FEE_BPS : ROUTER_MAX_FEE_BPS;
+}
+
 let cached: FeePolicy | undefined;
 
 /**
@@ -57,15 +86,35 @@ let cached: FeePolicy | undefined;
 export function feePolicy(): FeePolicy {
   cached ??= Object.freeze({
     recipient: address(process.env.NEXT_PUBLIC_FEE_RECIPIENT),
-    swapBps: bps(process.env.NEXT_PUBLIC_FEE_BPS, 25, MAX_FEE_BPS),
+    swapBps: bps(process.env.NEXT_PUBLIC_FEE_BPS, 25, SNYPER_MAX_FEE_BPS),
     profitShareBps: bps(process.env.NEXT_PUBLIC_PROFIT_SHARE_BPS, 1_000, 10_000),
   });
   return cached;
 }
 
-/** Only a pool route can carry a fee leg; a bonding curve has nowhere to put one. */
+/**
+ * Whether this venue can carry a fee at all. SwapRouter02 splits a pool trade
+ * and knows nothing about a bonding curve; SnyperRouter reaches both, so a
+ * launchpad trade is only chargeable once one is deployed.
+ */
 export function feeChargeable(venue: "v3" | "curve"): boolean {
-  return venue === "v3";
+  return venue === "v3" || Boolean(feeRouter());
+}
+
+/**
+ * Which end of the trade the fee comes off.
+ *
+ * The rule is that Snyper is paid in the asset the trade was funded with —
+ * never in the memecoin, which is a treasury full of things nobody can sell.
+ * The funding assets are the chain's own money: native currency and whatever
+ * the venue prices in dollars. A trade between two of them, or between two of
+ * neither, is charged on the way in.
+ */
+export function feeSide(tokenIn: Token, tokenOut: Token): { feeOnInput: boolean } {
+  const stable = activeVenue()?.stable?.toLowerCase();
+  const funding = (token: Token) =>
+    Boolean(token.native) || (stable !== undefined && token.address.toLowerCase() === stable);
+  return { feeOnInput: !(funding(tokenOut) && !funding(tokenIn)) };
 }
 
 /**
@@ -75,7 +124,7 @@ export function feeChargeable(venue: "v3" | "curve"): boolean {
  */
 export function swapFeeBps(): number {
   const policy = feePolicy();
-  return policy.recipient ? Math.min(MAX_FEE_BPS, policy.swapBps) : 0;
+  return policy.recipient ? Math.min(maxFeeBps(), policy.swapBps) : 0;
 }
 
 /**
@@ -88,10 +137,11 @@ export function swapFeeBps(): number {
  *   an exit that lost money is charged nothing — there is no profit to divide,
  *   and a cut loss is not an event anyone should be billed for;
  *
- *   a big winner is charged less than the headline share, because the router's
- *   100 bps ceiling bites first. A position that doubled would owe 10% of a
- *   profit worth half the exit — 500 bps — and pays 100. The ceiling is a cap
- *   in the reader's favour and is described as one wherever it is shown.
+ *   a big winner may be charged less than the headline share, because the
+ *   ceiling bites first. Through SwapRouter02 that ceiling is 100 bps, so a
+ *   position that doubled owes 500 and pays 100; through SnyperRouter it is
+ *   1_000, which the intended share can never exceed. Either way the cap is in
+ *   the reader's favour and is described as one wherever it is shown.
  */
 export function profitFeeBps(params: {
   /** Quote units the exit returns, before any split. */
@@ -113,13 +163,13 @@ export function profitFeeBps(params: {
   if (!Number.isFinite(share)) return 0;
   // Below one bip the router refuses the call outright, so a fee that rounds to
   // nothing is no fee rather than a reverted exit.
-  return Math.min(MAX_FEE_BPS, Math.floor(share));
+  return Math.min(maxFeeBps(), Math.floor(share));
 }
 
 /** The part of an output the fee leg keeps. */
 export function feeOnOutput(amountOut: bigint, feeBps: number): bigint {
   if (amountOut <= 0n || feeBps <= 0) return 0n;
-  return (amountOut * BigInt(Math.min(MAX_FEE_BPS, Math.round(feeBps)))) / 10_000n;
+  return (amountOut * BigInt(Math.min(maxFeeBps(), Math.round(feeBps)))) / 10_000n;
 }
 
 /** What actually reaches the wallet once the fee leg has taken its part. */

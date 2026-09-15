@@ -1,9 +1,9 @@
 import { encodeFunctionData, type Abi, type Address } from "viem";
-import { ponsCurveAbi, swapRouter02Abi } from "./abi";
+import { ponsCurveAbi, snyperRouterAbi, swapRouter02Abi } from "./abi";
 import { dexMeta } from "./chains";
-import { feePolicy, MAX_FEE_BPS } from "./fees";
+import { feePolicy, feeRouter, maxFeeBps } from "./fees";
 import type { Quote } from "./quote";
-import { routingAddress, type Token } from "./tokens";
+import { routingAddress, settlementAddress, type Token } from "./tokens";
 
 /** SwapRouter02 constant meaning "leave the output inside the router". */
 const ADDRESS_THIS = "0x0000000000000000000000000000000000000002" as Address;
@@ -42,7 +42,7 @@ function feeLeg(feeBps: number | undefined): { bps: bigint; recipient: Address }
   const recipient = feePolicy().recipient;
   if (!recipient) return undefined;
   const bps = Math.floor(feeBps ?? 0);
-  if (!(bps >= 1 && bps <= MAX_FEE_BPS)) return undefined;
+  if (!(bps >= 1 && bps <= maxFeeBps())) return undefined;
   return { bps: BigInt(bps), recipient };
 }
 
@@ -63,10 +63,100 @@ export function buildSwap(params: {
   quote: Quote;
   recipient: Address;
   deadlineMinutes: number;
-  /** Snyper's share of the output, in bps. Ignored by venues that cannot take one. */
+  /** Snyper's share of the trade, in bps. Ignored where none can be taken. */
   feeBps?: number;
+  /** Which end the fee comes off. Callers point it at the funding asset. */
+  feeOnInput?: boolean;
 }): SwapPlan {
+  /*
+   * A trade that owes nothing goes straight to its venue, whatever is deployed.
+   * Sending a free trade through an extra contract would cost the reader gas to
+   * collect nothing, and a snype's entry — and every exit that lost money — is
+   * exactly that trade.
+   */
+  const snyper = feeRouter();
+  if (snyper && feeLeg(params.feeBps)) {
+    return buildSnyperTrade({ ...params, router: snyper });
+  }
   return params.quote.venue === "curve" ? buildCurveTrade(params) : buildV3Swap(params);
+}
+
+/**
+ * A trade routed through Snyper's own contract, which is what makes two things
+ * possible that SwapRouter02's split cannot do: a share above one percent, and
+ * any share at all on a launchpad curve.
+ *
+ * The bound handed over is what the caller must actually end up with, net of
+ * the fee, and the contract checks it after taking its part rather than before.
+ */
+function buildSnyperTrade(params: {
+  tokenIn: Token;
+  tokenOut: Token;
+  amountIn: bigint;
+  amountOutMinimum: bigint;
+  quote: Quote;
+  deadlineMinutes: number;
+  feeBps?: number;
+  feeOnInput?: boolean;
+  router: Address;
+}): SwapPlan {
+  const { tokenIn, tokenOut, amountIn, amountOutMinimum, quote, router } = params;
+  const fee = feeLeg(params.feeBps);
+  const bps = fee ? Number(fee.bps) : 0;
+  const feeOnInput = params.feeOnInput ?? true;
+  // The fee comes off one end or the other, so either way the caller ends up
+  // with the same share of the trade less than the gross quote.
+  const minOut = amountOutMinimum - (amountOutMinimum * BigInt(bps)) / 10_000n;
+  const deadline = deadlineFrom(params.deadlineMinutes);
+
+  const plan = {
+    target: router,
+    abi: snyperRouterAbi as unknown as Abi,
+    amountIn,
+    amountOutMinimum: minOut,
+    fee: quote.fee,
+    feeBps: bps,
+  };
+
+  if (quote.venue === "curve") {
+    const buying = quote.curveSide !== "sell";
+    // The launched token is named; its curve is resolved on chain, never passed.
+    const token = buying ? tokenOut : tokenIn;
+    return {
+      ...plan,
+      functionName: "tradeCurve",
+      args: [
+        {
+          token: token.address,
+          buying,
+          amountIn,
+          minOut,
+          feeBps: bps,
+          feeOnInput,
+          deadline,
+        },
+      ] as const,
+      value: tokenIn.native ? amountIn : 0n,
+    };
+  }
+
+  return {
+    ...plan,
+    functionName: "swapV3",
+    args: [
+      {
+        tokenIn: settlementAddress(tokenIn),
+        tokenOut: settlementAddress(tokenOut),
+        poolFee: quote.fee,
+        amountIn,
+        minOut,
+        feeBps: bps,
+        feeOnInput,
+        deadline,
+      },
+    ] as const,
+    value: tokenIn.native ? amountIn : 0n,
+  };
 }
 
 /**

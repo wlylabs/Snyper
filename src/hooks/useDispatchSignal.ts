@@ -137,6 +137,9 @@ export function useDispatchSignal() {
           source: "snype",
           snypeName: snype.name,
           feeBps,
+          // Funded in the quote currency, so charged in it too: on the way in
+          // that is the input, on the way out it is the output.
+          feeOnInput: !closingPosition,
         });
 
         // A bonding-curve buy that clears the last of the sellable supply is

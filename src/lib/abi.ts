@@ -498,3 +498,68 @@ export const ponsCurveAbi = [
   },
   { type: "error", name: "UnexpectedNativeValue", inputs: [] },
 ] as const;
+
+/**
+ * Snyper's own fee router, from contracts/SnyperRouter.sol. Only the two entry
+ * points are described here; the contract has no other function worth calling
+ * from the app, and deliberately none worth calling from anywhere else.
+ */
+export const snyperRouterAbi = [
+  {
+    type: "function",
+    name: "swapV3",
+    stateMutability: "payable",
+    inputs: [
+      {
+        name: "p",
+        type: "tuple",
+        components: [
+          { name: "tokenIn", type: "address" },
+          { name: "tokenOut", type: "address" },
+          { name: "poolFee", type: "uint24" },
+          { name: "amountIn", type: "uint256" },
+          { name: "minOut", type: "uint256" },
+          { name: "feeBps", type: "uint16" },
+          { name: "feeOnInput", type: "bool" },
+          { name: "deadline", type: "uint256" },
+        ],
+      },
+    ],
+    outputs: [{ name: "amountOut", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "tradeCurve",
+    stateMutability: "payable",
+    inputs: [
+      {
+        name: "p",
+        type: "tuple",
+        components: [
+          { name: "token", type: "address" },
+          { name: "buying", type: "bool" },
+          { name: "amountIn", type: "uint256" },
+          { name: "minOut", type: "uint256" },
+          { name: "feeBps", type: "uint16" },
+          { name: "feeOnInput", type: "bool" },
+          { name: "deadline", type: "uint256" },
+        ],
+      },
+    ],
+    outputs: [{ name: "amountOut", type: "uint256" }],
+  },
+  { type: "error", name: "FeeTooHigh", inputs: [] },
+  { type: "error", name: "Expired", inputs: [] },
+  { type: "error", name: "NotALaunchpadToken", inputs: [] },
+  { type: "error", name: "WrongValue", inputs: [] },
+  {
+    type: "error",
+    name: "TooLittleReceived",
+    inputs: [
+      { name: "received", type: "uint256" },
+      { name: "minimum", type: "uint256" },
+    ],
+  },
+  { type: "error", name: "TransferFailed", inputs: [] },
+  { type: "error", name: "Reentrant", inputs: [] },
+] as const;
