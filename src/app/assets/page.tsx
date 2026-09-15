@@ -14,8 +14,18 @@ import { useI18n } from "@/hooks/useI18n";
 import { useFxRate } from "@/hooks/useFxRate";
 import { CHAIN_ID, chainMeta, explorerAddress } from "@/lib/chains";
 import { formatAmount, truncateAddress } from "@/lib/format";
-import { formatMoney } from "@/lib/currency";
+import {
+  formatCompactMoney,
+  formatMoney,
+  formatMoneyFloor,
+  formatPriceMoney,
+  type DisplayCurrency,
+  type FxRate,
+} from "@/lib/currency";
+import type { Locale } from "@/lib/i18n";
+import { memeSignal } from "@/lib/memecoin";
 import { baseTokens, mergeTokens, type Token } from "@/lib/tokens";
+import type { Holding } from "@/hooks/usePortfolio";
 import { useAppStore } from "@/store/useAppStore";
 
 export default function AssetsPage() {
@@ -158,38 +168,12 @@ export default function AssetsPage() {
           ) : (
             <div>
               {holdings?.map((holding) => (
-                <div
+                <HoldingRow
                   key={holding.token.address}
-                  className="flex items-center gap-3 border-t border-line px-3 py-2.5"
-                >
-                  <span
-                    className="ticker"
-                    data-native={holding.token.native ? "true" : undefined}
-                  >
-                    {holding.token.symbol}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="flex items-center gap-1.5 text-[12px] text-dim">
-                      <span className="truncate">{holding.token.name}</span>
-                      <TokenTags token={holding.token} listed={listed} />
-                    </p>
-                    <p className="num truncate text-[11px] text-faint">
-                      {holding.price !== undefined
-                        ? formatMoney(holding.price, { currency, fx, locale })
-                        : holding.token.native
-                          ? t("token.native")
-                          : truncateAddress(holding.token.address, 6, 4)}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="num text-[13px]">{formatAmount(holding.amount, 5)}</p>
-                    <p className="num text-[11px] text-faint">
-                      {holding.value !== undefined
-                        ? formatMoney(holding.value, { currency, fx, locale })
-                        : t("assets.unpriced")}
-                    </p>
-                  </div>
-                </div>
+                  holding={holding}
+                  listed={listed}
+                  money={{ currency, fx, locale }}
+                />
               ))}
             </div>
           )}
@@ -296,6 +280,140 @@ export default function AssetsPage() {
               ))
           )}
         </Panel>
+      </div>
+    </div>
+  );
+}
+
+type Money = { currency: DisplayCurrency; fx: FxRate | undefined; locale: Locale };
+
+/**
+ * Dollars in the deepest pair below which a price is a rumour. A quote drawn
+ * from a pool holding a few hundred dollars moves on a trade any reader could
+ * make, so it describes that pool rather than the token.
+ */
+const THIN_LIQUIDITY = 1000;
+
+/**
+ * One holding, and the argument for which number leads it.
+ *
+ * For the chain's own money, price is the figure a reader came for: ether has
+ * one supply, everybody knows roughly what it is, and $2,475 means something on
+ * its own. For everything else on this chain — which is to say the memecoins —
+ * price means nothing without the supply behind it, and the supply is whatever
+ * the launch decided that morning. A token at $9 and a token at $0.00007 are
+ * not expensive and cheap; they are two launches that picked different numbers
+ * of zeros, and the only way to tell which one is bigger is the market cap.
+ * That is the number every chart, launchpad and group chat quotes, so that is
+ * the number the row leads with, with the price kept a hover away.
+ */
+function HoldingRow({
+  holding,
+  listed,
+  money,
+}: {
+  holding: Holding;
+  listed: Set<string>;
+  money: Money;
+}) {
+  const { t } = useI18n();
+
+  /* The supply the pricing pass already read, which is also what the meme
+     heuristic wants: a trillion whole units is the genre's own signature. */
+  const token = { ...holding.token, totalSupply: holding.totalSupply };
+  const signal = holding.token.native ? undefined : memeSignal(token, listed);
+  const ownMoney = !signal || (!signal.unlisted && !signal.launchpad);
+
+  const leadsWithCap = !ownMoney && holding.marketCap !== undefined;
+
+  /*
+   * A price nothing corroborates. The feed aggregates every pair a token
+   * trades in, so a figure from there stands on its own; an explorer's quote
+   * and a lone pool's mid price do not, and neither does a feed price sitting
+   * on a few hundred dollars of depth. The page still shows them — an
+   * uncertain figure beats no figure on a wallet screen — and says out loud
+   * that it is one, because the alternative is printing a ticker collision in
+   * the same typeface as ether.
+   */
+  const unverified =
+    holding.price !== undefined &&
+    holding.priceSource !== "stable" &&
+    (holding.priceSource !== "feed" ||
+      holding.liquidity === undefined ||
+      holding.liquidity < THIN_LIQUIDITY);
+
+  /*
+   * Everything the figure is standing on, said once where it can be checked. A
+   * price with no depth behind it and no pool this app read is exactly the kind
+   * that arrives from a ticker collision, and the reader deserves to know that
+   * before they believe it.
+   */
+  const provenance = [
+    holding.price !== undefined &&
+      t("assets.priceHint", { price: formatPriceMoney(holding.price, money) }),
+    leadsWithCap && (holding.diluted ? t("assets.fdvHint") : t("assets.capHint")),
+    holding.priceSource === "feed"
+      ? t("assets.sourceFeed")
+      : holding.priceSource === "indexer"
+        ? t("assets.sourceIndexer")
+        : holding.priceSource === "pool"
+          ? t("assets.sourcePool")
+          : holding.priceSource === "stable"
+            ? t("assets.sourceStable")
+            : undefined,
+    holding.liquidity !== undefined
+      ? t("assets.depthHint", { value: formatCompactMoney(holding.liquidity, money) })
+      : holding.price !== undefined && holding.priceSource !== "stable"
+        ? t("assets.noDepthHint")
+        : undefined,
+    unverified && t("assets.unverifiedHint"),
+    !holding.token.native && holding.token.address,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  return (
+    <div className="flex items-center gap-3 border-t border-line px-3 py-2.5">
+      <span className="ticker" data-native={holding.token.native ? "true" : undefined}>
+        {holding.token.symbol}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="flex items-center gap-1.5 text-[12px] text-dim">
+          <span className="truncate">{holding.token.name}</span>
+          <TokenTags token={token} listed={listed} />
+          {unverified && (
+            <span
+              className="chip chip-xs chip-warn"
+              title={t("assets.unverifiedHint")}
+            >
+              {t("assets.tagUnverified")}
+            </span>
+          )}
+        </p>
+        <p className="num truncate text-[11px] text-faint" title={provenance || undefined}>
+          {leadsWithCap ? (
+            <>
+              <span className="lbl mr-1">
+                {holding.diluted ? t("assets.fdv") : t("assets.marketCap")}
+              </span>
+              {formatCompactMoney(holding.marketCap, money)}
+            </>
+          ) : holding.price !== undefined ? (
+            formatPriceMoney(holding.price, money)
+          ) : holding.token.native ? (
+            t("token.native")
+          ) : (
+            truncateAddress(holding.token.address, 6, 4)
+          )}
+        </p>
+      </div>
+      <div className="text-right">
+        <p className="num text-[13px]">{formatAmount(holding.amount, 5)}</p>
+        <p className="num text-[11px] text-faint">
+          {holding.value !== undefined
+            ? formatMoneyFloor(holding.value, money)
+            : t("assets.unpriced")}
+        </p>
       </div>
     </div>
   );

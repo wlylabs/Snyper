@@ -7,8 +7,17 @@ import { erc20Abi } from "@/lib/abi";
 import { dexMeta } from "@/lib/chains";
 import { readIndexedPortfolio, type IndexedPortfolio } from "@/lib/portfolioFeed";
 import { midPrice } from "@/lib/quote";
-import { readFeedPrices } from "@/lib/tokenFeed";
+import { readFeedQuotes, type FeedQuote } from "@/lib/tokenFeed";
 import { nativeToken, routingAddress, type Token } from "@/lib/tokens";
+
+/**
+ * Where a price came from, in descending order of how much money stands behind
+ * it. Worth carrying because the four are not interchangeable: a market feed
+ * has aggregated every pair a token trades in, an indexer's quote may be a
+ * ticker match against a token on another chain entirely, and a pool mid price
+ * is whatever the last trade — or the initialising mint — left behind.
+ */
+export type PriceSource = "feed" | "indexer" | "pool" | "stable";
 
 export type Holding = {
   token: Token;
@@ -17,6 +26,21 @@ export type Holding = {
   /** USD value, undefined when no source could price the token. */
   value?: number;
   price?: number;
+  /**
+   * What the whole token is worth: circulating cap where a feed reports one,
+   * otherwise fully diluted. The number a memecoin is actually read by — price
+   * alone is that figure divided by a supply each launch picks arbitrarily, so
+   * two tokens at the same price are not comparable and two at the same cap are.
+   */
+  marketCap?: number;
+  /** True when `marketCap` is fully diluted rather than circulating. */
+  diluted?: boolean;
+  /** Dollars in the deepest pair, when a feed reported any. */
+  liquidity?: number;
+  /** Fraction, 0.01 = 1%, over the last day. */
+  change24h?: number;
+  totalSupply?: bigint;
+  priceSource?: PriceSource;
 };
 
 /**
@@ -33,6 +57,22 @@ export type Portfolio = {
 
 /** How many tokens are worth pricing against a pool, one round trip each. */
 const MAX_POOL_PRICED = 24;
+
+/** How many contracts one pass asks for a supply, to bound the multicall. */
+const MAX_SUPPLY_READS = 60;
+
+/**
+ * A cap past which the price behind it is not a moonshot but a bad reading.
+ *
+ * Nothing on this chain is worth a trillion dollars, so a price that implies it
+ * came from somewhere that answered about a different token — a ticker matched
+ * against another chain's listing is the usual way — or from a pool that holds
+ * its initialising price and has never traded. Dropping the price leaves the
+ * holding unpriced, which the page already knows how to say, and which is a
+ * better answer than a confident wrong one on the screen a reader checks their
+ * wallet against.
+ */
+const IMPLAUSIBLE_CAP = 1e12;
 
 /**
  * Whole units of a balance. Scaling the raw integer by a power of ten would
@@ -105,6 +145,44 @@ async function fromChain(
 }
 
 /**
+ * Total supply for each contract, so a price can be turned into a cap.
+ *
+ * Read from the chain rather than taken from a feed: the feed may not cover
+ * this chain at all, and `totalSupply` is one word of storage every ERC-20 has.
+ * It doubles as the meme heuristic's supply signal, which is why the figure is
+ * kept on the holding rather than consumed here.
+ */
+async function readSupplies(
+  client: PublicClient,
+  holdings: Holding[],
+): Promise<Map<string, bigint>> {
+  const supplies = new Map<string, bigint>();
+  const targets = holdings
+    .filter((holding) => !holding.token.native)
+    .slice(0, MAX_SUPPLY_READS);
+  if (targets.length === 0) return supplies;
+
+  const results = await client
+    .multicall({
+      allowFailure: true,
+      contracts: targets.map((holding) => ({
+        address: holding.token.address,
+        abi: erc20Abi,
+        functionName: "totalSupply" as const,
+      })),
+    })
+    .catch(() => []);
+
+  targets.forEach((holding, index) => {
+    const entry = results[index];
+    if (!entry || entry.status !== "success") return;
+    const supply = entry.result as bigint;
+    if (supply > 0n) supplies.set(holding.token.address.toLowerCase(), supply);
+  });
+  return supplies;
+}
+
+/**
  * Puts a dollar figure on each holding, best source first.
  *
  * The market price is the one a reader recognises, because it is the number
@@ -112,6 +190,10 @@ async function fromChain(
  * moment. The pool's own mid price is the fallback rather than the default: it
  * is the truth about one pool on one venue, and a portfolio priced that way
  * disagrees with every other screen the reader has open.
+ *
+ * Whatever the source, the price is then made to answer for itself. A cap is
+ * worked out from the chain's own supply and, where that comes out absurd, the
+ * price is dropped rather than shown — see `IMPLAUSIBLE_CAP`.
  */
 async function priceHoldings(
   client: PublicClient,
@@ -123,57 +205,112 @@ async function priceHoldings(
   const dex = dexMeta(chainId);
   const stableAddress = dex?.stable?.toLowerCase();
 
-  const market = await readFeedPrices(
-    holdings.map((holding) => routingAddress(holding.token)),
-  );
+  const [market, supplies] = await Promise.all([
+    readFeedQuotes(holdings.map((holding) => routingAddress(holding.token))),
+    readSupplies(client, holdings),
+  ]);
+
+  const priced = (holding: Holding, price: number, source: PriceSource): Holding => ({
+    ...holding,
+    price,
+    value: holding.amount * price,
+    priceSource: source,
+  });
 
   const valued = holdings.map((holding) => {
     const address = holding.token.address.toLowerCase();
     const routed = routingAddress(holding.token).toLowerCase();
+    const withSupply = { ...holding, totalSupply: supplies.get(address) };
 
     // The USD unit prices itself; asking a feed what a dollar is worth invites
     // a depeg reading into a figure the whole page is denominated in.
     if (stableAddress && address === stableAddress) {
-      return { ...holding, price: 1, value: holding.amount };
+      return priced(withSupply, 1, "stable");
     }
 
-    const price = market.get(routed) ?? indexedPrices.get(address);
-    return price === undefined
-      ? holding
-      : { ...holding, price, value: holding.amount * price };
+    const quote: FeedQuote | undefined = market.get(routed);
+    if (quote) {
+      return {
+        ...priced(withSupply, quote.priceUsd, "feed"),
+        ...(quote.liquidityUsd !== undefined ? { liquidity: quote.liquidityUsd } : {}),
+        ...(quote.change24h !== undefined ? { change24h: quote.change24h } : {}),
+        ...(quote.marketCapUsd !== undefined
+          ? { marketCap: quote.marketCapUsd }
+          : quote.fdvUsd !== undefined
+            ? { marketCap: quote.fdvUsd, diluted: true }
+            : {}),
+      };
+    }
+
+    const indexed = indexedPrices.get(address);
+    return indexed === undefined ? withSupply : priced(withSupply, indexed, "indexer");
   });
 
   // Whatever no feed knew about, and the chain can still answer for: a pool
   // against the USD unit, one round trip per token, deepest holdings first.
-  if (!stableAddress) return valued;
-  const stable = tokens.find((token) => token.address.toLowerCase() === stableAddress);
-  if (!stable) return valued;
+  const stable = stableAddress
+    ? tokens.find((token) => token.address.toLowerCase() === stableAddress)
+    : undefined;
 
-  const pending = valued
-    .map((holding, index) => ({ holding, index }))
-    .filter((entry) => entry.holding.price === undefined)
-    .slice(0, MAX_POOL_PRICED);
+  if (stable) {
+    const pending = valued
+      .map((holding, index) => ({ holding, index }))
+      .filter((entry) => entry.holding.price === undefined)
+      .slice(0, MAX_POOL_PRICED);
 
-  const pooled = await Promise.all(
-    pending.map(async ({ holding, index }) => {
-      try {
-        const mid = await midPrice(client, holding.token, stable);
-        if (!mid) return undefined;
-        return {
-          index,
-          holding: { ...holding, price: mid.price, value: holding.amount * mid.price },
-        };
-      } catch {
-        return undefined;
-      }
-    }),
-  );
+    const pooled = await Promise.all(
+      pending.map(async ({ holding, index }) => {
+        try {
+          const mid = await midPrice(client, holding.token, stable);
+          if (!mid) return undefined;
+          return { index, holding: priced(holding, mid.price, "pool") };
+        } catch {
+          return undefined;
+        }
+      }),
+    );
 
-  for (const entry of pooled) {
-    if (entry) valued[entry.index] = entry.holding;
+    for (const entry of pooled) {
+      if (entry) valued[entry.index] = entry.holding;
+    }
   }
 
-  return valued;
+  return valued.map(withMarketCap);
+}
+
+/**
+ * Fills in the cap a price implies, and throws the price away when that cap is
+ * not a number anything on this chain could be worth.
+ */
+function withMarketCap(holding: Holding): Holding {
+  if (holding.price === undefined) return holding;
+  if (holding.priceSource === "stable" || holding.token.native) return holding;
+
+  const supply =
+    holding.totalSupply === undefined
+      ? undefined
+      : Number(formatUnits(holding.totalSupply, holding.token.decimals));
+
+  const implied =
+    supply !== undefined && Number.isFinite(supply) && supply > 0
+      ? supply * holding.price
+      : undefined;
+
+  const cap = holding.marketCap ?? implied;
+
+  if (cap !== undefined && cap > IMPLAUSIBLE_CAP) {
+    return {
+      ...holding,
+      price: undefined,
+      value: undefined,
+      marketCap: undefined,
+      diluted: undefined,
+      priceSource: undefined,
+    };
+  }
+
+  if (holding.marketCap !== undefined || implied === undefined) return holding;
+  return { ...holding, marketCap: implied, diluted: true };
 }
 
 /**

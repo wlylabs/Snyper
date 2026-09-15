@@ -1,3 +1,4 @@
+import { formatSignificant } from "./format";
 import { INTL_LOCALE, type Locale } from "./i18n";
 
 export type DisplayCurrency = "USD" | "IDR";
@@ -97,13 +98,118 @@ export function formatMoney(
   }
 
   const abs = Math.abs(converted.value);
-  const digits = abs >= 1000 ? 0 : abs >= 1 ? 2 : abs >= 0.01 ? 4 : 6;
+  // Zero is exactly zero at every scale; printing it as `$0.000000` reads as a
+  // price too small to show rather than as nothing.
+  const digits = abs === 0 ? 2 : abs >= 1000 ? 0 : abs >= 1 ? 2 : abs >= 0.01 ? 4 : 6;
   return new Intl.NumberFormat(tag, {
     style: "currency",
     currency: "USD",
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   }).format(converted.value);
+}
+
+/**
+ * Wraps an already-formatted number in the currency's own furniture — symbol,
+ * spacing and placement — by borrowing the shell `Intl` puts around zero. The
+ * number itself is built elsewhere, because the figures this is for are ones
+ * `Intl` will not render: a price whose digits start eight places past the
+ * decimal point has no `maximumFractionDigits` that both shows it and stays
+ * readable.
+ */
+function inCurrency(body: string, tag: string, currency: DisplayCurrency): string {
+  const parts = new Intl.NumberFormat(tag, {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).formatToParts(0);
+
+  return parts
+    .map((part) => {
+      if (part.type === "integer") return body;
+      if (part.type === "decimal" || part.type === "fraction") return "";
+      return part.value;
+    })
+    .join("");
+}
+
+/**
+ * A unit price, which on this chain is usually a memecoin's.
+ *
+ * `formatMoney` stops at six decimals, which is the right place to stop for a
+ * portfolio total and the wrong place for a token that trades eight decimals
+ * down: everything below it collapses onto the same `$0.000000`, so a token
+ * that doubled and one that halved print identically. This keeps four
+ * significant digits however far down they are.
+ */
+export function formatPriceMoney(
+  usd: number | undefined,
+  options: { currency: DisplayCurrency; fx: FxRate | undefined; locale: Locale },
+  significant = 4,
+): string {
+  const converted = convert(usd, options.currency, options.fx);
+  if (!converted || converted.value === 0) return "—";
+  const tag = INTL_LOCALE[options.locale];
+
+  // Rupiah has no sub-unit worth printing until the figure is small enough to
+  // need one, and at that point it is the same problem as a dollar price.
+  if (converted.currency === "IDR" && Math.abs(converted.value) >= 1) {
+    return formatMoney(usd, options);
+  }
+
+  return inCurrency(
+    formatSignificant(converted.value, significant, tag),
+    tag,
+    converted.currency,
+  );
+}
+
+/**
+ * A large figure written short: $412K, $1.24M, $3.1B. Market caps span six
+ * orders of magnitude across one wallet, and a column of full-length numbers
+ * is a column that has to be read digit by digit to be compared.
+ */
+export function formatCompactMoney(
+  usd: number | undefined,
+  options: { currency: DisplayCurrency; fx: FxRate | undefined; locale: Locale },
+): string {
+  const converted = convert(usd, options.currency, options.fx);
+  if (!converted) return "—";
+  return new Intl.NumberFormat(INTL_LOCALE[options.locale], {
+    style: "currency",
+    currency: converted.currency,
+    notation: "compact",
+    // Currency style would otherwise hold two decimals open and print $412.00K.
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(converted.value);
+}
+
+/**
+ * A holding's worth, with everything under the floor collapsed into one honest
+ * statement that it is dust.
+ *
+ * Eight airdropped contracts each printing `$0.000000` is a column of zeros
+ * claiming to be prices. `< $0.01` says the same thing in the way a reader
+ * already understands, and says it once.
+ */
+export function formatMoneyFloor(
+  usd: number | undefined,
+  options: { currency: DisplayCurrency; fx: FxRate | undefined; locale: Locale },
+  floor = 0.01,
+): string {
+  if (usd === undefined || !Number.isFinite(usd)) return "—";
+  if (usd !== 0 && Math.abs(usd) < floor) {
+    const converted = convert(floor, options.currency, options.fx);
+    if (!converted) return "—";
+    return `< ${new Intl.NumberFormat(INTL_LOCALE[options.locale], {
+      style: "currency",
+      currency: converted.currency,
+      maximumFractionDigits: converted.currency === "IDR" ? 0 : 2,
+    }).format(converted.value)}`;
+  }
+  return formatMoney(usd, options);
 }
 
 export function formatRate(rate: number, locale: Locale): string {

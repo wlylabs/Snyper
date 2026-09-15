@@ -12,7 +12,7 @@ import { useTokenList } from "@/hooks/useTokenList";
 import { useMounted } from "@/hooks/useMounted";
 import { useI18n } from "@/hooks/useI18n";
 import { useFxRate } from "@/hooks/useFxRate";
-import { formatMoney } from "@/lib/currency";
+import { formatPriceMoney } from "@/lib/currency";
 import { useAppStore } from "@/store/useAppStore";
 import { chainMeta, hasRouting } from "@/lib/chains";
 import { feeLabel, formatPrice, formatSigned, timeAgo } from "@/lib/format";
@@ -122,7 +122,10 @@ export default function TerminalPage() {
               {mounted && quotedInUsd && price !== undefined && currency === "IDR" && fx && (
                 <p className="num mt-1.5 text-[12px] text-faint">
                   {t("terminal.approxFx", {
-                    value: formatMoney(price, { currency, fx, locale }),
+                    /* A memecoin's rupiah price lands below the sub-unit, where
+                       `formatMoney` rounds it to Rp 0 — significant digits are
+                       the only way this line says anything. */
+                    value: formatPriceMoney(price, { currency, fx, locale }),
                   })}
                 </p>
               )}
