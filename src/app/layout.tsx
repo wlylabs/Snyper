@@ -63,6 +63,15 @@ export const viewport: Viewport = {
 
 const themeBoot = `(function(){try{var raw=localStorage.getItem("snyper.state.v1");var t="dark";if(raw){var s=JSON.parse(raw);t=(s&&s.state&&s.state.settings&&s.state.settings.theme)||"dark";}document.documentElement.dataset.theme=t;}catch(e){document.documentElement.dataset.theme="dark";}})();`;
 
+/*
+ * Chromium fires `beforeinstallprompt` on load, routinely before React has
+ * hydrated and can attach a listener — and it fires once. Missing it leaves the
+ * install sheet with nothing to prompt and nothing to show but a paragraph
+ * pointing at the browser menu. This catches it from the first byte and parks
+ * it for `useInstallPrompt` to collect.
+ */
+const installBoot = `(function(){window.__snyperInstallPrompt=null;window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();window.__snyperInstallPrompt=e;});window.addEventListener("appinstalled",function(){window.__snyperInstallPrompt=null;});})();`;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" data-theme="dark" suppressHydrationWarning>
@@ -74,6 +83,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
         />
         <script dangerouslySetInnerHTML={{ __html: themeBoot }} />
+        <script dangerouslySetInnerHTML={{ __html: installBoot }} />
       </head>
       <body>
         <Providers>
