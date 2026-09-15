@@ -96,16 +96,15 @@ export default function AssetsPage() {
    * A wallet on a memecoin chain collects contracts it never asked for, and
    * most of them are worth a fraction of a cent. Listed at the same weight as a
    * real position they bury it, so only holdings that clear a dollar get a row
-   * and the rest fold into one line that opens on a tap.
+   * and the rest fold into one line that opens on a tap. The bar is proof
+   * rather than suspicion: something has to have priced a holding at a dollar
+   * or more for it to be listed, which takes the unpriced with it — a token no
+   * feed and no pool could value is not known to be worth anything.
    *
-   * The bar is proof, not suspicion: a holding is listed when something priced
-   * it at a dollar or more, and folded away otherwise. That deliberately takes
-   * the unpriced with it — a token no feed and no pool could value is not known
-   * to be worth anything, and on this chain that is most of them — and the coin
-   * too, which is a real cost, because gas is what it pays for and a reader who
-   * cannot see their balance cannot work out why a trade will not sign. Both
-   * were asked about and both were meant. The count below the list says how
-   * many went, and one tap brings all of them back.
+   * The coin is the exception, at any size. It is not one of the contracts this
+   * is filtering, it is the balance the wallet is denominated in and the one
+   * gas comes out of, and a reader who cannot see it cannot work out why a
+   * trade will not sign.
    */
   const [showDust, setShowDust] = useState(false);
 
@@ -113,9 +112,11 @@ export default function AssetsPage() {
     const visible: Holding[] = [];
     let dust = 0;
     for (const holding of holdings ?? []) {
-      const worth = holding.value !== undefined && holding.value >= DUST_FLOOR;
-      if (!worth) dust += 1;
-      if (worth || showDust) visible.push(holding);
+      const listable =
+        holding.token.native ||
+        (holding.value !== undefined && holding.value >= DUST_FLOOR);
+      if (!listable) dust += 1;
+      if (listable || showDust) visible.push(holding);
     }
     return { visible, dust };
   }, [holdings, showDust]);
