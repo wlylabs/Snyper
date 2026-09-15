@@ -171,12 +171,12 @@ export default function AssetsPage() {
                 {address ? formatMoney(total, { currency, fx, locale }) : "—"}
               </p>
               {address && unpriced > 0 && (
-                <p className="mt-1.5 max-w-[42ch] text-[10px] leading-relaxed text-faint">
+                <p className="mt-1.5 max-w-[34ch] text-[10px] leading-relaxed text-faint">
                   {t("assets.unpricedNote", { count: unpriced })}
                 </p>
               )}
             </div>
-            <p className="lbl">
+            <p className="lbl shrink-0 whitespace-nowrap">
               {isFetching
                 ? t("assets.reading")
                 : t("assets.count", { count: visible.length })}
@@ -349,17 +349,23 @@ type Money = { currency: DisplayCurrency; fx: FxRate | undefined; locale: Locale
 const THIN_LIQUIDITY = 1000;
 
 /**
- * One holding, and the argument for which number leads it.
+ * One holding, laid out the way a wallet lays one out.
  *
- * For the chain's own money, price is the figure a reader came for: ether has
- * one supply, everybody knows roughly what it is, and $2,475 means something on
- * its own. For everything else on this chain — which is to say the memecoins —
- * price means nothing without the supply behind it, and the supply is whatever
- * the launch decided that morning. A token at $9 and a token at $0.00007 are
- * not expensive and cheap; they are two launches that picked different numbers
- * of zeros, and the only way to tell which one is bigger is the market cap.
- * That is the number every chart, launchpad and group chat quotes, so that is
- * the number the row leads with, with the price kept a hover away.
+ * Each side of the row carries one thing per line. On the left the token names
+ * itself and then says how much of it there is, with the unit attached — a bare
+ * `0.000051` under a dollar figure is two magnitudes in two units with nothing
+ * saying which is which, and a reader comparing it against their wallet reads
+ * the wrong one. On the right the dollar value leads, because that is the line
+ * they came to check, with what the token is worth per unit underneath it.
+ *
+ * That last line is where the chain shows through. For the chain's own money it
+ * is a price: ether has one supply, everybody knows roughly what it is, and
+ * $2,475 means something on its own. For everything else here — which is to say
+ * the memecoins — price means nothing without the supply behind it, and the
+ * supply is whatever the launch decided that morning. A token at $9 and a token
+ * at $0.00007 are not expensive and cheap; they are two launches that picked
+ * different numbers of zeros, and the only way to tell which is bigger is the
+ * market cap. So that is what sits there instead.
  */
 function HoldingRow({
   holding,
@@ -444,7 +450,19 @@ function HoldingRow({
             </span>
           )}
         </p>
-        <p className="num truncate text-[11px] text-faint" title={provenance || undefined}>
+        {/* The quantity carries its own unit. A bare number under a dollar
+            figure is two magnitudes in two units with nothing saying so. */}
+        <p className="num truncate text-[11px] text-faint">
+          {formatAmount(holding.amount, 5)} {holding.token.symbol}
+        </p>
+      </div>
+      <div className="shrink-0 text-right">
+        <p className="num text-[13px]">
+          {holding.value !== undefined
+            ? formatMoneyFloor(holding.value, money)
+            : t("assets.unpriced")}
+        </p>
+        <p className="num text-[11px] text-faint" title={provenance || undefined}>
           {leadsWithCap ? (
             <>
               <span className="lbl mr-1">
@@ -459,14 +477,6 @@ function HoldingRow({
           ) : (
             truncateAddress(holding.token.address, 6, 4)
           )}
-        </p>
-      </div>
-      <div className="text-right">
-        <p className="num text-[13px]">{formatAmount(holding.amount, 5)}</p>
-        <p className="num text-[11px] text-faint">
-          {holding.value !== undefined
-            ? formatMoneyFloor(holding.value, money)
-            : t("assets.unpriced")}
         </p>
       </div>
     </div>
