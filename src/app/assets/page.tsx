@@ -28,6 +28,13 @@ import { baseTokens, mergeTokens, type Token } from "@/lib/tokens";
 import type { Holding } from "@/hooks/usePortfolio";
 import { useAppStore } from "@/store/useAppStore";
 
+/**
+ * What a holding has to be worth to earn a row of its own. A dollar is the
+ * line most wallets draw, and it is well clear of the fractions of a cent an
+ * airdropped contract arrives with.
+ */
+const DUST_FLOOR = 1;
+
 export default function AssetsPage() {
   const mounted = useMounted();
   const { t, locale } = useI18n();
@@ -82,6 +89,38 @@ export default function AssetsPage() {
     () => (holdings ?? []).reduce((sum, holding) => sum + (holding.value ?? 0), 0),
     [holdings],
   );
+
+  /*
+   * Dust, and what counts as it.
+   *
+   * A wallet on a memecoin chain collects contracts it never asked for, and
+   * most of them are worth a fraction of a cent. Listing them at the same
+   * weight as a real position buries the position. So anything priced under a
+   * dollar folds away behind a count that says how many and opens on a tap —
+   * hidden, never dropped, because a holding the reader cannot see is a holding
+   * they cannot sell.
+   *
+   * Two things are never dust. The coin is what gas is paid in, and a reader
+   * who cannot see their gas balance cannot tell why a trade will not sign. And
+   * a token nothing could price is unknown, not worthless: no feed on this
+   * chain is confirmed to cover it, so hiding it would hide exactly the holding
+   * this page is worst at valuing.
+   */
+  const [showDust, setShowDust] = useState(false);
+
+  const { visible, dust } = useMemo(() => {
+    const visible: Holding[] = [];
+    let dust = 0;
+    for (const holding of holdings ?? []) {
+      const small =
+        !holding.token.native &&
+        holding.value !== undefined &&
+        holding.value < DUST_FLOOR;
+      if (small) dust += 1;
+      if (!small || showDust) visible.push(holding);
+    }
+    return { visible, dust };
+  }, [holdings, showDust]);
 
   /*
    * What the total leaves out. A token with no route to the chain's USD unit
@@ -141,7 +180,7 @@ export default function AssetsPage() {
             <p className="lbl">
               {isFetching
                 ? t("assets.reading")
-                : t("assets.count", { count: holdings?.length ?? 0 })}
+                : t("assets.count", { count: visible.length })}
             </p>
           </div>
 
@@ -167,7 +206,7 @@ export default function AssetsPage() {
             />
           ) : (
             <div>
-              {holdings?.map((holding) => (
+              {visible.map((holding) => (
                 <HoldingRow
                   key={holding.token.address}
                   holding={holding}
@@ -175,6 +214,22 @@ export default function AssetsPage() {
                   money={{ currency, fx, locale }}
                 />
               ))}
+              {dust > 0 && (
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between gap-3 border-t border-line px-3 py-2.5 text-left hover:bg-line/40"
+                  onClick={() => setShowDust((open) => !open)}
+                >
+                  <span className="text-[11px] text-faint">
+                    {showDust
+                      ? t("assets.dustShown", { count: dust })
+                      : t("assets.dustHidden", { count: dust })}
+                  </span>
+                  <span className="lbl shrink-0">
+                    {showDust ? t("assets.dustHide") : t("assets.dustShow")}
+                  </span>
+                </button>
+              )}
             </div>
           )}
 
