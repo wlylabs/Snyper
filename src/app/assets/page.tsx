@@ -29,9 +29,9 @@ import type { Holding } from "@/hooks/usePortfolio";
 import { useAppStore } from "@/store/useAppStore";
 
 /**
- * What a holding has to be worth to earn a row of its own. A dollar is the
- * line most wallets draw, and it is well clear of the fractions of a cent an
- * airdropped contract arrives with.
+ * What a holding has to be proven worth to earn a row of its own. A dollar is
+ * the line most wallets draw, and it is well clear of the fractions of a cent
+ * an airdropped contract arrives with.
  */
 const DUST_FLOOR = 1;
 
@@ -94,17 +94,18 @@ export default function AssetsPage() {
    * Dust, and what counts as it.
    *
    * A wallet on a memecoin chain collects contracts it never asked for, and
-   * most of them are worth a fraction of a cent. Listing them at the same
-   * weight as a real position buries the position. So anything priced under a
-   * dollar folds away behind a count that says how many and opens on a tap —
-   * hidden, never dropped, because a holding the reader cannot see is a holding
-   * they cannot sell.
+   * most of them are worth a fraction of a cent. Listed at the same weight as a
+   * real position they bury it, so only holdings that clear a dollar get a row
+   * and the rest fold into one line that opens on a tap.
    *
-   * Two things are never dust. The coin is what gas is paid in, and a reader
-   * who cannot see their gas balance cannot tell why a trade will not sign. And
-   * a token nothing could price is unknown, not worthless: no feed on this
-   * chain is confirmed to cover it, so hiding it would hide exactly the holding
-   * this page is worst at valuing.
+   * The bar is proof, not suspicion: a holding is listed when something priced
+   * it at a dollar or more, and folded away otherwise. That deliberately takes
+   * the unpriced with it — a token no feed and no pool could value is not known
+   * to be worth anything, and on this chain that is most of them — and the coin
+   * too, which is a real cost, because gas is what it pays for and a reader who
+   * cannot see their balance cannot work out why a trade will not sign. Both
+   * were asked about and both were meant. The count below the list says how
+   * many went, and one tap brings all of them back.
    */
   const [showDust, setShowDust] = useState(false);
 
@@ -112,12 +113,9 @@ export default function AssetsPage() {
     const visible: Holding[] = [];
     let dust = 0;
     for (const holding of holdings ?? []) {
-      const small =
-        !holding.token.native &&
-        holding.value !== undefined &&
-        holding.value < DUST_FLOOR;
-      if (small) dust += 1;
-      if (!small || showDust) visible.push(holding);
+      const worth = holding.value !== undefined && holding.value >= DUST_FLOOR;
+      if (!worth) dust += 1;
+      if (worth || showDust) visible.push(holding);
     }
     return { visible, dust };
   }, [holdings, showDust]);
