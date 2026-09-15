@@ -209,7 +209,6 @@ const en = {
   "assets.sourcePool": "Mid price of one pool on this chain",
   "assets.sourceStable": "The chain's USD unit, held at one dollar",
   "assets.capUnknown": "no cap",
-  "assets.tagUnverified": "?",
   "assets.unverifiedHint":
     "Nothing this app read corroborates this figure: no market feed covers the token, or the pair behind it is too thin for the price to mean much. Treat it as a guess.",
   "assets.address": "Address",
@@ -659,7 +658,6 @@ const id: Record<TKey, string> = {
   "assets.sourcePool": "Harga tengah satu pool di chain ini",
   "assets.sourceStable": "Unit dolar chain ini, dipegang di satu dolar",
   "assets.capUnknown": "tanpa cap",
-  "assets.tagUnverified": "?",
   "assets.unverifiedHint":
     "Tidak ada yang menguatkan angka ini: tidak ada feed pasar yang meliput token ini, atau pair di baliknya terlalu tipis untuk membuat harganya berarti. Anggap saja perkiraan.",
   "assets.address": "Alamat",

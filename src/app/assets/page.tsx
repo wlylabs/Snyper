@@ -446,24 +446,25 @@ function HoldingRow({
           one that stays is the one attached to the number, because that is the
           copy doing work. */}
       <div className="min-w-0 flex-1">
-        {/* With no ticker column left to mark it, the coin's own row takes the
-            accent instead. It is the balance the wallet is denominated in and
-            the one a reader looks for first, among names that all look alike. */}
+        {/*
+         * The name, unadorned. The tags that used to sit here — unlisted, meme,
+         * Pons — are 24px bordered pills against a 13px name, and on a chain
+         * whose curated list is three addresses long, "unlisted" was true of
+         * every row but one. A badge that never varies is not a signal, it is
+         * furniture, and it was outweighing the thing it annotated. The picker
+         * still carries all of them, which is where they decide something: a
+         * reader holding a token has already made that choice.
+         *
+         * With no ticker column left to mark it, the coin's own row takes the
+         * accent instead — it is the balance the wallet is denominated in, and
+         * it should be findable among names that otherwise all look alike.
+         */}
         <p
-          className={`flex items-center gap-1.5 text-[13px] ${
+          className={`truncate text-[13px] ${
             holding.token.native ? "text-accent-text" : "text-dim"
           }`}
         >
-          <span className="truncate">{holding.token.name}</span>
-          <TokenTags token={token} listed={listed} />
-          {unverified && (
-            <span
-              className="chip chip-xs chip-warn"
-              title={t("assets.unverifiedHint")}
-            >
-              {t("assets.tagUnverified")}
-            </span>
-          )}
+          {holding.token.name}
         </p>
         {/* The quantity, and nothing else. It carries its own unit, because a
             bare number under a dollar figure is two magnitudes in two units
@@ -476,7 +477,14 @@ function HoldingRow({
         </p>
       </div>
       <div className="shrink-0 text-right">
-        <p className="num text-[13px]">
+        {/* The doubt belongs against the figure it is about, not against the
+            token's name, and it is one glyph rather than a pill. */}
+        <p className="num flex items-center justify-end gap-1.5 text-[13px]">
+          {unverified && (
+            <span className="warn flex shrink-0" title={t("assets.unverifiedHint")}>
+              <Icon name="alert" size={12} />
+            </span>
+          )}
           {holding.value !== undefined
             ? formatMoneyFloor(holding.value, money)
             : t("assets.unpriced")}
