@@ -5,12 +5,12 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import type { Token } from "@/lib/tokens";
 import { resolveVenue, setActiveVenue, type VenueConfig } from "@/lib/venue";
 import type {
-  Bot,
-  BotRuntime,
-  OrderStage,
   PricePoint,
   Settings,
   Signal,
+  Snype,
+  SnypeRuntime,
+  SnypeStage,
   Trade,
 } from "@/lib/types";
 
@@ -28,8 +28,6 @@ export const DEFAULT_SETTINGS: Settings = {
   tickSeconds: 30,
   theme: "dark",
   autoDispatch: false,
-  presetsNative: [0.05, 0.1, 0.25, 0.5],
-  presetsStable: [25, 50, 100, 250],
   priorityFeeGwei: 0,
   maxImpactBps: 1_500,
 };
@@ -58,16 +56,12 @@ export function seriesKey(chainId: number, base: Token, quote: Token): string {
   return `${chainId}:${base.address.toLowerCase()}:${quote.address.toLowerCase()}`;
 }
 
-export function todayKey(now = Date.now()): string {
-  return new Date(now).toISOString().slice(0, 10);
-}
-
-export function emptyRuntime(): BotRuntime {
-  return { filledLevels: [], spentQuote: 0, deployedQuote: 0, fills: 0 };
+export function emptyRuntime(): SnypeRuntime {
+  return { fills: 0 };
 }
 
 type AppState = {
-  bots: Bot[];
+  snypes: Snype[];
   signals: Signal[];
   trades: Trade[];
   series: Record<string, PricePoint[]>;
@@ -83,13 +77,11 @@ type AppState = {
   venueKey: string;
   hydrated: boolean;
 
-  addBot: (bot: Bot) => void;
-  updateBot: (id: string, patch: Partial<Omit<Bot, "runtime">>) => void;
-  patchRuntime: (id: string, patch: Partial<BotRuntime>) => void;
-  removeBot: (id: string) => void;
-  setBotStatus: (id: string, status: Bot["status"]) => void;
-  resetBot: (id: string) => void;
-  closeOrder: (id: string, stage: Extract<OrderStage, "expired" | "cancelled">) => void;
+  addSnype: (snype: Snype) => void;
+  patchRuntime: (id: string, patch: Partial<SnypeRuntime>) => void;
+  removeSnype: (id: string) => void;
+  setSnypeStatus: (id: string, status: Snype["status"]) => void;
+  closeSnype: (id: string, stage: Extract<SnypeStage, "expired" | "cancelled">) => void;
 
   pushSignal: (signal: Signal) => void;
   updateSignal: (id: string, patch: Partial<Signal>) => void;
@@ -108,10 +100,97 @@ type AppState = {
   setHydrated: () => void;
 };
 
+/**
+ * State written before this release carried a list of `bots`, each one a
+ * strategy of its own kind. Only the one-shot order survived — it is what a
+ * snype is now — so the bots that were something else are dropped rather than
+ * left in the list as entries nothing can evaluate.
+ */
+type LegacyBot = {
+  id?: string;
+  name?: string;
+  chainId?: number;
+  base?: Token;
+  quote?: Token;
+  strategy?: { kind?: string } & Record<string, unknown>;
+  slippageBps?: number;
+  cooldownSec?: number;
+  status?: Snype["status"];
+  createdAt?: number;
+  runtime?: Record<string, unknown>;
+};
+
+function migrateBot(bot: LegacyBot): Snype | undefined {
+  const strategy = bot.strategy;
+  if (!strategy || strategy.kind !== "order") return undefined;
+  if (!bot.id || !bot.base || !bot.quote || !bot.chainId) return undefined;
+  const runtime = (bot.runtime ?? {}) as Record<string, unknown>;
+  return {
+    id: bot.id,
+    name: bot.name ?? bot.base.symbol,
+    chainId: bot.chainId,
+    base: bot.base,
+    quote: bot.quote,
+    plan: {
+      amountQuote: Number(strategy.amountQuote ?? 0),
+      entryPrice: Number(strategy.entryPrice ?? 0),
+      takeProfitPct: Number(strategy.takeProfitPct ?? 0),
+      cutLossPct: Number(strategy.cutLossPct ?? 0),
+      expiresAt: Number(strategy.expiresAt ?? 0),
+    },
+    slippageBps: bot.slippageBps ?? 100,
+    cooldownSec: bot.cooldownSec ?? 30,
+    status: bot.status === "armed" ? "armed" : "idle",
+    createdAt: bot.createdAt ?? Date.now(),
+    runtime: {
+      fills: Number(runtime.fills ?? 0),
+      lastTickAt: runtime.lastTickAt as number | undefined,
+      lastFireAt: runtime.lastFireAt as number | undefined,
+      lastPrice: runtime.lastPrice as number | undefined,
+      completed: runtime.completed as boolean | undefined,
+      error: runtime.error as string | undefined,
+      stage: runtime.stage as SnypeStage | undefined,
+      fillPrice: runtime.fillPrice as number | undefined,
+      positionBase: runtime.positionBase as string | undefined,
+      exitReason: runtime.exitReason as Snype["runtime"]["exitReason"],
+    },
+  };
+}
+
+function migrateState(persisted: unknown): Record<string, unknown> {
+  const state = { ...((persisted ?? {}) as Record<string, unknown>) };
+  const bots = state.bots as LegacyBot[] | undefined;
+  if (Array.isArray(bots)) {
+    const snypes = bots.map(migrateBot).filter((snype): snype is Snype => Boolean(snype));
+    const kept = new Set(snypes.map((snype) => snype.id));
+    state.snypes = snypes;
+    const signals = state.signals as (Signal & { botId?: string; botName?: string })[] | undefined;
+    if (Array.isArray(signals)) {
+      state.signals = signals
+        .map((signal) => ({
+          ...signal,
+          snypeId: signal.snypeId ?? signal.botId ?? "",
+          snypeName: signal.snypeName ?? signal.botName ?? "",
+        }))
+        .filter((signal) => kept.has(signal.snypeId));
+    }
+  }
+  delete state.bots;
+  const trades = state.trades as (Trade & { botName?: string; source?: string })[] | undefined;
+  if (Array.isArray(trades)) {
+    state.trades = trades.map((trade) => ({
+      ...trade,
+      source: trade.source === "terminal" ? "terminal" : "snype",
+      snypeName: trade.snypeName ?? trade.botName,
+    }));
+  }
+  return state;
+}
+
 export const useAppStore = create<AppState>()(
   persist(
     (set) => ({
-      bots: [],
+      snypes: [],
       signals: [],
       trades: [],
       series: {},
@@ -123,56 +202,46 @@ export const useAppStore = create<AppState>()(
       venueKey: syncVenue(),
       hydrated: false,
 
-      addBot: (bot) => set((state) => ({ bots: [bot, ...state.bots] })),
-
-      updateBot: (id, patch) =>
-        set((state) => ({
-          bots: state.bots.map((bot) => (bot.id === id ? { ...bot, ...patch } : bot)),
-        })),
+      addSnype: (snype) => set((state) => ({ snypes: [snype, ...state.snypes] })),
 
       patchRuntime: (id, patch) =>
         set((state) => ({
-          bots: state.bots.map((bot) =>
-            bot.id === id ? { ...bot, runtime: { ...bot.runtime, ...patch } } : bot,
+          snypes: state.snypes.map((snype) =>
+            snype.id === id ? { ...snype, runtime: { ...snype.runtime, ...patch } } : snype,
           ),
         })),
 
-      removeBot: (id) =>
+      removeSnype: (id) =>
         set((state) => ({
-          bots: state.bots.filter((bot) => bot.id !== id),
-          signals: state.signals.filter((signal) => signal.botId !== id),
+          snypes: state.snypes.filter((snype) => snype.id !== id),
+          signals: state.signals.filter((signal) => signal.snypeId !== id),
         })),
 
-      setBotStatus: (id, status) =>
+      setSnypeStatus: (id, status) =>
         set((state) => ({
-          bots: state.bots.map((bot) => (bot.id === id ? { ...bot, status } : bot)),
-        })),
-
-      resetBot: (id) =>
-        set((state) => ({
-          bots: state.bots.map((bot) =>
-            bot.id === id ? { ...bot, status: "idle", runtime: emptyRuntime() } : bot,
+          snypes: state.snypes.map((snype) =>
+            snype.id === id ? { ...snype, status } : snype,
           ),
         })),
 
       /**
-       * Retires an order that never reached a position. Signals still waiting
-       * for a signature go with it — an order that has given up must not be
+       * Retires a snype that never reached a position. Signals still waiting
+       * for a signature go with it — a snype that has given up must not be
        * able to buy later at a price nobody agreed to.
        */
-      closeOrder: (id, stage) =>
+      closeSnype: (id, stage) =>
         set((state) => ({
-          bots: state.bots.map((bot) =>
-            bot.id === id
+          snypes: state.snypes.map((snype) =>
+            snype.id === id
               ? {
-                  ...bot,
+                  ...snype,
                   status: "idle",
-                  runtime: { ...bot.runtime, stage, completed: true, error: undefined },
+                  runtime: { ...snype.runtime, stage, completed: true, error: undefined },
                 }
-              : bot,
+              : snype,
           ),
           signals: state.signals.map((signal) =>
-            signal.botId === id && signal.status === "pending"
+            signal.snypeId === id && signal.status === "pending"
               ? { ...signal, status: "cancelled" }
               : signal,
           ),
@@ -262,10 +331,11 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: "snyper.state.v1",
-      version: 3,
+      version: 4,
       storage: createJSONStorage(() => localStorage),
+      migrate: (persisted, version) => (version < 4 ? migrateState(persisted) : persisted),
       partialize: (state) => ({
-        bots: state.bots,
+        snypes: state.snypes,
         signals: state.signals,
         trades: state.trades,
         series: state.series,

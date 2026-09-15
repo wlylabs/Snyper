@@ -30,7 +30,7 @@ export default function AssetsPage() {
   const { listed } = useTokenList(chainId);
   const customTokens = useAppStore((state) => state.customTokens);
   const discoveredTokens = useAppStore((state) => state.discoveredTokens);
-  const bots = useAppStore((state) => state.bots);
+  const snypes = useAppStore((state) => state.snypes);
   const trades = useAppStore((state) => state.trades);
   const venueKey = useAppStore((state) => state.venueKey);
   const discovery = useTokenDiscovery(chainId);
@@ -39,8 +39,8 @@ export default function AssetsPage() {
   const scope = useMemo<Token[]>(() => {
     if (!chainId) return [];
     const touched: Token[] = [];
-    for (const bot of bots) {
-      if (bot.chainId === chainId) touched.push(bot.base, bot.quote);
+    for (const snype of snypes) {
+      if (snype.chainId === chainId) touched.push(snype.base, snype.quote);
     }
     for (const trade of trades) {
       if (trade.chainId !== chainId) continue;
@@ -48,7 +48,7 @@ export default function AssetsPage() {
       if (trade.tokenOut) touched.push(trade.tokenOut);
     }
     return mergeTokens(chainId, baseTokens(chainId), customTokens, discoveredTokens, touched);
-  }, [chainId, bots, trades, customTokens, discoveredTokens, venueKey]);
+  }, [chainId, snypes, trades, customTokens, discoveredTokens, venueKey]);
 
   const { data: holdings, isFetching, refetch } = usePortfolio(chainId, scope);
 

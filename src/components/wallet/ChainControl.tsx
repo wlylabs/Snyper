@@ -1,7 +1,6 @@
 "use client";
 
 import { useAccount, useChainId, useSwitchChain } from "wagmi";
-import { Icon } from "@/components/ui/Icon";
 import { CHAIN_ID, chainMeta } from "@/lib/chains";
 import { useMounted } from "@/hooks/useMounted";
 import { useI18n } from "@/hooks/useI18n";
@@ -49,8 +48,7 @@ export function ChainControl() {
       title={hasRouting ? meta?.label : t("wallet.balancesOnly")}
     >
       <span className={`dot ${hasRouting ? "dot-live" : ""}`} />
-      <span className="hidden sm:inline">{meta?.mark ?? t("common.network")}</span>
-      {!hasRouting && <Icon name="alert" size={12} />}
+      <span>{meta?.mark ?? t("common.network")}</span>
     </span>
   );
 }

@@ -2,7 +2,7 @@
   "id": "/",
   "name": "Snyper — Robinhood Chain terminal",
   "short_name": "Snyper",
-  "description": "Non-custodial Robinhood Chain terminal: paste a memecoin contract, price it against its Uniswap pool or its Pons bonding curve, and run snipes, orders and trailing strategies from any device.",
+  "description": "Non-custodial Robinhood Chain terminal: paste a memecoin contract, price it against its Uniswap pool or its Pons bonding curve, and run snypes — buy at your price, take profit, cut loss — from any device.",
   "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",
@@ -58,7 +58,7 @@
     {
       "name": "Strategies",
       "short_name": "Strategies",
-      "description": "Review and arm running strategies",
+      "description": "Set up a snype and watch the ones already armed",
       "url": "/bots?source=pwa",
       "icons": [{ "src": "/icons/shortcuts/strategies.png?v=2", "sizes": "96x96", "type": "image/png" }]
     },

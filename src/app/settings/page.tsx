@@ -14,7 +14,8 @@ import { LOCALES } from "@/lib/i18n";
 import { useI18n } from "@/hooks/useI18n";
 import { useFxRate } from "@/hooks/useFxRate";
 import { formatClock, timeAgo } from "@/lib/format";
-import { RPC_OVERRIDE, WALLETCONNECT_PROJECT_ID } from "@/lib/wagmi";
+import { RPC_OVERRIDE } from "@/lib/wagmi";
+import { PRIVY_CONFIGURED } from "@/lib/privy";
 import { PONS_V1_FACTORY, PONS_V2_FACTORY } from "@/lib/pons";
 import { useVenue, useVenueDiscovery } from "@/hooks/useVenue";
 import { truncateAddress } from "@/lib/format";
@@ -34,7 +35,7 @@ export default function SettingsPage() {
 
   const wipe = () => {
     useAppStore.setState({
-      bots: [],
+      snypes: [],
       signals: [],
       trades: [],
       series: {},
@@ -177,22 +178,6 @@ export default function SettingsPage() {
         </label>
       </Panel>
 
-      <Panel label={t("settings.presets")} bodyClassName="p-3">
-        <p className="text-[11px] leading-relaxed text-faint">{t("settings.presetsNote")}</p>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <PresetField
-            label={t("settings.presetsNative")}
-            values={settings.presetsNative}
-            onChange={(presetsNative) => setSettings({ presetsNative })}
-          />
-          <PresetField
-            label={t("settings.presetsStable")}
-            values={settings.presetsStable}
-            onChange={(presetsStable) => setSettings({ presetsStable })}
-          />
-        </div>
-      </Panel>
-
       <Panel label={t("settings.install")} bodyClassName="p-3">
         {mounted && standalone ? (
           <p className="flex items-center gap-2 text-[12px] long">
@@ -219,13 +204,13 @@ export default function SettingsPage() {
 
       <Panel label={t("settings.connectivity")} bodyClassName="p-3">
         <Row
-          k={t("settings.walletConnect")}
+          k={t("settings.privy")}
           v={
-            mounted && WALLETCONNECT_PROJECT_ID
+            mounted && PRIVY_CONFIGURED
               ? t("settings.configured")
               : t("settings.notConfigured")
           }
-          tone={mounted && WALLETCONNECT_PROJECT_ID ? "long" : "warn"}
+          tone={mounted && PRIVY_CONFIGURED ? "long" : "warn"}
         />
         <Row
           k={CHAIN_META[CHAIN_ID].label}
@@ -254,47 +239,6 @@ export default function SettingsPage() {
         </button>
       </Panel>
     </div>
-  );
-}
-
-/**
- * Preset sizes as one comma separated line. Anything that is not a positive
- * number is dropped rather than stored, so a half-typed list cannot end up on a
- * buy button.
- */
-function PresetField({
-  label,
-  values,
-  onChange,
-}: {
-  label: string;
-  values: number[];
-  onChange: (values: number[]) => void;
-}) {
-  const [draft, setDraft] = useState(values.join(", "));
-
-  const commit = (text: string) => {
-    const parsed = text
-      .split(",")
-      .map((part) => Number(part.trim()))
-      .filter((value) => Number.isFinite(value) && value > 0)
-      .slice(0, 6);
-    onChange(parsed);
-  };
-
-  return (
-    <label className="block">
-      <span className="lbl mb-1.5 block">{label}</span>
-      <input
-        className="field num"
-        inputMode="decimal"
-        value={draft}
-        onChange={(event) => {
-          setDraft(event.target.value);
-          commit(event.target.value);
-        }}
-      />
-    </label>
   );
 }
 

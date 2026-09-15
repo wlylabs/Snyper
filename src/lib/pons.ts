@@ -132,14 +132,6 @@ export async function readPonsLaunch(
   return undefined;
 }
 
-/** The asset a launch trades against, as this app's token addressing sees it. */
-export function launchQuoteAddress(launch: PonsLaunch): `0x${string}` {
-  if (launch.gen === "v1") return launch.pairedToken;
-  // A V2 curve denotes native ETH with the zero address; the app uses its own
-  // sentinel for the same thing.
-  return launch.pairToken === ZERO ? NATIVE : launch.pairToken;
-}
-
 /** True while a V2 launch still trades on its curve rather than a v4 pool. */
 export function tradesOnCurve(launch: PonsLaunch | undefined): launch is PonsV2Launch {
   return launch?.gen === "v2" && launch.phase === "curve";
@@ -317,11 +309,4 @@ export function curveMidPrice(
 
 export function isCurveToken(state: CurveState, token: Token): boolean {
   return token.address.toLowerCase() === state.token.toLowerCase();
-}
-
-/** How far a launch has walked toward graduation, 0 to 1. */
-export function curveProgress(state: CurveState): number | undefined {
-  if (state.graduationThreshold <= 0n) return undefined;
-  const ratio = Number((state.realQuoteReserve * 10_000n) / state.graduationThreshold) / 10_000;
-  return Math.max(0, Math.min(1, ratio));
 }

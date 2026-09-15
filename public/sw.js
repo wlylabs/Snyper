@@ -1,5 +1,5 @@
 /* Snyper service worker — shell caching only. */
-const VERSION = "snyper-v3";
+const VERSION = "snyper-v4";
 const SHELL = `${VERSION}-shell`;
 const STATIC = `${VERSION}-static`;
 const OFFLINE_URL = "/";

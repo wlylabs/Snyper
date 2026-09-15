@@ -4,7 +4,7 @@ import { AppShell } from "@/components/shell/AppShell";
 import "./globals.css";
 
 const description =
-  "Non-custodial Robinhood Chain terminal: paste a memecoin contract, price it against its Uniswap pool or its Pons bonding curve, and run snipes, orders and trailing strategies from any device.";
+  "Non-custodial Robinhood Chain terminal: paste a memecoin contract, price it against its Uniswap pool or its Pons bonding curve, and run snypes — buy at your price, take profit, cut loss — from any device.";
 
 /** Set NEXT_PUBLIC_SITE_URL in production so social cards resolve absolutely. */
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();

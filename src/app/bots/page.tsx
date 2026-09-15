@@ -1,51 +1,40 @@
 "use client";
 
 import { useState } from "react";
-import { BotCard } from "@/components/bots/BotCard";
-import { BotComposer } from "@/components/bots/BotComposer";
-import { ContractDesk } from "@/components/bots/ContractDesk";
-import { OrderCard } from "@/components/bots/OrderCard";
-import { OrderComposer } from "@/components/bots/OrderComposer";
-import { PositionsPanel } from "@/components/bots/PositionsPanel";
-import { SignalQueue } from "@/components/bots/SignalQueue";
-import { SnipeCard } from "@/components/bots/SnipeCard";
+import { PositionsPanel } from "@/components/snype/PositionsPanel";
+import { SignalQueue } from "@/components/snype/SignalQueue";
+import { SnypeCard } from "@/components/snype/SnypeCard";
+import { SnypeComposer } from "@/components/snype/SnypeComposer";
 import { Icon } from "@/components/ui/Icon";
 import { Empty, Panel } from "@/components/ui/Panel";
 import { Segmented } from "@/components/ui/Segmented";
 import { useMounted } from "@/hooks/useMounted";
 import { useI18n } from "@/hooks/useI18n";
+import type { TKey } from "@/lib/i18n";
 import { useAppStore } from "@/store/useAppStore";
 
-type Tab = "snipe" | "orders" | "bots";
+/**
+ * Strategies the section offers. Snype is the only one for now — the tab bar
+ * stays so the next strategy is one entry here plus its own panel below.
+ */
+type Tab = "snype";
 
-export default function BotsPage() {
+const TABS: { value: Tab; label: TKey }[] = [{ value: "snype", label: "bots.tabSnype" }];
+
+export default function StrategiesPage() {
   const mounted = useMounted();
   const { t } = useI18n();
-  const bots = useAppStore((state) => state.bots);
+  const snypes = useAppStore((state) => state.snypes);
   const settings = useAppStore((state) => state.settings);
   const setSettings = useAppStore((state) => state.setSettings);
-  const [tab, setTab] = useState<Tab>("snipe");
+  const [tab, setTab] = useState<Tab>("snype");
   const [composerOpen, setComposerOpen] = useState(false);
-  const [orderOpen, setOrderOpen] = useState(false);
 
-  const snipes = bots.filter((bot) => bot.strategy.kind === "snipe");
-  const orders = bots.filter((bot) => bot.strategy.kind === "order");
-  const strategies = bots.filter(
-    (bot) => bot.strategy.kind !== "order" && bot.strategy.kind !== "snipe",
-  );
-
-  const armed = strategies.filter((bot) => bot.status === "armed").length;
-  const autoBots = bots.filter((bot) => bot.execution === "auto").length;
-  const liveOrders = orders.filter((order) => !order.runtime.completed).length;
-  const liveSnipes = snipes.filter((snipe) => !snipe.runtime.completed).length;
+  const live = snypes.filter((snype) => !snype.runtime.completed).length;
 
   const summary = !mounted
     ? t("common.loadingLocal")
-    : tab === "snipe"
-      ? t("bots.snipesSummary", { total: snipes.length, live: liveSnipes })
-      : tab === "orders"
-        ? t("bots.ordersSummary", { total: orders.length, live: liveOrders })
-        : t("bots.summary", { total: strategies.length, armed });
+    : t("snype.summary", { total: snypes.length, live });
 
   return (
     <div className="grid gap-3 lg:grid-cols-12">
@@ -57,85 +46,44 @@ export default function BotsPage() {
             </h1>
             <p className="mt-0.5 text-[11px] text-faint">{summary}</p>
           </div>
-          {tab !== "snipe" && (
-            <button
-              type="button"
-              className="btn btn-accent btn-sm"
-              onClick={() => (tab === "orders" ? setOrderOpen(true) : setComposerOpen(true))}
-            >
-              <Icon name="plus" size={13} />
-              {tab === "orders" ? t("order.new") : t("bots.new")}
-            </button>
-          )}
+          <button
+            type="button"
+            className="btn btn-accent btn-sm"
+            onClick={() => setComposerOpen(true)}
+          >
+            <Icon name="plus" size={13} />
+            {t("snype.new")}
+          </button>
         </div>
 
         <Segmented
-          options={[
-            { value: "snipe" as const, label: t("bots.tabSnipe") },
-            { value: "orders" as const, label: t("bots.tabOrders") },
-            { value: "bots" as const, label: t("bots.tabBots") },
-          ]}
+          options={TABS.map((entry) => ({ value: entry.value, label: t(entry.label) }))}
           value={tab}
           onChange={setTab}
-          className="mb-3 w-full max-w-sm"
+          // One tab sizes to its label; a second one splits a proper track.
+          className={TABS.length > 1 ? "mb-3 w-full max-w-sm" : "mb-3 w-fit"}
         />
 
-        {tab === "snipe" && (
-          <div className="flex flex-col gap-3">
-            <ContractDesk />
-            {mounted && snipes.length > 0 && (
-              <div className="grid gap-3 sm:grid-cols-2">
-                {snipes.map((snipe) => (
-                  <SnipeCard key={snipe.id} bot={snipe} />
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {tab === "orders" &&
-          (mounted && orders.length === 0 ? (
+        {tab === "snype" &&
+          (mounted && snypes.length === 0 ? (
             <Panel bodyClassName="p-0">
               <Empty
-                title={t("order.emptyTitle")}
-                hint={t("order.emptyHint")}
-                action={
-                  <button
-                    type="button"
-                    className="btn btn-sm mt-1"
-                    onClick={() => setOrderOpen(true)}
-                  >
-                    {t("order.emptyAction")}
-                  </button>
-                }
-              />
-            </Panel>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {mounted && orders.map((order) => <OrderCard key={order.id} bot={order} />)}
-            </div>
-          ))}
-
-        {tab === "bots" &&
-          (mounted && strategies.length === 0 ? (
-            <Panel bodyClassName="p-0">
-              <Empty
-                title={t("bots.emptyTitle")}
-                hint={t("bots.emptyHint")}
+                title={t("snype.emptyTitle")}
+                hint={t("snype.emptyHint")}
                 action={
                   <button
                     type="button"
                     className="btn btn-sm mt-1"
                     onClick={() => setComposerOpen(true)}
                   >
-                    {t("bots.emptyAction")}
+                    {t("snype.emptyAction")}
                   </button>
                 }
               />
             </Panel>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">
-              {mounted && strategies.map((bot) => <BotCard key={bot.id} bot={bot} />)}
+              {mounted && snypes.map((snype) => <SnypeCard key={snype.id} snype={snype} />)}
             </div>
           ))}
       </div>
@@ -152,7 +100,7 @@ export default function BotsPage() {
             <span>
               <span className="block text-[12px] font-semibold">{t("bots.autoLabel")}</span>
               <span className="mt-1 block text-[11px] leading-relaxed text-faint">
-                {t("bots.autoHint", { count: autoBots })}
+                {t("bots.autoHint", { count: live })}
               </span>
             </span>
           </label>
@@ -162,8 +110,7 @@ export default function BotsPage() {
         <SignalQueue />
       </div>
 
-      <BotComposer open={composerOpen} onClose={() => setComposerOpen(false)} />
-      <OrderComposer open={orderOpen} onClose={() => setOrderOpen(false)} />
+      <SnypeComposer open={composerOpen} onClose={() => setComposerOpen(false)} />
     </div>
   );
 }

@@ -66,7 +66,7 @@ function pairKey(chainId: number, a: string, b: string): string {
 }
 
 /** Resolves every deployed fee tier for a pair, ordered by active liquidity. */
-export async function findPools(
+async function findPools(
   client: PublicClient,
   chainId: number,
   tokenA: `0x${string}`,
@@ -118,8 +118,8 @@ export async function findPools(
 
   pools.sort((a, b) => (b.liquidity > a.liquidity ? 1 : b.liquidity < a.liquidity ? -1 : 0));
   // An empty result is never cached: a pool that is deployed but still dry is
-  // exactly what a snipe is waiting on, and ten minutes of cached emptiness
-  // would make it miss the moment liquidity lands.
+  // exactly what a waiting snype prices against, and ten minutes of cached
+  // emptiness would make it miss the moment liquidity lands.
   if (pools.length > 0) poolCache.set(key, { at: Date.now(), pools });
   return pools;
 }
@@ -129,7 +129,7 @@ export async function findPools(
  * has not graduated yet. Looked up through the launchpad's own record, so a
  * token that has since moved to a Uniswap v4 pool stops resolving here.
  */
-export async function findCurve(
+async function findCurve(
   client: PublicClient,
   tokenIn: Token,
   tokenOut: Token,
@@ -161,31 +161,6 @@ export async function findCurve(
 function curveAcceptsQuote(state: CurveState, token: Token): boolean {
   if (state.pairToken === zeroAddress) return Boolean(token.native);
   return token.address.toLowerCase() === state.pairToken.toLowerCase();
-}
-
-/**
- * Quote-side depth of a pool, in whole quote units. Reading the pool's own
- * balance of the funding asset is the plainest measure of what can actually be
- * traded against — and the one a rug empties first.
- */
-export async function poolDepth(
-  client: PublicClient,
-  pool: `0x${string}`,
-  quote: Token,
-): Promise<number | undefined> {
-  try {
-    // A pool never holds native currency: the native leg sits there wrapped,
-    // which is what `routingAddress` resolves to.
-    const balance = (await client.readContract({
-      address: routingAddress(quote),
-      abi: erc20Abi,
-      functionName: "balanceOf",
-      args: [pool],
-    })) as bigint;
-    return Number(balance) / 10 ** quote.decimals;
-  } catch {
-    return undefined;
-  }
 }
 
 const Q96 = 2n ** 96n;
