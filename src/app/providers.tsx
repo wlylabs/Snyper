@@ -12,6 +12,7 @@ import { SnypeRunner } from "@/components/snype/SnypeRunner";
 import { VenueSync } from "@/hooks/useVenue";
 import { TokenLogoSync } from "@/hooks/useTokenLogos";
 import { ConnectPromptProvider } from "@/hooks/useConnectPrompt";
+import { ActiveWalletSync } from "@/components/wallet/ActiveWalletSync";
 import { useAppStore } from "@/store/useAppStore";
 import { setNumberLocale } from "@/lib/format";
 import { INTL_LOCALE, detectLocale } from "@/lib/i18n";
@@ -95,6 +96,7 @@ function WalletProviders({ children }: { children: ReactNode }) {
       config={privyConfig(theme, locale)}
     >
       <WagmiProvider config={config}>
+        <ActiveWalletSync />
         <ConnectPromptProvider>{children}</ConnectPromptProvider>
       </WagmiProvider>
     </PrivyProvider>

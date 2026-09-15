@@ -39,7 +39,6 @@ const en = {
   "wallet.account": "Account",
   "wallet.wallet": "Wallet",
   "wallet.disconnect": "Disconnect",
-  "wallet.unsupportedNetwork": "Unsupported network",
   "wallet.wrongNetwork": "Wrong network",
   "wallet.switchTo": "Switch to {chain}",
   "wallet.balancesOnly": "Balances only — no routing venue",
@@ -59,6 +58,8 @@ const en = {
   "wallet.addWallet": "Connect another wallet",
   "wallet.active": "Active",
   "wallet.balance": "Balance",
+  "wallet.otherNetwork":
+    "Your wallet is pointing at another network. What it holds on {chain} is read over this app's own endpoint either way — switching networks only matters for signing.",
   "wallet.securedBy": "Secured by Privy",
 
   "privy.landingHeader": "Connect to Snyper",
@@ -180,8 +181,13 @@ const en = {
   "assets.scanning": "Scanning balances…",
   "assets.emptyTitle": "No balances in scope",
   "assets.emptyHint":
-    "Scope covers your defaults, imported tokens and anything you have traded here. Run a deep scan to sweep the full Uniswap list.",
+    "Scope covers the chain's own money, tokens you imported and anything you have traded here. Run the wallet scan below to pick up whatever else this address holds.",
   "assets.unpriced": "unpriced",
+  "assets.scopeOnly": "Scope only",
+  "assets.scopeOnlyHint":
+    "The chain's indexer did not answer, so this lists only the tokens the app already knew about. Run the wallet scan below to find the rest.",
+  "assets.unpricedNote":
+    "{count} holding(s) have no route to the chain's USD unit, so they count as zero in this figure.",
   "assets.address": "Address",
   "assets.openExplorer": "Open in explorer",
   "assets.connectHint": "Connect a wallet to read balances.",
@@ -459,7 +465,6 @@ const id: Record<TKey, string> = {
   "wallet.account": "Akun",
   "wallet.wallet": "Dompet",
   "wallet.disconnect": "Putuskan",
-  "wallet.unsupportedNetwork": "Jaringan tidak didukung",
   "wallet.wrongNetwork": "Jaringan salah",
   "wallet.switchTo": "Pindah ke {chain}",
   "wallet.balancesOnly": "Hanya saldo — belum ada tempat routing",
@@ -479,6 +484,8 @@ const id: Record<TKey, string> = {
   "wallet.addWallet": "Hubungkan dompet lain",
   "wallet.active": "Aktif",
   "wallet.balance": "Saldo",
+  "wallet.otherNetwork":
+    "Dompetmu sedang menunjuk jaringan lain. Isi dompet di {chain} tetap dibaca lewat endpoint aplikasi ini — pindah jaringan hanya perlu saat menandatangani transaksi.",
   "wallet.securedBy": "Diamankan oleh Privy",
 
   "privy.landingHeader": "Hubungkan ke Snyper",
@@ -602,8 +609,13 @@ const id: Record<TKey, string> = {
   "assets.scanning": "Memindai saldo…",
   "assets.emptyTitle": "Tidak ada saldo dalam cakupan",
   "assets.emptyHint":
-    "Cakupan meliputi aset bawaan, token yang kamu impor, dan apa pun yang pernah kamu tukar di sini. Jalankan pemindaian dalam untuk menyapu seluruh daftar Uniswap.",
+    "Cakupan meliputi aset bawaan chain ini, token yang kamu impor, dan apa pun yang pernah kamu tukar di sini. Jalankan pemindaian dompet di bawah untuk menarik sisa token yang dipegang alamat ini.",
   "assets.unpriced": "tanpa harga",
+  "assets.scopeOnly": "Hanya cakupan",
+  "assets.scopeOnlyHint":
+    "Indexer chain tidak menjawab, jadi daftar ini hanya memuat token yang sudah dikenal aplikasi. Jalankan pemindaian dompet di bawah untuk menemukan sisanya.",
+  "assets.unpricedNote":
+    "{count} aset belum punya rute ke unit USD chain ini, jadi dihitung nol pada angka di atas.",
   "assets.address": "Alamat",
   "assets.openExplorer": "Buka di explorer",
   "assets.connectHint": "Hubungkan dompet untuk membaca saldo.",

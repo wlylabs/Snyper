@@ -34,6 +34,8 @@ const ENABLED = process.env.NEXT_PUBLIC_DEXSCREENER?.trim().toLowerCase() !== "o
 
 /** The endpoint's documented ceiling for one request. */
 const MAX_ADDRESSES = 30;
+/** Requests one pricing pass may make, so a crowded wallet stays one burst. */
+const MAX_BATCHES = 6;
 const TIMEOUT = 6000;
 
 type FeedPair = {
@@ -41,7 +43,21 @@ type FeedPair = {
   baseToken?: { address?: string };
   liquidity?: { usd?: number };
   info?: { imageUrl?: string };
+  /** Market price of the base token in dollars, as a decimal string. */
+  priceUsd?: string;
 };
+
+/** What the feed had to say about one token, out of every pair it is in. */
+export type FeedToken = {
+  logo?: string;
+  priceUsd?: number;
+};
+
+function usd(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
 
 /**
  * Asks DexScreener about a batch of addresses in one request.
@@ -50,11 +66,16 @@ type FeedPair = {
  * chains — the same deployer produces the same address on every one of them —
  * so a pair from somewhere else would hand back a picture of a different token
  * that merely shares an address.
+ *
+ * Deepest pair wins, and price and artwork are settled separately: the pair
+ * that prices a token best is the one holding the most money, while the pair
+ * carrying its picture may be any of them. Taking both off a single winner
+ * would cost a token its logo for the sake of tidiness.
  */
-export async function readFeedLogos(
+export async function readFeedTokens(
   addresses: readonly `0x${string}`[],
-): Promise<Map<string, string>> {
-  const found = new Map<string, string>();
+): Promise<Map<string, FeedToken>> {
+  const found = new Map<string, FeedToken>();
   if (!ENABLED || addresses.length === 0) return found;
 
   const batch = addresses.slice(0, MAX_ADDRESSES);
@@ -70,28 +91,96 @@ export async function readFeedLogos(
     const pairs = body.pairs;
     if (!Array.isArray(pairs)) return found;
 
-    /* Deepest pair wins: the thinnest one is the likeliest to be an impostor. */
-    const best = new Map<string, { liquidity: number; url: string }>();
+    const bestPrice = new Map<string, { liquidity: number; priceUsd: number }>();
+    const bestLogo = new Map<string, { liquidity: number; url: string }>();
 
     for (const pair of pairs) {
       if (pair.chainId !== CHAIN_SLUG) continue;
       const address = pair.baseToken?.address?.toLowerCase();
       if (!address) continue;
-      const url = resolveUri(pair.info?.imageUrl);
-      if (!url) continue;
 
       const liquidity = Number(pair.liquidity?.usd ?? 0);
-      const held = best.get(address);
-      if (!held || liquidity > held.liquidity) best.set(address, { liquidity, url });
+
+      const priceUsd = usd(pair.priceUsd);
+      if (priceUsd !== undefined) {
+        const held = bestPrice.get(address);
+        if (!held || liquidity > held.liquidity) {
+          bestPrice.set(address, { liquidity, priceUsd });
+        }
+      }
+
+      const url = resolveUri(pair.info?.imageUrl);
+      if (url) {
+        const held = bestLogo.get(address);
+        if (!held || liquidity > held.liquidity) bestLogo.set(address, { liquidity, url });
+      }
     }
 
-    for (const [address, { url }] of best) found.set(address, url);
+    for (const [address, { url }] of bestLogo) found.set(address, { logo: url });
+    for (const [address, { priceUsd }] of bestPrice) {
+      found.set(address, { ...found.get(address), priceUsd });
+    }
   } catch {
     // Offline, rate limited, blocked by the reader's network, or a chain this
     // indexer has never heard of: all of them mean the same nothing.
   }
 
   return found;
+}
+
+/** Just the artwork, for the path that only ever wanted that. */
+export async function readFeedLogos(
+  addresses: readonly `0x${string}`[],
+): Promise<Map<string, string>> {
+  const tokens = await readFeedTokens(addresses);
+  const logos = new Map<string, string>();
+  for (const [address, token] of tokens) {
+    if (token.logo) logos.set(address, token.logo);
+  }
+  return logos;
+}
+
+/**
+ * Market prices for a batch of tokens, in dollars.
+ *
+ * This is the number a reader recognises. A pool's own mid price is the truth
+ * about one pool; the price a wallet, a chart and an aggregator all show is the
+ * one taken across every pair a token trades in, weighted to the deepest. A
+ * portfolio valued the first way disagrees with every other screen the reader
+ * has open, and is right in a way that helps nobody.
+ */
+export async function readFeedPrices(
+  addresses: readonly `0x${string}`[],
+): Promise<Map<string, number>> {
+  const prices = new Map<string, number>();
+  if (addresses.length === 0) return prices;
+
+  /* The coin and its wrapper route to one address; asking twice buys nothing. */
+  const unique = [...new Set(addresses.map((address) => address.toLowerCase()))] as
+    `0x${string}`[];
+
+  /*
+   * One request per thirty addresses, run together rather than in sequence, up
+   * to a ceiling. A wallet on a memecoin chain collects airdropped contracts it
+   * never asked for, and a few hundred of them must not turn one page load into
+   * a burst the feed answers with a rate limit — which would cost the prices of
+   * the holdings that actually matter. What is left over is simply unpriced,
+   * and the interface already says how many of those there are.
+   */
+  const batches: (readonly `0x${string}`[])[] = [];
+  for (let index = 0; index < unique.length; index += MAX_ADDRESSES) {
+    if (batches.length >= MAX_BATCHES) break;
+    batches.push(unique.slice(index, index + MAX_ADDRESSES));
+  }
+
+  const results = await Promise.all(batches.map((batch) => readFeedTokens(batch)));
+  for (const result of results) {
+    for (const [address, token] of result) {
+      if (token.priceUsd !== undefined) prices.set(address, token.priceUsd);
+    }
+  }
+
+  return prices;
 }
 
 /**
