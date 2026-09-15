@@ -890,6 +890,187 @@
     margin: 8px auto 0;
   }
 
+  /* ---------- identity ---------- */
+
+  /*
+   * The face of anything that has one: a token, a wallet, an account. The
+   * ground is painted inline from `tokenArt` because it is derived per address,
+   * so this rule only owns the shape — round, clipped, and lit from the top
+   * left so a flat gradient reads as a minted thing rather than a swatch.
+   */
+  .badge {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    overflow: hidden;
+    border-radius: var(--radius-pill);
+    font-family: var(--font-sans);
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    user-select: none;
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.1);
+  }
+
+  .badge::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(180deg, rgb(255 255 255 / 0.16), transparent 58%);
+  }
+
+  .badge-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  /* The chain's own money carries the accent, so its edge is drawn in ink. */
+  .badge[data-native="true"] {
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent-ink) 22%, transparent);
+  }
+
+  /* A wallet Privy holds the keys for is marked, the way it is in the modal. */
+  .badge-avatar[data-embedded="true"] {
+    box-shadow:
+      inset 0 0 0 1px rgb(255 255 255 / 0.1),
+      0 0 0 1.5px var(--color-accent-line);
+  }
+
+  /* The quote asset tucked behind the base needs to cut its own silhouette. */
+  .badge-stacked {
+    box-shadow: 0 0 0 2px var(--color-panel);
+  }
+
+  .badge-stacked::after {
+    display: none;
+  }
+
+  /* Nothing picked yet: the slot keeps the shape so the row does not resize. */
+  .badge-empty {
+    background: var(--color-raise);
+    border: 1px dashed var(--color-edge);
+    box-shadow: none;
+  }
+
+  .badge-empty::after {
+    display: none;
+  }
+
+  /* ---------- wallet ---------- */
+
+  /*
+   * The connected account in the header. It is a pill rather than a bracketed
+   * button because it is the one control that carries a face: past the connect
+   * moment this is the reader's identity in the app, and it should read the way
+   * an account reads inside Privy's own modal.
+   */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 30px;
+    padding: 0 10px 0 3px;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-pill);
+    background: var(--color-panel);
+    color: var(--color-ink);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition:
+      background-color var(--dur-tap) var(--ease-out),
+      border-color var(--dur-tap) var(--ease-out),
+      transform var(--dur-press) var(--ease-out);
+  }
+
+  .pill:hover {
+    background: var(--color-raise);
+    border-color: var(--color-edge);
+  }
+
+  .pill:active {
+    transform: scale(0.97);
+  }
+
+  /* While Privy's modal is open the control it was opened from stays lit. */
+  .pill[data-open="true"],
+  .btn[data-open="true"] {
+    border-color: var(--color-accent-line);
+    background: var(--color-accent-soft);
+  }
+
+  /* A filled primary is already accent, so it holds its hover state instead. */
+  .btn-accent[data-open="true"] {
+    background: var(--color-accent-hover);
+    border-color: var(--color-accent-hover);
+  }
+
+  /*
+   * A row in the account sheet. Privy builds its account and wallet lists out
+   * of soft filled rows rather than ruled ones, so the sheet that opens next to
+   * that modal is built the same way — same height, same corner, same fill.
+   */
+  .tile {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-xs);
+    background: var(--color-raise);
+    color: var(--color-ink);
+    font-size: 12px;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+    transition:
+      background-color var(--dur-tap) var(--ease-out),
+      border-color var(--dur-tap) var(--ease-out),
+      color var(--dur-tap) var(--ease-out),
+      transform var(--dur-press) var(--ease-out);
+  }
+
+  .tile:hover {
+    background: var(--color-panel);
+    border-color: var(--color-edge);
+  }
+
+  .tile:active {
+    transform: scale(0.99);
+  }
+
+  .tile[data-active="true"] {
+    border-color: var(--color-accent-line);
+  }
+
+  .tile-danger:hover {
+    color: var(--color-short);
+    border-color: color-mix(in srgb, var(--color-short-line) 55%, transparent);
+    background: color-mix(in srgb, var(--color-short-line) 10%, var(--color-raise));
+  }
+
+  /*
+   * The identity block at the top of the account sheet: avatar, address, what
+   * the account holds. Centred, because that is where Privy puts it, and the
+   * two surfaces are meant to be read as one flow.
+   */
+  .identity {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 20px 16px 18px;
+    text-align: center;
+  }
+
   /* ---------- misc ---------- */
 
   .marquee-track {
@@ -1011,5 +1192,164 @@
       transition-duration: 1ms !important;
       scroll-behavior: auto !important;
     }
+  }
+}
+
+/*
+ * The privy bridge lives outside `@layer components` on purpose. Privy injects
+ * its palette and its component styles at runtime, unlayered, and unlayered
+ * rules beat every layered one no matter how specific the layered rule is — so
+ * a bridge written inside a Tailwind layer would lose to the SDK it is meant to
+ * overrule. Out here it is plain cascade again, which specificity settles.
+ */
+/* ---------- privy bridge ---------- */
+
+/*
+ * Privy draws the connect modal, and it draws it in the same document as the
+ * app. Left alone the two do not match: its palette is its own, its corners
+ * are rounder, its type is system-ui, and its backdrop is a bare blur — so
+ * the moment a reader taps Connect, Snyper hands them off to something that
+ * plainly belongs to another product.
+ *
+ * The SDK paints every surface from `--privy-*` custom properties it sets on
+ * `:root` at runtime, which is the seam to sew. Each one is pointed at the
+ * app's own token, so the modal inherits the theme — including a theme switch
+ * mid-session — instead of being re-skinned. Two selectors deep beats the
+ * SDK's single `:root`, whichever stylesheet the browser sees last.
+ */
+:root:root {
+  --privy-color-background: var(--color-panel);
+  --privy-color-background-2: var(--color-raise);
+  --privy-color-background-3: var(--color-base);
+  --privy-color-background-hover: var(--color-raise);
+  --privy-color-background-clicked: var(--color-base);
+  --privy-color-background-disabled: var(--color-base);
+  --privy-color-background-interactive: var(--color-raise);
+  --privy-color-background-interactive-hover: var(--color-base);
+  --privy-color-background-interactive-clicked: var(--color-base);
+  --privy-color-background-interactive-disabled: var(--color-base);
+
+  --privy-color-foreground: var(--color-ink);
+  --privy-color-foreground-2: var(--color-ink);
+  --privy-color-foreground-3: var(--color-dim);
+  --privy-color-foreground-4: var(--color-faint);
+  --privy-color-foreground-accent: var(--color-accent-ink);
+  --privy-color-foreground-hover: var(--color-ink);
+  --privy-color-foreground-clicked: var(--color-ink);
+  --privy-color-foreground-disabled: var(--color-faint);
+  --privy-color-foreground-interactive: var(--color-accent-text);
+  --privy-color-foreground-interactive-hover: var(--color-accent-text);
+
+  --privy-color-accent: var(--color-accent);
+  --privy-color-accent-light: var(--color-accent-hover);
+  --privy-color-accent-hover: var(--color-accent-hover);
+  --privy-color-accent-dark: var(--color-accent-text);
+  --privy-color-accent-darkest: var(--color-accent-text);
+
+  --privy-color-success: var(--color-accent-text);
+  --privy-color-success-dark: var(--color-accent-text);
+  --privy-color-success-light: var(--color-accent);
+  --privy-color-success-bg: var(--color-accent-soft);
+  --privy-color-error: var(--color-short);
+  --privy-color-error-dark: var(--color-short);
+  --privy-color-error-light: var(--color-short-line);
+  --privy-color-error-bg: var(--color-raise);
+  --privy-color-error-bg-hover: var(--color-base);
+  --privy-color-warn: var(--color-warn);
+  --privy-color-warn-light: var(--color-warn);
+  --privy-color-warn-bg: var(--color-raise);
+  --privy-color-warning-dark: var(--color-warn);
+  --privy-color-info-bg: var(--color-raise);
+  --privy-color-info-bg-hover: var(--color-base);
+
+  --privy-color-border-default: var(--color-line);
+  --privy-color-border-hover: var(--color-edge);
+  /* A 3px ring, same wash as `.field:focus`, so focus reads the same in both. */
+  --privy-color-border-focus: color-mix(in srgb, var(--color-accent-line) 18%, transparent);
+  --privy-color-border-error: var(--color-short-line);
+  --privy-color-border-success: var(--color-accent-line);
+  --privy-color-border-warning: var(--color-warn);
+  --privy-color-border-info: var(--color-edge);
+  --privy-color-border-interactive: var(--color-edge);
+  --privy-color-border-interactive-hover: var(--color-accent-line);
+
+  --privy-color-icon-default: var(--color-ink);
+  --privy-color-icon-default-hover: var(--color-ink);
+  --privy-color-icon-default-clicked: var(--color-ink);
+  --privy-color-icon-default-disabled: var(--color-faint);
+  --privy-color-icon-muted: var(--color-dim);
+  --privy-color-icon-muted-hover: var(--color-ink);
+  --privy-color-icon-muted-clicked: var(--color-ink);
+  --privy-color-icon-muted-disabled: var(--color-faint);
+  --privy-color-icon-muted-disabled-alt: var(--color-faint);
+  --privy-color-icon-subtle: var(--color-faint);
+  --privy-color-icon-subtle-hover: var(--color-dim);
+  --privy-color-icon-subtle-clicked: var(--color-dim);
+  --privy-color-icon-subtle-disabled: var(--color-faint);
+  --privy-color-icon-subtle-disabled-alt: var(--color-faint);
+  --privy-color-icon-inverse: var(--color-accent-ink);
+  --privy-color-icon-interactive: var(--color-accent-text);
+  --privy-color-icon-interactive-hover: var(--color-accent-text);
+  --privy-color-icon-interactive-clicked: var(--color-accent-text);
+  --privy-color-icon-success: var(--color-accent-text);
+  --privy-color-icon-warning: var(--color-warn);
+  --privy-color-icon-error: var(--color-short);
+  --privy-color-icon-error-hover: var(--color-short);
+  --privy-color-icon-error-clicked: var(--color-short);
+
+  --privy-link-navigation-color: var(--color-accent-text);
+
+  /*
+   * Corners, mapped rather than copied: the modal lands on the same radius as
+   * a Snyper sheet, and every control inside it on the same radius as a
+   * Snyper button.
+   */
+  --privy-border-radius-xs: var(--radius-xs);
+  --privy-border-radius-sm: var(--radius-xs);
+  --privy-border-radius-md: var(--radius-xs);
+  --privy-border-radius-mdlg: var(--radius-sm);
+  --privy-border-radius-lg: var(--radius-md);
+}
+
+/* The modal reads in the app's typeface, headings included. */
+#privy-dialog,
+#privy-dialog h1,
+#privy-dialog h2,
+#privy-dialog h3,
+#privy-dialog h4,
+#privy-dialog h5,
+#privy-dialog h6 {
+  font-family: var(--font-sans);
+}
+
+/* Addresses and codes in the modal set in the app's mono, like everywhere. */
+#privy-dialog code,
+#privy-dialog kbd,
+#privy-dialog samp,
+#privy-dialog pre {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Privy's backdrop is blur alone; this is the app's scrim, so both match. */
+#privy-dialog-backdrop {
+  background: var(--scrim);
+}
+
+/*
+ * Privy's dialog panel is transparent — the content pane is what paints — so
+ * the sheet treatment goes here: same edge, same drop, same corner as
+ * `.sheet`, squared off at the bottom once Privy switches to its drawer.
+ */
+#privy-modal-content {
+  border: 1px solid var(--color-edge);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-pop);
+}
+
+@media (max-width: 440px) {
+  #privy-modal-content {
+    border-bottom: none;
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
   }
 }

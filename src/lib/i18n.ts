@@ -51,6 +51,18 @@ const en = {
     "Wallet connection is switched off in this build. Set {env} to a Privy app id to turn it back on.",
   "wallet.privyNote":
     "Privy handles the sign-in. Keys stay in your own wallet — or, for an embedded one, in Privy's enclave, where only you can export them. Snyper signs nothing on your behalf.",
+  "wallet.connecting": "Connecting…",
+  "wallet.connected": "Wallet connected",
+  "wallet.connectFailed": "That wallet could not be connected.",
+  "wallet.disconnected": "Wallet disconnected",
+  "wallet.wallets": "Wallets",
+  "wallet.addWallet": "Connect another wallet",
+  "wallet.active": "Active",
+  "wallet.balance": "Balance",
+  "wallet.securedBy": "Secured by Privy",
+
+  "privy.landingHeader": "Connect to Snyper",
+  "privy.loginMessage": "Non-custodial. Your keys never leave your wallet.",
 
   "token.select": "Select asset",
   "token.payWith": "Pay with",
@@ -88,6 +100,7 @@ const en = {
     "This size moves the pool more than 5%. Consider splitting it across legs.",
   "swap.footnote": "Routed through Uniswap v3 · signed in your wallet · no keys held",
   "swap.ctaConnect": "Connect a wallet first",
+  "swap.ctaConnectAction": "Connect wallet",
   "swap.ctaSwitch": "Switch to {chain}",
   "swap.ctaAmount": "Enter an amount",
   "swap.ctaInsufficient": "Insufficient {symbol}",
@@ -458,6 +471,18 @@ const id: Record<TKey, string> = {
     "Koneksi dompet dimatikan di build ini. Isi {env} dengan app id Privy untuk menyalakannya lagi.",
   "wallet.privyNote":
     "Privy yang menangani proses masuk. Kunci tetap di dompetmu sendiri — atau, untuk dompet bawaan, di enclave Privy, yang hanya kamu yang bisa mengekspornya. Snyper tidak menandatangani apa pun atas namamu.",
+  "wallet.connecting": "Menghubungkan…",
+  "wallet.connected": "Dompet terhubung",
+  "wallet.connectFailed": "Dompet itu tidak bisa dihubungkan.",
+  "wallet.disconnected": "Dompet diputus",
+  "wallet.wallets": "Dompet",
+  "wallet.addWallet": "Hubungkan dompet lain",
+  "wallet.active": "Aktif",
+  "wallet.balance": "Saldo",
+  "wallet.securedBy": "Diamankan oleh Privy",
+
+  "privy.landingHeader": "Hubungkan ke Snyper",
+  "privy.loginMessage": "Non-kustodial. Kuncimu tidak pernah keluar dari dompetmu.",
 
   "token.select": "Pilih aset",
   "token.payWith": "Bayar dengan",
@@ -496,6 +521,7 @@ const id: Record<TKey, string> = {
   "swap.footnote":
     "Lewat Uniswap v3 · ditandatangani di dompetmu · tidak ada kunci yang disimpan",
   "swap.ctaConnect": "Hubungkan dompet dulu",
+  "swap.ctaConnectAction": "Hubungkan dompet",
   "swap.ctaSwitch": "Pindah ke {chain}",
   "swap.ctaAmount": "Masukkan jumlah",
   "swap.ctaInsufficient": "{symbol} tidak cukup",

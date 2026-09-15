@@ -10,6 +10,7 @@ import { readableError, useExecutor } from "@/hooks/useExecutor";
 import { useQuote } from "@/hooks/useQuote";
 import { useTokenBalance } from "@/hooks/useTokenBalance";
 import { useVenue, useVenueDiscovery, useVenueFromToken } from "@/hooks/useVenue";
+import { useConnectPrompt } from "@/hooks/useConnectPrompt";
 import { chainMeta, isSupportedChain } from "@/lib/chains";
 import {
   feeLabel,
@@ -22,7 +23,8 @@ import { applySlippage } from "@/lib/swap";
 import type { Token } from "@/lib/tokens";
 import { useAppStore } from "@/store/useAppStore";
 import { useI18n } from "@/hooks/useI18n";
-import { TokenBadge, TokenPicker } from "./TokenPicker";
+import { TokenPicker } from "./TokenPicker";
+import { TokenBadge } from "@/components/ui/TokenBadge";
 
 const SLIPPAGE_PRESETS = [10, 50, 100];
 
@@ -56,6 +58,8 @@ export function SwapPanel({
   const { execute, phase } = useExecutor();
   const toast = useToast();
   const { t } = useI18n();
+  // The execute button is where a reader without a wallet actually stands.
+  const connectPrompt = useConnectPrompt();
   const settings = useAppStore((state) => state.settings);
   const setSettings = useAppStore((state) => state.setSettings);
   // Reading the venue through the hook is what re-renders this panel the moment
@@ -141,7 +145,11 @@ export function SwapPanel({
   };
 
   const cta = (() => {
-    if (!isConnected) return { label: t("swap.ctaConnect"), disabled: true };
+    if (!isConnected) {
+      return connectPrompt
+        ? { label: t("swap.ctaConnectAction"), disabled: false, action: connectPrompt }
+        : { label: t("swap.ctaConnect"), disabled: true };
+    }
     if (wrongNetwork) {
       const meta = chainMeta(tokenIn?.chainId);
       return {

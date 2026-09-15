@@ -2,9 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { useAccount, useChainId } from "wagmi";
-import { TokenBadge, TokenTags } from "@/components/terminal/TokenPicker";
+import { TokenTags } from "@/components/terminal/TokenPicker";
+import { TokenBadge } from "@/components/ui/TokenBadge";
 import { Icon } from "@/components/ui/Icon";
 import { Empty, Panel, Skeleton } from "@/components/ui/Panel";
+import { useConnectPrompt } from "@/hooks/useConnectPrompt";
 import { useMounted } from "@/hooks/useMounted";
 import { usePortfolio } from "@/hooks/usePortfolio";
 import { useTokenList } from "@/hooks/useTokenList";
@@ -24,6 +26,7 @@ export default function AssetsPage() {
   const { fx } = useFxRate();
   const activeChainId = useChainId();
   const { address, chainId: accountChainId } = useAccount();
+  const connectPrompt = useConnectPrompt();
   const chainId = accountChainId ?? activeChainId;
   const meta = chainMeta(chainId);
 
@@ -98,6 +101,16 @@ export default function AssetsPage() {
             <Empty
               title={t("assets.noWallet")}
               hint={t("assets.noWalletHint")}
+              /* Nothing to list until a wallet is connected, so offer that here
+                 rather than sending the reader back up to the header. */
+              action={
+                connectPrompt && (
+                  <button type="button" className="btn btn-accent btn-sm" onClick={connectPrompt}>
+                    <Icon name="wallet" size={13} />
+                    {t("wallet.connect")}
+                  </button>
+                )
+              }
             />
           ) : (holdings?.length ?? 0) === 0 ? (
             <Empty
