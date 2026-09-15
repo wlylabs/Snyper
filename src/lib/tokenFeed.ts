@@ -37,12 +37,42 @@ type FeedPair = {
   liquidity?: { usd?: number };
   /** Market price of the base token in dollars, as a decimal string. */
   priceUsd?: string;
+  /** Circulating market cap, when the feed knows the circulating supply. */
+  marketCap?: number;
+  /** Price times total supply, which the feed can always work out. */
+  fdv?: number;
+  priceChange?: { h24?: number };
+};
+
+/**
+ * What the feed knows about a token, which is more than its price.
+ *
+ * Price is the part a portfolio needs and the part a memecoin reader trusts
+ * least: it says nothing on its own, because it is market cap divided by a
+ * supply that every launch picks differently. Two tokens at the same price are
+ * not comparable; two at the same market cap are. So the depth behind a price
+ * and the cap it implies travel with it, and the interface leads with whichever
+ * one the token calls for.
+ */
+export type FeedQuote = {
+  priceUsd: number;
+  /** Circulating cap where the feed has one, otherwise nothing. */
+  marketCapUsd?: number;
+  /** Fully diluted value: price times total supply. */
+  fdvUsd?: number;
+  /** Dollars in the deepest pair. The price means as much as this number does. */
+  liquidityUsd?: number;
+  change24h?: number;
 };
 
 function usd(value: string | undefined): number | undefined {
   if (!value) return undefined;
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function positive(value: number | undefined): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
 }
 
 /**
@@ -56,8 +86,8 @@ function usd(value: string | undefined): number | undefined {
  */
 async function readBatch(
   addresses: readonly `0x${string}`[],
-): Promise<Map<string, number>> {
-  const found = new Map<string, number>();
+): Promise<Map<string, FeedQuote>> {
+  const found = new Map<string, FeedQuote>();
   if (!ENABLED || addresses.length === 0) return found;
 
   const batch = addresses.slice(0, MAX_ADDRESSES);
@@ -87,7 +117,18 @@ async function readBatch(
       const held = deepest.get(address);
       if (held === undefined || liquidity > held) {
         deepest.set(address, liquidity);
-        found.set(address, priceUsd);
+        found.set(address, {
+          priceUsd,
+          ...(positive(pair.marketCap) ? { marketCapUsd: pair.marketCap } : {}),
+          ...(positive(pair.fdv) ? { fdvUsd: pair.fdv } : {}),
+          ...(Number.isFinite(liquidity) && liquidity > 0
+            ? { liquidityUsd: liquidity }
+            : {}),
+          ...(typeof pair.priceChange?.h24 === "number" &&
+          Number.isFinite(pair.priceChange.h24)
+            ? { change24h: pair.priceChange.h24 / 100 }
+            : {}),
+        });
       }
     }
   } catch {
@@ -98,12 +139,12 @@ async function readBatch(
   return found;
 }
 
-/** Market prices for a batch of tokens, in dollars. */
-export async function readFeedPrices(
+/** Market data for a batch of tokens, keyed by lowercased address. */
+export async function readFeedQuotes(
   addresses: readonly `0x${string}`[],
-): Promise<Map<string, number>> {
-  const prices = new Map<string, number>();
-  if (addresses.length === 0) return prices;
+): Promise<Map<string, FeedQuote>> {
+  const quotes = new Map<string, FeedQuote>();
+  if (addresses.length === 0) return quotes;
 
   /* The coin and its wrapper route to one address; asking twice buys nothing. */
   const unique = [...new Set(addresses.map((address) => address.toLowerCase()))] as
@@ -125,8 +166,8 @@ export async function readFeedPrices(
 
   const results = await Promise.all(batches.map((batch) => readBatch(batch)));
   for (const result of results) {
-    for (const [address, price] of result) prices.set(address, price);
+    for (const [address, quote] of result) quotes.set(address, quote);
   }
 
-  return prices;
+  return quotes;
 }
