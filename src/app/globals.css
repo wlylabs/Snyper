@@ -78,6 +78,24 @@
   --shell-tabs: 60px;
   --scrim: rgb(3 5 8 / 0.7);
   --grid-opacity: 0.25;
+
+  /*
+   * One motion scale for the whole app. The durations sit on Material 3's
+   * short/medium steps, inside the 150–250ms band a press or a hover reads
+   * best in — faster than that and nothing registers, slower and the control
+   * feels like it is thinking. The curves are Open Props' ease-out-3 for
+   * anything arriving and Material's emphasised curve for the few things that
+   * travel a distance. Nothing overshoots: an instrument that bounces reads as
+   * imprecise, which is the one impression a trading surface cannot afford.
+   */
+  --dur-press: 90ms;
+  --dur-tap: 140ms;
+  --dur-enter: 200ms;
+  --dur-travel: 260ms;
+  --dur-flash: 640ms;
+  --ease-out: cubic-bezier(0, 0, 0.3, 1);
+  --ease-emphasis: cubic-bezier(0.2, 0, 0, 1);
+  --ease-settle: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 [data-theme="light"] {
@@ -190,6 +208,20 @@
     box-shadow: var(--shadow-panel);
     /* Rounded corners only read as rounded if row hovers are clipped to them. */
     overflow: hidden;
+    /*
+     * Panels arrive rather than appear. Four pixels is barely a movement, but
+     * it is the difference between a screen that was already there and one that
+     * was just drawn — and it runs once per mount, so nothing re-animates while
+     * prices tick underneath.
+     */
+    animation: panel-in var(--dur-enter) var(--ease-out) both;
+  }
+
+  @keyframes panel-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
   }
 
   .panel-head {
@@ -206,7 +238,11 @@
     padding: 12px;
   }
 
-  /* An accent rail marks the primary instrument panel on the page. */
+  /*
+   * An accent rail marks the primary instrument panel on the page, and it draws
+   * itself in from the left when the panel mounts. It is the app's signature
+   * movement: a readout being plotted, not a card fading up.
+   */
   .ticked::before {
     content: "";
     position: absolute;
@@ -215,12 +251,20 @@
     right: 0;
     height: 2px;
     pointer-events: none;
+    transform-origin: left center;
+    animation: rail-sweep 460ms var(--ease-out) both;
     background: linear-gradient(
       90deg,
       var(--color-accent-line),
       color-mix(in srgb, var(--color-accent-line) 35%, transparent) 38%,
       transparent 72%
     );
+  }
+
+  @keyframes rail-sweep {
+    from {
+      transform: scaleX(0);
+    }
   }
 
   .hair {
@@ -246,13 +290,31 @@
     letter-spacing: 0.1em;
     text-transform: uppercase;
     cursor: pointer;
-    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+    transition:
+      background-color var(--dur-tap) var(--ease-out),
+      border-color var(--dur-tap) var(--ease-out),
+      color var(--dur-tap) var(--ease-out),
+      transform var(--dur-press) var(--ease-out);
     white-space: nowrap;
   }
 
   .btn:hover:not(:disabled) {
     background: var(--color-raise);
     border-color: var(--color-accent-line);
+  }
+
+  /*
+   * Press feedback: the control gives a little under the finger and springs
+   * back the moment it is released. 2.5% is enough to feel and small enough
+   * that a row of buttons does not appear to wobble.
+   */
+  .btn:active:not(:disabled) {
+    transform: scale(0.975);
+  }
+
+  /* A wide slab scaled by the same factor travels much further at its edges. */
+  .btn-block:active:not(:disabled) {
+    transform: scale(0.99);
   }
 
   .btn:disabled {
@@ -313,13 +375,22 @@
     background: transparent;
     color: var(--color-dim);
     cursor: pointer;
-    transition: color 120ms ease, border-color 120ms ease, background-color 120ms ease;
+    transition:
+      color var(--dur-tap) var(--ease-out),
+      border-color var(--dur-tap) var(--ease-out),
+      background-color var(--dur-tap) var(--ease-out),
+      transform var(--dur-press) var(--ease-out);
   }
 
   .icon-btn:hover {
     color: var(--color-ink);
     border-color: var(--color-edge);
     background: var(--color-raise);
+    transform: translateY(-1px);
+  }
+
+  .icon-btn:active {
+    transform: scale(0.94);
   }
 
   .field {
@@ -332,7 +403,9 @@
     font-family: var(--font-mono);
     font-size: 13px;
     font-variant-numeric: tabular-nums;
-    transition: border-color 120ms ease, box-shadow 120ms ease;
+    transition:
+      border-color var(--dur-tap) var(--ease-out),
+      box-shadow var(--dur-tap) var(--ease-out);
   }
 
   .field::placeholder {
@@ -373,7 +446,14 @@
     border: 1px solid var(--color-edge);
     border-radius: var(--radius-xs);
     cursor: pointer;
-    transition: background-color 120ms ease, border-color 120ms ease;
+    transition:
+      background-color var(--dur-tap) var(--ease-out),
+      border-color var(--dur-tap) var(--ease-out),
+      transform var(--dur-press) var(--ease-out);
+  }
+
+  .check:active {
+    transform: scale(0.92);
   }
 
   .check::after {
@@ -383,7 +463,8 @@
     background: var(--color-accent-ink);
     clip-path: polygon(14% 46%, 0 62%, 38% 100%, 100% 20%, 84% 6%, 36% 70%);
     transform: scale(0);
-    transition: transform 120ms ease;
+    /* The tick lands rather than fades: it is a confirmation, not a hint. */
+    transition: transform var(--dur-tap) var(--ease-emphasis);
   }
 
   .check:checked {
@@ -396,6 +477,7 @@
   }
 
   .seg {
+    position: relative;
     display: inline-flex;
     padding: 2px;
     gap: 2px;
@@ -404,7 +486,37 @@
     border-radius: var(--radius-xs);
   }
 
+  /*
+   * The selection is one block that slides between options rather than a fill
+   * that blinks from one to the next. It is the single piece of motion in the
+   * app that travels, so it carries the emphasised curve: quick away, settled
+   * on arrival. It only takes over once its position has been measured, which
+   * is what the flag on the track marks — until then the active item paints its
+   * own background and nothing moves.
+   */
+  .seg-marker {
+    position: absolute;
+    top: 2px;
+    bottom: 2px;
+    left: 0;
+    width: 0;
+    border-radius: calc(var(--radius-xs) - 3px);
+    background: var(--color-accent);
+    opacity: 0;
+    pointer-events: none;
+    transition:
+      transform var(--dur-travel) var(--ease-emphasis),
+      width var(--dur-travel) var(--ease-emphasis),
+      opacity var(--dur-tap) linear;
+  }
+
+  .seg[data-measured="true"] .seg-marker {
+    opacity: 1;
+  }
+
   .seg-item {
+    position: relative;
+    z-index: 1;
     flex: 1;
     height: 28px;
     padding: 0 12px;
@@ -417,7 +529,9 @@
     letter-spacing: 0.12em;
     text-transform: uppercase;
     cursor: pointer;
-    transition: background-color 120ms ease, color 120ms ease;
+    transition:
+      background-color var(--dur-tap) var(--ease-out),
+      color var(--dur-tap) var(--ease-out);
   }
 
   .seg-item:hover:not([data-active="true"]) {
@@ -427,6 +541,10 @@
   .seg-item[data-active="true"] {
     background: var(--color-accent);
     color: var(--color-accent-ink);
+  }
+
+  .seg[data-measured="true"] .seg-item[data-active="true"] {
+    background: transparent;
   }
 
   .chip {
@@ -442,6 +560,25 @@
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--color-dim);
+  }
+
+  /* Presets and offsets are chips that can be pressed, so they answer back. */
+  button.chip {
+    cursor: pointer;
+    transition:
+      color var(--dur-tap) var(--ease-out),
+      border-color var(--dur-tap) var(--ease-out),
+      background-color var(--dur-tap) var(--ease-out),
+      transform var(--dur-press) var(--ease-out);
+  }
+
+  button.chip:hover:not(:disabled) {
+    color: var(--color-ink);
+    border-color: var(--color-edge);
+  }
+
+  button.chip:active:not(:disabled) {
+    transform: scale(0.95);
   }
 
   .chip-live {
@@ -495,12 +632,6 @@
     }
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .dot-live {
-      animation: none;
-    }
-  }
-
   /* ---------- data rows ---------- */
 
   .kv {
@@ -531,17 +662,46 @@
   }
 
   .row-link {
+    position: relative;
     display: block;
     width: 100%;
     text-align: left;
     border: none;
     background: transparent;
     cursor: pointer;
-    transition: background-color 120ms ease;
+    transition:
+      background-color var(--dur-tap) var(--ease-out),
+      transform var(--dur-press) var(--ease-out);
+  }
+
+  /*
+   * A 2px accent edge draws down the left of the row under the cursor. It reads
+   * as the row being selected on an instrument panel rather than a card lifting
+   * off the page, and it costs one transform.
+   */
+  .row-link::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 2px;
+    background: var(--color-accent-line);
+    transform: scaleY(0);
+    transform-origin: top;
+    transition: transform var(--dur-tap) var(--ease-out);
   }
 
   .row-link:hover {
     background: var(--color-raise);
+  }
+
+  .row-link:hover::before {
+    transform: scaleY(1);
+  }
+
+  .row-link:active {
+    transform: scale(0.995);
   }
 
   /* ---------- shell ---------- */
@@ -580,7 +740,10 @@
     height: 58px;
     color: var(--color-faint);
     border-left: 2px solid transparent;
-    transition: color 120ms ease, border-color 120ms ease, background-color 120ms ease;
+    transition:
+      color var(--dur-tap) var(--ease-out),
+      border-color var(--dur-tap) var(--ease-out),
+      background-color var(--dur-tap) var(--ease-out);
   }
 
   .rail-label {
@@ -619,12 +782,25 @@
     text-align: center;
     color: var(--color-faint);
     border-top: 2px solid transparent;
-    transition: color 120ms ease, border-color 120ms ease;
+    transition:
+      color var(--dur-tap) var(--ease-out),
+      border-color var(--dur-tap) var(--ease-out);
   }
 
   .tab-link[data-active="true"] {
     color: var(--color-accent-text);
     border-top-color: var(--color-accent-line);
+  }
+
+  /* The icon of the tab you are on sits a pixel proud of the others. */
+  .rail-link svg,
+  .tab-link svg {
+    transition: transform var(--dur-travel) var(--ease-settle);
+  }
+
+  .rail-link[data-active="true"] svg,
+  .tab-link[data-active="true"] svg {
+    transform: translateY(-1px) scale(1.06);
   }
 
   .tab-bar {
@@ -649,7 +825,7 @@
     z-index: 60;
     background: var(--scrim);
     backdrop-filter: blur(3px);
-    animation: fade 140ms ease;
+    animation: fade var(--dur-tap) var(--ease-out) both;
   }
 
   .sheet {
@@ -670,7 +846,7 @@
       max-height: min(84vh, 720px);
       transform: translate(-50%, -50%);
       border-radius: var(--radius-md);
-      animation: rise 160ms ease;
+      animation: rise var(--dur-enter) var(--ease-emphasis) both;
     }
   }
 
@@ -683,7 +859,7 @@
       border-radius: var(--radius-md) var(--radius-md) 0 0;
       border-bottom: none;
       padding-bottom: env(safe-area-inset-bottom);
-      animation: slide 200ms cubic-bezier(0.16, 1, 0.3, 1);
+      animation: slide var(--dur-travel) var(--ease-settle) both;
     }
   }
 
@@ -703,13 +879,6 @@
   @keyframes slide {
     from {
       transform: translateY(100%);
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .scrim,
-    .sheet {
-      animation: none;
     }
   }
 
@@ -736,9 +905,56 @@
     }
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .marquee-track {
-      animation: none;
+  /*
+   * A toast is the one surface that interrupts, so it enters on its own terms:
+   * up from where it will sit, with a hair of scale so it reads as arriving
+   * rather than being revealed.
+   */
+  .toast {
+    animation: toast-in var(--dur-enter) var(--ease-emphasis) both;
+  }
+
+  @keyframes toast-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px) scale(0.98);
+    }
+  }
+
+  /*
+   * Tick flash. When a live number changes, a wash of the direction's colour
+   * lands behind it and drains away — the one habit borrowed wholesale from
+   * dealing screens, where a cell that changed has to catch the eye without
+   * moving anything. The wash sits behind its own element so the digits never
+   * reflow, and it is mounted fresh on each change so repeats always replay.
+   */
+  .flash {
+    position: relative;
+    display: inline-block;
+  }
+
+  .flash-wash {
+    position: absolute;
+    inset: -3px -6px;
+    border-radius: var(--radius-xs);
+    pointer-events: none;
+    animation: flash-wash var(--dur-flash) var(--ease-out) forwards;
+  }
+
+  .flash-wash[data-dir="up"] {
+    background: color-mix(in srgb, var(--color-accent-line) 24%, transparent);
+  }
+
+  .flash-wash[data-dir="down"] {
+    background: color-mix(in srgb, var(--color-short-line) 24%, transparent);
+  }
+
+  @keyframes flash-wash {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
     }
   }
 
@@ -778,5 +994,22 @@
 
   .warn {
     color: var(--color-warn);
+  }
+
+  /*
+   * One policy for the whole app rather than a clause per animation: a reader
+   * who has asked their system for less motion gets end states immediately,
+   * including from anything added later. Durations collapse instead of being
+   * removed so that every animation still fires its completion events.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 1ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 1ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }

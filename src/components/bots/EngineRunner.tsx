@@ -2,10 +2,12 @@
 
 import { useEffect, useRef } from "react";
 import { useAccount, useConfig } from "wagmi";
-import { getPublicClient } from "wagmi/actions";
+import { getPublicClient, readContract } from "wagmi/actions";
+import { erc20Abi } from "@/lib/abi";
 import { midPrice } from "@/lib/quote";
 import { safeParseUnits } from "@/lib/format";
-import { evaluate, withinRiskLimits, type Intent } from "@/lib/strategies";
+import { snipeGate } from "@/lib/snipe";
+import { evaluate, isStaged, withinRiskLimits, type Intent } from "@/lib/strategies";
 import type { Bot, Signal } from "@/lib/types";
 import { seriesKey, todayKey, useAppStore } from "@/store/useAppStore";
 import { readableError } from "@/hooks/useExecutor";
@@ -14,6 +16,33 @@ import { useI18n } from "@/hooks/useI18n";
 
 function newId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/**
+ * What the wallet is holding of a token right now. A protect watch guards the
+ * balance rather than a position it opened itself, so it has to look.
+ */
+async function walletBalance(
+  config: ReturnType<typeof useConfig>,
+  bot: Bot,
+  owner: `0x${string}` | undefined,
+): Promise<bigint | undefined> {
+  if (!owner) return undefined;
+  try {
+    if (bot.base.native) {
+      const client = getPublicClient(config, { chainId: bot.chainId });
+      return client ? await client.getBalance({ address: owner }) : undefined;
+    }
+    return (await readContract(config, {
+      address: bot.base.address,
+      abi: erc20Abi,
+      functionName: "balanceOf",
+      args: [owner],
+      chainId: bot.chainId,
+    })) as bigint;
+  } catch {
+    return undefined;
+  }
 }
 
 function intentToSignal(bot: Bot, intent: Intent, price: number): Signal | undefined {
@@ -72,12 +101,19 @@ export function EngineRunner() {
   const tRef = useRef(t);
   const running = useRef(false);
   const dispatching = useRef(false);
+  // Held in a ref for the same reason as the translator: reconnecting a wallet
+  // must not tear down and restart the strategy interval.
+  const addressRef = useRef(address);
 
   const dispatch = useDispatchSignal();
 
   useEffect(() => {
     tRef.current = t;
   }, [t]);
+
+  useEffect(() => {
+    addressRef.current = address;
+  }, [address]);
 
   useEffect(() => {
     const interval = Math.max(10, Math.min(600, tickSeconds)) * 1000;
@@ -95,12 +131,15 @@ export function EngineRunner() {
         const today = todayKey(now);
 
         for (const bot of armed) {
-          // An order that never traded down to its entry gives up on its own.
-          // Only the waiting stage is timed: once a position exists, its take
-          // profit and cut loss run until one of them closes it.
+          // An entry that never came gives up on its own — an order that never
+          // traded down to its price, a snipe whose pool never opened. Only the
+          // waiting stage is timed: once a position exists, its take profit and
+          // cut loss run until one of them closes it.
+          const waitingEntry =
+            isStaged(bot.strategy) && (bot.runtime.stage ?? "waiting") === "waiting";
           if (
-            bot.strategy.kind === "order" &&
-            (bot.runtime.stage ?? "waiting") === "waiting" &&
+            isStaged(bot.strategy) &&
+            waitingEntry &&
             now >= bot.strategy.expiresAt
           ) {
             useAppStore.getState().closeOrder(bot.id, "expired");
@@ -121,12 +160,13 @@ export function EngineRunner() {
             continue;
           }
           if (!price) {
-            useAppStore
-              .getState()
-              .patchRuntime(bot.id, {
-                lastTickAt: now,
-                error: tRef.current("error.noPool"),
-              });
+            // A snipe with no pool yet is not broken; it is doing its one job.
+            const watching = bot.strategy.kind === "snipe" && waitingEntry;
+            useAppStore.getState().patchRuntime(bot.id, {
+              lastTickAt: now,
+              error: watching ? undefined : tRef.current("error.noPool"),
+              note: watching ? tRef.current("reason.snipeNoPool") : undefined,
+            });
             continue;
           }
 
@@ -147,7 +187,21 @@ export function EngineRunner() {
             peak,
             activated,
             error: undefined,
+            note: undefined,
           });
+
+          if (bot.strategy.kind === "protect") {
+            const held = await walletBalance(config, bot, addressRef.current);
+            useAppStore.getState().patchRuntime(bot.id, {
+              ...(held !== undefined ? { heldBase: held.toString() } : {}),
+              // A watch armed without a fixed reference anchors on the first
+              // price it sees, so both targets stay put from then on.
+              ...(bot.strategy.referencePrice <= 0 && !bot.runtime.refPrice
+                ? { refPrice: price }
+                : {}),
+              ...(held === 0n ? { note: tRef.current("reason.protectEmpty") } : {}),
+            });
+          }
 
           const current = useAppStore.getState().bots.find((item) => item.id === bot.id);
           if (!current) continue;
@@ -162,9 +216,9 @@ export function EngineRunner() {
           if (hasOpen) continue;
 
           // A dispatch interrupted mid-signature (tab closed, wallet dismissed
-          // without an error) leaves the order parked in a stage nothing
+          // without an error) leaves the entry parked in a stage nothing
           // evaluates. With no signal left open, hand it back to where it was.
-          const stalled = current.strategy.kind === "order" && !current.runtime.completed
+          const stalled = isStaged(current.strategy) && !current.runtime.completed
             ? current.runtime.stage === "entering"
               ? "waiting"
               : current.runtime.stage === "exiting"
@@ -188,7 +242,23 @@ export function EngineRunner() {
           }
 
           const signal = intentToSignal(current, intent, price);
-          if (signal) useAppStore.getState().pushSignal(signal);
+          if (!signal) continue;
+
+          // Depth and price impact cannot be read off the price, so a snipe
+          // asks the pool itself one last time before it commits.
+          if (current.strategy.kind === "snipe" && intent.leg === "entry") {
+            const depth = await snipeGate(client, current, BigInt(signal.amountIn));
+            if (!depth.ok) {
+              const message = tRef.current(depth.reason.key, depth.reason.vars);
+              useAppStore.getState().patchRuntime(bot.id, {
+                error: depth.waiting ? undefined : message,
+                note: depth.waiting ? message : undefined,
+              });
+              continue;
+            }
+          }
+
+          useAppStore.getState().pushSignal(signal);
         }
       } finally {
         running.current = false;

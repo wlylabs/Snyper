@@ -1,6 +1,6 @@
 import type { PublicClient } from "viem";
 import { zeroAddress } from "viem";
-import { quoterV2Abi, v3FactoryAbi, v3PoolAbi } from "./abi";
+import { erc20Abi, quoterV2Abi, v3FactoryAbi, v3PoolAbi } from "./abi";
 import { dexMeta } from "./chains";
 import { routingAddress, type Token } from "./tokens";
 
@@ -85,8 +85,34 @@ export async function findPools(
   });
 
   pools.sort((a, b) => (b.liquidity > a.liquidity ? 1 : b.liquidity < a.liquidity ? -1 : 0));
-  poolCache.set(key, { at: Date.now(), pools });
+  // An empty result is never cached: a pool that is deployed but still dry is
+  // exactly what a snipe is waiting on, and ten minutes of cached emptiness
+  // would make it miss the moment liquidity lands.
+  if (pools.length > 0) poolCache.set(key, { at: Date.now(), pools });
   return pools;
+}
+
+/**
+ * Quote-side depth of a pool, in whole quote units. Reading the pool's own
+ * balance of the funding asset is the plainest measure of what can actually be
+ * traded against — and the one a rug empties first.
+ */
+export async function poolDepth(
+  client: PublicClient,
+  pool: `0x${string}`,
+  quote: Token,
+): Promise<number | undefined> {
+  try {
+    const balance = (await client.readContract({
+      address: routingAddress(quote),
+      abi: erc20Abi,
+      functionName: "balanceOf",
+      args: [pool],
+    })) as bigint;
+    return Number(balance) / 10 ** quote.decimals;
+  } catch {
+    return undefined;
+  }
 }
 
 const Q96 = 2n ** 96n;

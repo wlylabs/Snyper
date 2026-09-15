@@ -147,7 +147,24 @@ export default function SettingsPage() {
             max={600}
             onChange={(value) => setSettings({ tickSeconds: value })}
           />
+          <NumberField
+            label={t("settings.priorityFee")}
+            value={settings.priorityFeeGwei}
+            min={0}
+            max={500}
+            onChange={(value) => setSettings({ priorityFeeGwei: value })}
+          />
+          <NumberField
+            label={t("settings.maxImpact")}
+            value={settings.maxImpactBps}
+            min={0}
+            max={9000}
+            onChange={(value) => setSettings({ maxImpactBps: value })}
+          />
         </div>
+        <p className="mt-2 text-[10px] leading-relaxed text-faint">
+          {t("settings.guardNote")}
+        </p>
         <label className="mt-4 flex items-start gap-3">
           <input
             type="checkbox"
@@ -162,6 +179,22 @@ export default function SettingsPage() {
             </span>
           </span>
         </label>
+      </Panel>
+
+      <Panel label={t("settings.presets")} bodyClassName="p-3">
+        <p className="text-[11px] leading-relaxed text-faint">{t("settings.presetsNote")}</p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <PresetField
+            label={t("settings.presetsNative")}
+            values={settings.presetsNative}
+            onChange={(presetsNative) => setSettings({ presetsNative })}
+          />
+          <PresetField
+            label={t("settings.presetsStable")}
+            values={settings.presetsStable}
+            onChange={(presetsStable) => setSettings({ presetsStable })}
+          />
+        </div>
       </Panel>
 
       <Panel label={t("settings.install")} bodyClassName="p-3">
@@ -226,6 +259,47 @@ export default function SettingsPage() {
         </button>
       </Panel>
     </div>
+  );
+}
+
+/**
+ * Preset sizes as one comma separated line. Anything that is not a positive
+ * number is dropped rather than stored, so a half-typed list cannot end up on a
+ * buy button.
+ */
+function PresetField({
+  label,
+  values,
+  onChange,
+}: {
+  label: string;
+  values: number[];
+  onChange: (values: number[]) => void;
+}) {
+  const [draft, setDraft] = useState(values.join(", "));
+
+  const commit = (text: string) => {
+    const parsed = text
+      .split(",")
+      .map((part) => Number(part.trim()))
+      .filter((value) => Number.isFinite(value) && value > 0)
+      .slice(0, 6);
+    onChange(parsed);
+  };
+
+  return (
+    <label className="block">
+      <span className="lbl mb-1.5 block">{label}</span>
+      <input
+        className="field num"
+        inputMode="decimal"
+        value={draft}
+        onChange={(event) => {
+          setDraft(event.target.value);
+          commit(event.target.value);
+        }}
+      />
+    </label>
   );
 }
 

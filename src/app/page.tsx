@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAccount, useChainId } from "wagmi";
 import { SwapPanel } from "@/components/terminal/SwapPanel";
 import { Panel, Row, Skeleton } from "@/components/ui/Panel";
+import { Flash } from "@/components/ui/Flash";
 import { Spark } from "@/components/ui/Spark";
 import { Icon } from "@/components/ui/Icon";
 import { usePairPrice, usePairSeries } from "@/hooks/usePairPrice";
@@ -92,7 +93,9 @@ export default function TerminalPage() {
               <p className="lbl mb-1.5">{t("terminal.poolMid")}</p>
               {mounted ? (
                 <p className="num text-[30px] leading-none">
-                  {price !== undefined ? formatPrice(price) : "—"}
+                  <Flash value={price}>
+                    {price !== undefined ? formatPrice(price) : "—"}
+                  </Flash>
                   {quote && (
                     <span className="ml-2 text-[13px] text-faint">{quote.symbol}</span>
                   )}

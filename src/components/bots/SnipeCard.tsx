@@ -5,19 +5,19 @@ import { Flash } from "@/components/ui/Flash";
 import { Icon } from "@/components/ui/Icon";
 import { useI18n } from "@/hooks/useI18n";
 import { chainMeta } from "@/lib/chains";
-import { formatAmount, formatDuration, formatPrice, formatSigned } from "@/lib/format";
-import { orderPosition, orderTargets } from "@/lib/strategies";
+import { formatAmount, formatDuration, formatPercent, formatPrice, formatSigned } from "@/lib/format";
+import { exitTargets, orderPosition } from "@/lib/strategies";
 import type { Bot, OrderStage } from "@/lib/types";
-import { useAppStore } from "@/store/useAppStore";
 import type { TKey } from "@/lib/i18n";
+import { useAppStore } from "@/store/useAppStore";
 
 const STAGE_LABEL: Record<OrderStage, TKey> = {
-  waiting: "order.stage.waiting",
-  entering: "order.stage.entering",
+  waiting: "snipe.stage.waiting",
+  entering: "snipe.stage.entering",
   holding: "order.stage.holding",
   exiting: "order.stage.exiting",
   done: "order.stage.done",
-  expired: "order.stage.expired",
+  expired: "snipe.stage.expired",
   cancelled: "order.stage.cancelled",
 };
 
@@ -27,15 +27,20 @@ const EXIT_LABEL = {
   manual: "order.exit.manual",
 } satisfies Record<string, TKey>;
 
-export function OrderCard({ bot }: { bot: Bot }) {
-  const { t, r } = useI18n();
+/**
+ * A snipe in flight. Before the fill it reports what it is waiting on, which is
+ * usually a pool that does not exist yet; after it, it reads like any other
+ * guarded position.
+ */
+export function SnipeCard({ bot }: { bot: Bot }) {
+  const { t } = useI18n();
   const closeOrder = useAppStore((state) => state.closeOrder);
   const removeBot = useAppStore((state) => state.removeBot);
   const pushSignal = useAppStore((state) => state.pushSignal);
   const patchRuntime = useAppStore((state) => state.patchRuntime);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  if (bot.strategy.kind !== "order") return null;
+  if (bot.strategy.kind !== "snipe") return null;
   const strategy = bot.strategy;
   const runtime = bot.runtime;
   const stage: OrderStage = runtime.stage ?? "waiting";
@@ -46,18 +51,16 @@ export function OrderCard({ bot }: { bot: Bot }) {
   const holding = stage === "holding" || stage === "exiting";
   const finished = stage === "done" || stage === "expired" || stage === "cancelled";
 
-  const { takeProfit, cutLoss } = orderTargets(strategy, runtime.fillPrice);
+  const { takeProfit, cutLoss } = exitTargets(strategy, runtime.fillPrice);
   const position = orderPosition(bot);
   const positionSize = Number(position) / 10 ** bot.base.decimals;
-
-  const toEntry = price !== undefined ? strategy.entryPrice / price - 1 : undefined;
   const pnl =
     holding && runtime.fillPrice && price !== undefined
       ? price / runtime.fillPrice - 1
       : undefined;
   const msLeft = strategy.expiresAt - Date.now();
 
-  /** Manual full exit. It joins the same queue every other leg goes through. */
+  /** Manual full exit, through the same queue every other leg goes through. */
   const sellNow = () => {
     if (position <= 0n || price === undefined) return;
     pushSignal({
@@ -79,10 +82,10 @@ export function OrderCard({ bot }: { bot: Bot }) {
   };
 
   return (
-    <article className={`panel ${stage === "holding" ? "ticked" : ""}`}>
+    <article className={`panel ${waiting || holding ? "ticked" : ""}`}>
       <header className="panel-head">
         <span className="flex min-w-0 items-center gap-2">
-          <span className={`dot ${holding ? "dot-live" : ""}`} />
+          <span className={`dot ${bot.status === "armed" ? "dot-live" : ""}`} />
           <span className="truncate text-[13px] font-semibold">{bot.name}</span>
         </span>
         <span className="chip shrink-0">{meta?.mark ?? bot.chainId}</span>
@@ -105,11 +108,9 @@ export function OrderCard({ bot }: { bot: Bot }) {
           className={`mt-2 inline-block border px-1.5 py-0.5 text-[10px] tracking-[0.1em] uppercase ${
             stage === "expired" || stage === "cancelled"
               ? "border-line text-faint"
-              : holding
+              : holding || stage === "done"
                 ? "border-[var(--color-accent-text)] text-accent-text"
-                : stage === "done"
-                  ? "border-[var(--color-accent-text)] text-accent-text"
-                  : "border-[var(--color-warn)] warn"
+                : "border-[var(--color-warn)] warn"
           }`}
         >
           {t(STAGE_LABEL[stage])}
@@ -119,17 +120,29 @@ export function OrderCard({ bot }: { bot: Bot }) {
           {waiting && (
             <>
               <Metric
-                label={t("order.entryAt")}
-                value={`${formatPrice(strategy.entryPrice)}${
-                  toEntry !== undefined ? ` · ${t("order.away", { percent: formatSigned(toEntry) })}` : ""
-                }`}
+                label={t("snipe.commit")}
+                value={`${formatAmount(strategy.amountQuote)} ${bot.quote.symbol}`}
               />
               <Metric
-                label={t("order.expiresIn")}
+                label={t("snipe.guards")}
+                value={t("snipe.guardLine", {
+                  depth:
+                    strategy.minLiquidityQuote > 0
+                      ? `${formatAmount(strategy.minLiquidityQuote)} ${bot.quote.symbol}`
+                      : t("common.none"),
+                  impact: formatPercent(strategy.maxImpactBps / 10_000),
+                })}
+              />
+              <Metric
+                label={t("snipe.givesUp")}
                 value={msLeft > 0 ? formatDuration(msLeft / 1000) : "—"}
                 tone="warn"
               />
-              <p className="text-[11px] leading-relaxed text-faint">{t("order.noSpendYet")}</p>
+              {runtime.note && (
+                <p className="wrap-any text-[11px] leading-relaxed text-faint">
+                  {runtime.note}
+                </p>
+              )}
             </>
           )}
 
@@ -145,8 +158,10 @@ export function OrderCard({ bot }: { bot: Bot }) {
                 value={formatSigned(pnl)}
                 tone={pnl !== undefined && pnl < 0 ? "short" : "long"}
               />
-              <Targets takeProfit={takeProfit} cutLoss={cutLoss} />
-              <p className="text-[11px] leading-relaxed text-faint">{t("order.recalcNote")}</p>
+              <div className="grid grid-cols-2 gap-2">
+                <Target label={t("order.exit.tp")} value={takeProfit} tone="long" />
+                <Target label={t("order.exit.cl")} value={cutLoss} tone="short" />
+              </div>
             </>
           )}
 
@@ -157,7 +172,12 @@ export function OrderCard({ bot }: { bot: Bot }) {
               )}
               {stage === "expired" && (
                 <p className="text-[11px] leading-relaxed text-faint">
-                  {t("order.expiredAfter")}
+                  {t("snipe.expiredNote")}
+                </p>
+              )}
+              {stage === "done" && !runtime.exitReason && (
+                <p className="text-[11px] leading-relaxed text-faint">
+                  {t("snipe.handedOver")}
                 </p>
               )}
             </>
@@ -165,19 +185,11 @@ export function OrderCard({ bot }: { bot: Bot }) {
         </dl>
 
         {runtime.error && (
-          <p className="mt-2 flex items-start gap-1.5 text-[11px] leading-relaxed short">
+          <p className="wrap-any mt-2 flex items-start gap-1.5 text-[11px] leading-relaxed short">
             <Icon name="alert" size={12} className="mt-0.5 shrink-0" />
             {runtime.error}
           </p>
         )}
-
-        <p className="mt-2 text-[11px] text-faint">{r({ key: "strategy.orderDesc", vars: {
-          amount: strategy.amountQuote,
-          quote: bot.quote.symbol,
-          entry: formatPrice(strategy.entryPrice),
-          tp: strategy.takeProfitPct,
-          cl: strategy.cutLossPct,
-        } })}</p>
 
         <div className="mt-3 flex gap-2">
           {holding && (
@@ -196,7 +208,7 @@ export function OrderCard({ bot }: { bot: Bot }) {
               className="btn btn-sm flex-1"
               onClick={() => closeOrder(bot.id, "cancelled")}
             >
-              {t("order.cancelOrder")}
+              {t("snipe.cancel")}
             </button>
           )}
           {finished &&
@@ -232,18 +244,22 @@ export function OrderCard({ bot }: { bot: Bot }) {
   );
 }
 
-function Targets({ takeProfit, cutLoss }: { takeProfit: number; cutLoss: number }) {
+function Target({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value?: number;
+  tone: "long" | "short";
+}) {
   const { t } = useI18n();
   return (
-    <div className="grid grid-cols-2 gap-2">
-      <div className="border border-line bg-base px-2 py-1.5">
-        <span className="lbl block">{t("order.exit.tp")}</span>
-        <span className="num text-[12.5px] long">{formatPrice(takeProfit)}</span>
-      </div>
-      <div className="border border-line bg-base px-2 py-1.5">
-        <span className="lbl block">{t("order.exit.cl")}</span>
-        <span className="num text-[12.5px] short">{formatPrice(cutLoss)}</span>
-      </div>
+    <div className="border border-line bg-base px-2 py-1.5">
+      <span className="lbl block">{label}</span>
+      <span className={`num text-[12.5px] ${value !== undefined ? tone : "text-faint"}`}>
+        {value !== undefined ? formatPrice(value) : t("snipe.targetOff")}
+      </span>
     </div>
   );
 }
