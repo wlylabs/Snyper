@@ -82,8 +82,10 @@ export function usePortfolio(chainId: number | undefined, tokens: Token[]) {
         });
       });
 
-      // Without a routing venue there is nothing to price against; balances stand alone.
-      if (!dex) return holdings;
+      // Pricing needs a USD unit to price against. Without a venue, or without a
+      // stable on it, balances stand alone rather than being valued in a unit
+      // nobody chose.
+      if (!dex?.stable) return holdings;
 
       const stableAddress = dex.stable.toLowerCase();
       const priced = await Promise.all(

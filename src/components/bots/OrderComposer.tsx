@@ -10,11 +10,11 @@ import { useFxRate } from "@/hooks/useFxRate";
 import { useI18n } from "@/hooks/useI18n";
 import { usePairPrice } from "@/hooks/usePairPrice";
 import { useTokenList } from "@/hooks/useTokenList";
-import { chainMeta, dexMeta } from "@/lib/chains";
+import { chainMeta } from "@/lib/chains";
 import { formatMoney } from "@/lib/currency";
 import { formatAmount, formatPrice } from "@/lib/format";
 import { ORDER_TTL_MS } from "@/lib/strategies";
-import { baseTokens, nativeToken, type Token } from "@/lib/tokens";
+import { nativeToken, stableToken, type Token } from "@/lib/tokens";
 import type { Bot, Strategy } from "@/lib/types";
 import { emptyRuntime, useAppStore } from "@/store/useAppStore";
 
@@ -48,6 +48,8 @@ export function OrderComposer({ open, onClose }: { open: boolean; onClose: () =>
   const meta = chainMeta(chainId);
   const { tokens, listed } = useTokenList(chainId);
   const addBot = useAppStore((state) => state.addBot);
+  const customTokens = useAppStore((state) => state.customTokens);
+  const venueKey = useAppStore((state) => state.venueKey);
   const settings = useAppStore((state) => state.settings);
   const { fx } = useFxRate();
 
@@ -58,17 +60,21 @@ export function OrderComposer({ open, onClose }: { open: boolean; onClose: () =>
   const [step, setStep] = useState<"setup" | "confirm">("setup");
   const [error, setError] = useState<string>();
 
+  /**
+   * The funding leg is the one that can be defaulted: the chain's USD unit where
+   * the venue carries one, otherwise its coin. The traded leg is left for the
+   * reader to pick, seeded with the last contract they imported — which on this
+   * chain is the memecoin they were just looking at.
+   */
   useEffect(() => {
     if (!chainId || !meta) return;
-    const defaults = baseTokens(chainId);
-    const stable = dexMeta(chainId)?.stable;
-    setBase((current) => (current?.chainId === chainId ? current : nativeToken(chainId)));
-    setQuote((current) =>
-      current?.chainId === chainId
-        ? current
-        : defaults.find((token) => token.address === stable),
-    );
-  }, [chainId, meta]);
+    const funding = stableToken(chainId) ?? nativeToken(chainId);
+    const lastImported = [...customTokens]
+      .reverse()
+      .find((token) => token.chainId === chainId);
+    setQuote((current) => (current?.chainId === chainId ? current : funding));
+    setBase((current) => (current?.chainId === chainId ? current : lastImported));
+  }, [chainId, meta, venueKey, customTokens]);
 
   useEffect(() => {
     if (open) {
@@ -90,7 +96,8 @@ export function OrderComposer({ open, onClose }: { open: boolean; onClose: () =>
 
   /** Rupiah only means anything when the funding leg is the chain's stable. */
   const stableQuote =
-    quote !== undefined && quote.address === dexMeta(chainId)?.stable;
+    quote !== undefined &&
+    quote.address.toLowerCase() === stableToken(chainId)?.address.toLowerCase();
   const money = (value: number) =>
     stableQuote ? formatMoney(value, { currency: settings.currency, fx, locale }) : undefined;
 

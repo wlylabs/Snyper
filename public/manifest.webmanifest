@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "Snyper — On-chain execution terminal",
+  "name": "Snyper — Robinhood Chain terminal",
   "short_name": "Snyper",
-  "description": "Non-custodial execution terminal: connect a wallet, price routes on-chain and run interval, grid, trigger and trailing strategies from any device.",
+  "description": "Non-custodial Robinhood Chain terminal: paste a memecoin contract, price it against its Uniswap pool or its Pons bonding curve, and run snipes, orders and trailing strategies from any device.",
   "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",

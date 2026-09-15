@@ -4,7 +4,7 @@ import { AppShell } from "@/components/shell/AppShell";
 import "./globals.css";
 
 const description =
-  "Non-custodial execution terminal: connect a wallet, price routes on-chain and run interval, grid, trigger and trailing strategies from any device.";
+  "Non-custodial Robinhood Chain terminal: paste a memecoin contract, price it against its Uniswap pool or its Pons bonding curve, and run snipes, orders and trailing strategies from any device.";
 
 /** Set NEXT_PUBLIC_SITE_URL in production so social cards resolve absolutely. */
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
@@ -12,7 +12,7 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
 export const metadata: Metadata = {
   ...(siteUrl ? { metadataBase: new URL(siteUrl) } : {}),
   title: {
-    default: "Snyper — On-chain execution terminal",
+    default: "Snyper — Robinhood Chain terminal",
     template: "%s · Snyper",
   },
   description,
@@ -35,7 +35,7 @@ export const metadata: Metadata = {
     other: [{ rel: "mask-icon", url: "/icons/safari-pinned-tab.svg?v=2", color: "#d7fe4b" }],
   },
   openGraph: {
-    title: "Snyper — On-chain execution terminal",
+    title: "Snyper — Robinhood Chain terminal",
     description,
     siteName: "Snyper",
     type: "website",
@@ -43,7 +43,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary",
-    title: "Snyper — On-chain execution terminal",
+    title: "Snyper — Robinhood Chain terminal",
     description,
     images: ["/icons/icon-512.png?v=2"],
   },

@@ -80,8 +80,11 @@ export function SwapPanel({
 
   // Before a wallet is connected the config's active chain is the one on show.
   const pairChainId = tokenIn?.chainId ?? chainId ?? activeChainId;
-  /** Chains with no Uniswap deployment price nothing and execute nothing. */
-  const routable = hasRouting(pairChainId);
+  /**
+   * Without a resolved Uniswap venue nothing prices or executes — except a Pons
+   * bonding curve, which settles trades itself with no router in front of it.
+   */
+  const routable = hasRouting(pairChainId) || quote?.venue === "curve";
   const pairChainLabel = chainMeta(pairChainId)?.label ?? t("common.network");
   const wrongNetwork = isConnected && tokenIn && chainId !== tokenIn.chainId;
   const insufficient = Boolean(amountIn && balanceIn !== undefined && amountIn > balanceIn);

@@ -1,7 +1,8 @@
 import type { PublicClient } from "viem";
 import { erc20Abi } from "./abi";
 import { formatAmount, formatPercent } from "./format";
-import { findPools, poolDepth, quoteExactIn, type PoolRef } from "./quote";
+import { findCurve, findPools, poolDepth, quoteExactIn, type PoolRef } from "./quote";
+import { curveProgress } from "./pons";
 import { routingAddress, type Token } from "./tokens";
 import type { Bot, Reason, Strategy } from "./types";
 
@@ -28,6 +29,10 @@ export type PoolState = {
   depth?: number;
   /** Total supply of the base token, used for the meme heuristics. */
   totalSupply?: bigint;
+  /** Which venue the depth was read from. */
+  venue?: "v3" | "curve";
+  /** How far a launchpad curve has walked toward graduation, 0 to 1. */
+  progress?: number;
 };
 
 export async function readPoolState(
@@ -35,20 +40,37 @@ export async function readPoolState(
   base: Token,
   quote: Token,
 ): Promise<PoolState> {
-  const [pools, supply] = await Promise.all([
-    findPools(client, base.chainId, routingAddress(base), routingAddress(quote)),
-    client
-      .readContract({ address: base.address, abi: erc20Abi, functionName: "totalSupply" })
-      .catch(() => undefined),
-  ]);
+  const supply = await client
+    .readContract({ address: base.address, abi: erc20Abi, functionName: "totalSupply" })
+    .catch(() => undefined);
+  const totalSupply = typeof supply === "bigint" ? supply : undefined;
 
+  // A launch still on its bonding curve has no pool to find; the curve itself
+  // is the venue, and its real quote reserve is the depth that matters.
+  const curve = await findCurve(client, quote, base).catch(() => undefined);
+  if (curve) {
+    return {
+      pool: {
+        address: curve.curve,
+        fee: Number(curve.feeBps) * 100,
+        liquidity: curve.tokenReserve,
+      },
+      depth: Number(curve.realQuoteReserve) / 10 ** quote.decimals,
+      totalSupply,
+      venue: "curve",
+      progress: curveProgress(curve),
+    };
+  }
+
+  const pools = await findPools(
+    client,
+    base.chainId,
+    routingAddress(base),
+    routingAddress(quote),
+  );
   const pool = pools[0];
   const depth = pool ? await poolDepth(client, pool.address, quote) : undefined;
-  return {
-    pool,
-    depth,
-    totalSupply: typeof supply === "bigint" ? supply : undefined,
-  };
+  return { pool, depth, totalSupply, venue: pool ? "v3" : undefined };
 }
 
 export type SnipeGate = { ok: true } | { ok: false; reason: Reason; waiting: boolean };
@@ -66,17 +88,12 @@ export async function snipeGate(
   const strategy = bot.strategy;
   if (strategy.kind !== "snipe") return { ok: true };
 
-  const pools = await findPools(
-    client,
-    bot.chainId,
-    routingAddress(bot.base),
-    routingAddress(bot.quote),
-  );
-  const pool = pools[0];
+  const state = await readPoolState(client, bot.base, bot.quote);
+  const pool = state.pool;
   if (!pool) return { ok: false, reason: { key: "reason.snipeNoPool" }, waiting: true };
 
   if (strategy.minLiquidityQuote > 0) {
-    const depth = await poolDepth(client, pool.address, bot.quote);
+    const depth = state.depth;
     if (depth === undefined) {
       return { ok: false, reason: { key: "reason.snipeDepthUnknown" }, waiting: true };
     }

@@ -7,6 +7,7 @@ import { Icon } from "@/components/ui/Icon";
 import { Sheet } from "@/components/ui/Sheet";
 import { truncateAddress } from "@/lib/format";
 import { memeSignal } from "@/lib/memecoin";
+import type { PonsLaunch } from "@/lib/pons";
 import { readToken, searchTokens, type Token } from "@/lib/tokens";
 import { useAppStore } from "@/store/useAppStore";
 import { useI18n } from "@/hooks/useI18n";
@@ -163,29 +164,35 @@ export function TokenBadge({ token, size = 28 }: { token: Token; size?: number }
 }
 
 /**
- * Flags assets the curated token list does not carry. Meme tokens are the usual
- * reason one shows up here, so the heuristic label says so — as a hint, never as
- * a safety judgement.
+ * Flags anything that is not one of the chain's own assets. A memecoin is the
+ * usual reason one shows up here, so the label says so — as a reading, never as
+ * a safety judgement. A launchpad record turns the reading into a fact.
  */
 export function TokenTags({
   token,
   listed,
+  launch,
 }: {
   token: Token & { totalSupply?: bigint };
   listed?: Set<string>;
+  launch?: PonsLaunch;
 }) {
   const { t } = useI18n();
-  if (!listed || listed.size === 0 || token.native) return null;
+  if (!listed || token.native) return null;
 
-  const signal = memeSignal(token, listed);
-  if (!signal.unlisted) return null;
+  const signal = memeSignal(token, listed, launch);
+  if (!signal.unlisted && !signal.launchpad) return null;
 
   return (
     <span
       className={`chip chip-xs ${signal.meme ? "chip-warn" : ""}`}
       title={signal.reasons.map((reason) => t(reason)).join(" · ")}
     >
-      {signal.meme ? t("meme.tagMeme") : t("meme.tagUnlisted")}
+      {signal.launchpad
+        ? t("meme.tagPons")
+        : signal.meme
+          ? t("meme.tagMeme")
+          : t("meme.tagUnlisted")}
     </span>
   );
 }

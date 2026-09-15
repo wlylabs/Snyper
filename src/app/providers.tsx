@@ -6,6 +6,7 @@ import { WagmiProvider } from "wagmi";
 import { config } from "@/lib/wagmi";
 import { ToastProvider } from "@/components/ui/Toast";
 import { EngineRunner } from "@/components/bots/EngineRunner";
+import { VenueSync } from "@/hooks/useVenue";
 import { useAppStore } from "@/store/useAppStore";
 import { setNumberLocale } from "@/lib/format";
 import { INTL_LOCALE, detectLocale } from "@/lib/i18n";
@@ -87,6 +88,7 @@ export function Providers({ children }: { children: ReactNode }) {
           <ThemeSync />
           <LocaleSync />
           <ServiceWorker />
+          <VenueSync />
           <EngineRunner />
           {children}
         </ToastProvider>

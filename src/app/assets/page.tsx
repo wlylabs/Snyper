@@ -27,15 +27,15 @@ export default function AssetsPage() {
   const chainId = accountChainId ?? activeChainId;
   const meta = chainMeta(chainId);
 
-  const { tokens: listTokens, listed } = useTokenList(chainId);
+  const { listed } = useTokenList(chainId);
   const customTokens = useAppStore((state) => state.customTokens);
   const discoveredTokens = useAppStore((state) => state.discoveredTokens);
   const bots = useAppStore((state) => state.bots);
   const trades = useAppStore((state) => state.trades);
-  const [deepScan, setDeepScan] = useState(false);
+  const venueKey = useAppStore((state) => state.venueKey);
   const discovery = useTokenDiscovery(chainId);
 
-  /** Default scope stays small: held defaults, imports and anything traded. */
+  /** Everything worth reading a balance for: money, imports, anything traded. */
   const scope = useMemo<Token[]>(() => {
     if (!chainId) return [];
     const touched: Token[] = [];
@@ -47,15 +47,8 @@ export default function AssetsPage() {
       if (trade.tokenIn) touched.push(trade.tokenIn);
       if (trade.tokenOut) touched.push(trade.tokenOut);
     }
-    const core = mergeTokens(
-      chainId,
-      baseTokens(chainId),
-      customTokens,
-      discoveredTokens,
-      touched,
-    );
-    return deepScan ? mergeTokens(chainId, core, listTokens) : core;
-  }, [chainId, bots, trades, customTokens, discoveredTokens, deepScan, listTokens]);
+    return mergeTokens(chainId, baseTokens(chainId), customTokens, discoveredTokens, touched);
+  }, [chainId, bots, trades, customTokens, discoveredTokens, venueKey]);
 
   const { data: holdings, isFetching, refetch } = usePortfolio(chainId, scope);
 
@@ -171,18 +164,6 @@ export default function AssetsPage() {
               </p>
             )}
 
-            <button
-              type="button"
-              className="btn btn-sm mt-2 w-full"
-              onClick={() => setDeepScan((value) => !value)}
-              disabled={!address}
-            >
-              <Icon name="search" size={13} />
-              {deepScan ? t("assets.deepScanOn") : t("assets.deepScanOff")}
-            </button>
-            <p className="mt-2 text-[10px] leading-relaxed text-faint">
-              {t("assets.deepScanNote")}
-            </p>
           </div>
         </Panel>
       </div>

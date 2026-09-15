@@ -2,7 +2,7 @@
 
 import { useLayoutEffect, useRef, useState } from "react";
 
-type Option<T extends string> = { value: T; label: string };
+type Option<T extends string> = { value: T; label: string; disabled?: boolean };
 
 type Marker = { left: number; width: number };
 
@@ -66,6 +66,7 @@ export function Segmented<T extends string>({
           aria-selected={option.value === value}
           data-active={option.value === value}
           className="seg-item"
+          disabled={option.disabled}
           onClick={() => onChange(option.value)}
         >
           {option.label}

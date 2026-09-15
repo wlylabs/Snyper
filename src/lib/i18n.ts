@@ -55,6 +55,7 @@ const en = {
   "wallet.openInApp": "Open in app",
   "wallet.unsupportedNetwork": "Unsupported network",
   "wallet.wrongNetwork": "Wrong network",
+  "wallet.switchTo": "Switch to {chain}",
   "wallet.balancesOnly": "Balances only — no routing venue",
   "wallet.errNoProvider":
     "That wallet did not answer. It may be disabled for this site, or another extension took over the injected provider — enable it and reload, or pair from your phone with WalletConnect.",
@@ -127,7 +128,9 @@ const en = {
   "terminal.sourceNote":
     "Prices come from the pool itself — sqrtPrice for the mid, QuoterV2 for executable size. Nothing is cached from a third-party feed.",
   "terminal.awaitingTicks": "Awaiting ticks",
-  "terminal.noVenue": "Not deployed on this chain",
+  "terminal.noVenue": "No venue resolved yet",
+  "terminal.venueUniswap": "Uniswap v3",
+  "terminal.venueCurve": "Pons bonding curve",
   "terminal.approxFx": "≈ {value} at the rate in Settings",
 
   "bots.title": "Strategies",
@@ -232,10 +235,6 @@ const en = {
   "assets.emptyTitle": "No balances in scope",
   "assets.emptyHint":
     "Scope covers your defaults, imported tokens and anything you have traded here. Run a deep scan to sweep the full Uniswap list.",
-  "assets.deepScanOn": "Deep scan on — tap to narrow",
-  "assets.deepScanOff": "Deep scan full token list",
-  "assets.deepScanNote":
-    "A deep scan multicalls every listed token on this chain. It is heavier on your RPC endpoint and off by default.",
   "assets.unpriced": "unpriced",
   "assets.address": "Address",
   "assets.openExplorer": "Open in explorer",
@@ -302,8 +301,32 @@ const en = {
   "settings.notConfigured": "Not configured",
   "settings.privateEndpoint": "Private endpoint",
   "settings.publicEndpoint": "Public endpoint",
+  "settings.venue": "Routing venue",
+  "settings.venueNote":
+    "Robinhood Chain publishes no deployment list the app can ship with, so the venue is resolved at runtime: Snyper asks the Pons launchpad which Uniswap deployment it opens its pools in. A quoter and a USD unit are not part of that record — fill them in here to get exact pricing and portfolio values.",
+  "settings.venueSource": "Resolved from",
+  "settings.venueEnv": "Build configuration",
+  "settings.venueManual": "Entered here",
+  "settings.venuePons": "Pons launchpad",
+  "settings.venueResolving": "Resolving…",
+  "settings.venueNone": "Not resolved — balances only",
+  "settings.venueRouter": "Router",
+  "settings.venueFactory": "Factory",
+  "settings.venueWrapped": "Wrapped native",
+  "settings.venueQuoter": "Quoter",
+  "settings.venueEstimating": "None — pricing from pool state",
+  "settings.venueStable": "USD unit",
+  "settings.venueStableSymbol": "USD symbol",
+  "settings.venueStableDecimals": "USD decimals",
+  "settings.venueEdit": "Enter addresses by hand",
+  "settings.venueSave": "Use these",
+  "settings.venueClear": "Clear",
+  "settings.venueWarning":
+    "A wrong router address sends funds to a contract that was never meant to receive them. Check every address against the explorer before saving.",
+  "settings.ponsV1": "Pons V1 factory",
+  "settings.ponsV2": "Pons V2 factory",
   "settings.rpcNote":
-    "Endpoints are set at build time through NEXT_PUBLIC_RPC_<chainId>. Public fallbacks rate-limit quickly under a fast engine tick.",
+    "The endpoint is set at build time through NEXT_PUBLIC_RPC_4663. The public fallback rate-limits quickly under a fast engine tick.",
   "settings.localData": "Local data",
   "settings.localDataNote":
     "Strategies, signals, the activity ledger and recorded price ticks live in this browser only. Clearing them cannot be undone and does not touch anything on-chain.",
@@ -352,6 +375,8 @@ const en = {
   "error.notConnected": "Wallet not connected",
   "error.unsupportedChain": "Unsupported chain",
   "error.noVenue": "No routing venue on {chain}",
+  "error.curveGraduated":
+    "This launch finished its bonding curve before the trade landed. It trades in a Uniswap v4 pool now.",
   "error.switchFirst": "Switch the wallet to {chain} first",
   "error.approvalReverted": "Approval reverted",
   "error.swapReverted": "Swap reverted",
@@ -392,6 +417,9 @@ const en = {
   "meme.reasonGlyphs": "Non-standard characters in the ticker",
   "meme.reasonHype": "Multiplier or version hype in the name",
   "meme.reasonSupply": "Trillion-plus supply",
+  "meme.tagPons": "Pons",
+  "meme.reasonPonsV1": "Minted by the Pons launchpad (V1, Uniswap v3)",
+  "meme.reasonPonsV2": "Minted by the Pons launchpad (V2, bonding curve)",
 
   "a11y.home": "Snyper home",
   "a11y.primaryNav": "Primary",
@@ -503,6 +531,18 @@ const en = {
   "desk.ctaBuy": "Buy {symbol}",
   "desk.errAmount": "Set how much to commit.",
   "desk.armedNote": "Snipe armed on {symbol}. It buys the moment a pool clears the guards.",
+  "desk.fundLocked": "Set by the launch",
+  "desk.venueCurve": "Pons bonding curve",
+  "desk.refund": "Refunded",
+  "desk.estimatedQuote":
+    "No quoter is configured for this venue, so the size shown is worked out from the pool's own state. The slippage bound still applies — an optimistic estimate fails the trade rather than filling it badly.",
+  "desk.ponsV1": "Minted by the Pons launchpad. Trades in its locked Uniswap v3 pool at {fee}.",
+  "desk.ponsCurve": "Minted by the Pons launchpad. Still trading on its own bonding curve.",
+  "desk.ponsCurveProgress":
+    "Minted by the Pons launchpad. On its bonding curve, {percent} of the way to graduation.",
+  "desk.ponsGraduated":
+    "This launch has graduated into a Uniswap v4 pool. Snyper routes v3 and the curve, so it cannot trade this one yet.",
+  "desk.ctaGraduatedV4": "Graduated to Uniswap v4",
 
   "snipe.stage.waiting": "Watching for a pool",
   "snipe.stage.entering": "Buying",
@@ -626,6 +666,7 @@ const id: Record<TKey, string> = {
   "wallet.openInApp": "Buka di aplikasi",
   "wallet.unsupportedNetwork": "Jaringan tidak didukung",
   "wallet.wrongNetwork": "Jaringan salah",
+  "wallet.switchTo": "Pindah ke {chain}",
   "wallet.balancesOnly": "Hanya saldo — belum ada tempat routing",
   "wallet.errNoProvider":
     "Dompet itu tidak merespons. Bisa jadi dimatikan untuk situs ini, atau ekstensi lain mengambil alih provider-nya — aktifkan lalu muat ulang, atau sambungkan dari ponsel lewat WalletConnect.",
@@ -699,7 +740,9 @@ const id: Record<TKey, string> = {
   "terminal.sourceNote":
     "Harga diambil dari pool itu sendiri — sqrtPrice untuk harga tengah, QuoterV2 untuk ukuran yang bisa dieksekusi. Tidak ada data dari feed pihak ketiga.",
   "terminal.awaitingTicks": "Menunggu tick",
-  "terminal.noVenue": "Belum ada di chain ini",
+  "terminal.noVenue": "Belum ada tempat routing",
+  "terminal.venueUniswap": "Uniswap v3",
+  "terminal.venueCurve": "Bonding curve Pons",
   "terminal.approxFx": "≈ {value} dengan kurs di Pengaturan",
 
   "bots.title": "Strategi",
@@ -804,10 +847,6 @@ const id: Record<TKey, string> = {
   "assets.emptyTitle": "Tidak ada saldo dalam cakupan",
   "assets.emptyHint":
     "Cakupan meliputi aset bawaan, token yang kamu impor, dan apa pun yang pernah kamu tukar di sini. Jalankan pemindaian dalam untuk menyapu seluruh daftar Uniswap.",
-  "assets.deepScanOn": "Pemindaian dalam aktif — ketuk untuk mempersempit",
-  "assets.deepScanOff": "Pindai seluruh daftar token",
-  "assets.deepScanNote":
-    "Pemindaian dalam melakukan multicall ke setiap token terdaftar di chain ini. Lebih berat untuk endpoint RPC-mu, jadi dimatikan secara bawaan.",
   "assets.unpriced": "tanpa harga",
   "assets.address": "Alamat",
   "assets.openExplorer": "Buka di explorer",
@@ -875,8 +914,32 @@ const id: Record<TKey, string> = {
   "settings.notConfigured": "Belum dikonfigurasi",
   "settings.privateEndpoint": "Endpoint pribadi",
   "settings.publicEndpoint": "Endpoint publik",
+  "settings.venue": "Tempat routing",
+  "settings.venueNote":
+    "Robinhood Chain belum menerbitkan daftar deployment yang bisa ikut dibundel, jadi tempat routingnya dicari saat aplikasi jalan: Snyper menanyakan ke launchpad Pons, Uniswap mana yang dipakainya membuka pool. Quoter dan satuan dolar tidak ada di catatan itu — isi di sini kalau mau harga yang presisi dan nilai portofolio.",
+  "settings.venueSource": "Sumbernya",
+  "settings.venueEnv": "Konfigurasi build",
+  "settings.venueManual": "Diisi di sini",
+  "settings.venuePons": "Launchpad Pons",
+  "settings.venueResolving": "Sedang dicari…",
+  "settings.venueNone": "Belum ketemu — hanya saldo",
+  "settings.venueRouter": "Router",
+  "settings.venueFactory": "Factory",
+  "settings.venueWrapped": "Wrapped native",
+  "settings.venueQuoter": "Quoter",
+  "settings.venueEstimating": "Belum ada — harga dihitung dari pool",
+  "settings.venueStable": "Satuan dolar",
+  "settings.venueStableSymbol": "Simbol dolar",
+  "settings.venueStableDecimals": "Desimal dolar",
+  "settings.venueEdit": "Isi alamatnya sendiri",
+  "settings.venueSave": "Pakai ini",
+  "settings.venueClear": "Kosongkan",
+  "settings.venueWarning":
+    "Alamat router yang salah mengirim dana ke kontrak yang tidak pernah dimaksudkan menerimanya. Cek tiap alamat di explorer sebelum disimpan.",
+  "settings.ponsV1": "Factory Pons V1",
+  "settings.ponsV2": "Factory Pons V2",
   "settings.rpcNote":
-    "Endpoint disetel saat build lewat NEXT_PUBLIC_RPC_<chainId>. Endpoint publik cepat kena batas jika interval mesin terlalu pendek.",
+    "Endpoint disetel saat build lewat NEXT_PUBLIC_RPC_4663. Endpoint publik cepat kena batas jika interval mesin terlalu pendek.",
   "settings.localData": "Data lokal",
   "settings.localDataNote":
     "Strategi, sinyal, catatan aktivitas, dan tick harga hanya tersimpan di browser ini. Menghapusnya tidak bisa dibatalkan dan tidak memengaruhi apa pun di chain.",
@@ -925,6 +988,8 @@ const id: Record<TKey, string> = {
   "error.notConnected": "Dompet belum terhubung",
   "error.unsupportedChain": "Chain tidak didukung",
   "error.noVenue": "Belum ada tempat routing di {chain}",
+  "error.curveGraduated":
+    "Launch ini menyelesaikan bonding curve-nya sebelum transaksimu masuk. Sekarang dia ada di pool Uniswap v4.",
   "error.switchFirst": "Pindahkan dompet ke {chain} dulu",
   "error.approvalReverted": "Persetujuan gagal di chain",
   "error.swapReverted": "Penukaran gagal di chain",
@@ -965,6 +1030,9 @@ const id: Record<TKey, string> = {
   "meme.reasonGlyphs": "Ada karakter tidak standar di tickernya",
   "meme.reasonHype": "Ada embel-embel pengganda atau versi di namanya",
   "meme.reasonSupply": "Suplai di atas satu triliun",
+  "meme.tagPons": "Pons",
+  "meme.reasonPonsV1": "Dicetak lewat launchpad Pons (V1, Uniswap v3)",
+  "meme.reasonPonsV2": "Dicetak lewat launchpad Pons (V2, bonding curve)",
 
   "a11y.home": "Beranda Snyper",
   "a11y.primaryNav": "Navigasi utama",
@@ -1077,6 +1145,18 @@ const id: Record<TKey, string> = {
   "desk.ctaBuy": "Beli {symbol}",
   "desk.errAmount": "Isi mau pakai berapa.",
   "desk.armedNote": "Snipe {symbol} aktif. Dia beli begitu ada pool yang lolos penjaga.",
+  "desk.fundLocked": "Ditentukan launchnya",
+  "desk.venueCurve": "Bonding curve Pons",
+  "desk.refund": "Dikembalikan",
+  "desk.estimatedQuote":
+    "Belum ada quoter untuk tempat ini, jadi angkanya dihitung dari keadaan pool itu sendiri. Batas slippage tetap berlaku — perkiraan yang kelewat optimistis membatalkan transaksinya, bukan mengisinya di harga buruk.",
+  "desk.ponsV1": "Dicetak lewat launchpad Pons. Diperdagangkan di pool Uniswap v3 terkuncinya, fee {fee}.",
+  "desk.ponsCurve": "Dicetak lewat launchpad Pons. Masih jalan di bonding curve-nya sendiri.",
+  "desk.ponsCurveProgress":
+    "Dicetak lewat launchpad Pons. Masih di bonding curve, {percent} menuju kelulusan.",
+  "desk.ponsGraduated":
+    "Launch ini sudah lulus ke pool Uniswap v4. Snyper melayani v3 dan bonding curve, jadi yang ini belum bisa dirutekan.",
+  "desk.ctaGraduatedV4": "Sudah lulus ke Uniswap v4",
 
   "snipe.stage.waiting": "Menunggu pool",
   "snipe.stage.entering": "Sedang beli",

@@ -1,18 +1,24 @@
 import type { TKey } from "./i18n";
+import type { PonsLaunch } from "./pons";
 import type { Token } from "./tokens";
 
 /**
- * Meme tokens are a social category, not an on-chain one, so nothing here is
- * authoritative. These are the signals that can be read without an indexer:
- * the token is absent from the curated list, its naming follows the genre, and
- * its supply is shaped like a meme launch. The interface presents the result as
- * a hint next to the contract address, never as a verdict.
+ * Meme tokens are a social category, not an on-chain one, so most of what
+ * follows is inference. There is one exception on Robinhood Chain, and it is
+ * the strongest signal available anywhere: the Pons launchpad keeps a record of
+ * every token it minted, so a contract it claims is a memecoin by construction.
+ * Everything else here is the fallback for contracts the launchpad does not
+ * know — naming that follows the genre, a supply shaped like a meme launch, and
+ * absence from the chain's own money. The interface presents the result as a
+ * reading next to the contract address, never as a verdict.
  */
 export type MemeSignal = {
-  /** Present in the wallet but absent from the curated token list. */
+  /** Not one of the chain's own assets. True for almost every pasted address. */
   unlisted: boolean;
-  /** Enough naming and supply signals to flag it as a likely meme token. */
+  /** Enough signal to call it a meme token. */
   meme: boolean;
+  /** The launchpad itself vouches for what this is. */
+  launchpad: boolean;
   score: number;
   reasons: TKey[];
 };
@@ -55,6 +61,8 @@ const LEXICON = [
   "popcat",
   "sigma",
   "gm",
+  "pons",
+  "hood",
 ];
 
 /** Anything outside plain ASCII in a ticker is a strong genre signal. */
@@ -68,15 +76,24 @@ function lexiconHit(value: string): boolean {
 
 /**
  * Scores a token against the meme heuristics. `listedAddresses` is the set of
- * lowercased addresses the curated list carries for this chain.
+ * lowercased addresses the chain's own money occupies; `launch` is the
+ * launchpad's record for this contract, when it has one.
  */
 export function memeSignal(
   token: Token & { totalSupply?: bigint },
   listedAddresses: Set<string>,
+  launch?: PonsLaunch,
 ): MemeSignal {
   const unlisted = !listedAddresses.has(token.address.toLowerCase());
   const reasons: TKey[] = [];
   let score = 0;
+
+  // A launchpad mint settles the question on its own. Nothing gets minted by
+  // Pons except memecoins, and the record comes from the factory, not a feed.
+  if (launch) {
+    reasons.push(launch.gen === "v1" ? "meme.reasonPonsV1" : "meme.reasonPonsV2");
+    return { unlisted, meme: true, launchpad: true, score: 10, reasons };
+  }
 
   if (unlisted) {
     score += 1;
@@ -108,9 +125,5 @@ export function memeSignal(
   }
 
   // Naming or supply alone is noise; the flag needs the token to be uncurated.
-  return { unlisted, meme: unlisted && score >= 3, score, reasons };
-}
-
-export function listedAddressSet(tokens: Token[]): Set<string> {
-  return new Set(tokens.map((token) => token.address.toLowerCase()));
+  return { unlisted, meme: unlisted && score >= 3, launchpad: false, score, reasons };
 }
