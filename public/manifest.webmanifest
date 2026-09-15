@@ -51,15 +51,15 @@
       "sizes": "430x932",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "Snype list on mobile"
+      "label": "Strategy list on mobile"
     }
   ],
   "shortcuts": [
     {
-      "name": "Snype",
-      "short_name": "Snype",
+      "name": "Strategies",
+      "short_name": "Strategies",
       "description": "Set up a snype and watch the ones already armed",
-      "url": "/snype?source=pwa",
+      "url": "/bots?source=pwa",
       "icons": [{ "src": "/icons/shortcuts/strategies.png?v=2", "sizes": "96x96", "type": "image/png" }]
     },
     {

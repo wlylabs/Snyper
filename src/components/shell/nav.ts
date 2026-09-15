@@ -9,7 +9,7 @@ export type NavItem = {
 
 export const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "nav.terminal", icon: "candles" },
-  { href: "/snype", label: "nav.snype", icon: "crosshair" },
+  { href: "/bots", label: "nav.bots", icon: "grid" },
   { href: "/assets", label: "nav.assets", icon: "stack" },
   { href: "/activity", label: "nav.activity", icon: "pulse" },
   { href: "/settings", label: "nav.settings", icon: "sliders" },

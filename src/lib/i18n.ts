@@ -13,7 +13,7 @@ export const INTL_LOCALE: Record<Locale, string> = {
 
 const en = {
   "nav.terminal": "Terminal",
-  "nav.snype": "Snype",
+  "nav.bots": "Strategies",
   "nav.assets": "Assets",
   "nav.activity": "Activity",
   "nav.settings": "Settings",
@@ -123,11 +123,12 @@ const en = {
   "terminal.venueCurve": "Pons bonding curve",
   "terminal.approxFx": "≈ {value} at the rate in Settings",
 
-  "snype.title": "Snype",
-  "snype.dispatchMode": "Dispatch mode",
-  "snype.autoLabel": "Auto-submit snype signals",
-  "snype.autoHint":
-    "{count} snype(s) still running. Your wallet still prompts for every signature — keep this device unlocked and the app open for it to work.",
+  "bots.title": "Strategies",
+  "bots.tabSnype": "Snype",
+  "bots.dispatchMode": "Dispatch mode",
+  "bots.autoLabel": "Auto-submit strategy signals",
+  "bots.autoHint":
+    "{count} strategy(s) still running. Your wallet still prompts for every signature — keep this device unlocked and the app open for it to work.",
   "snype.delete": "Delete",
   "snype.pairOn": "Pair · {chain}",
   "snype.poolMid": "Pool mid",
@@ -419,7 +420,7 @@ export type TKey = keyof typeof en;
 
 const id: Record<TKey, string> = {
   "nav.terminal": "Terminal",
-  "nav.snype": "Snype",
+  "nav.bots": "Strategi",
   "nav.assets": "Aset",
   "nav.activity": "Aktivitas",
   "nav.settings": "Pengaturan",
@@ -530,11 +531,12 @@ const id: Record<TKey, string> = {
   "terminal.venueCurve": "Bonding curve Pons",
   "terminal.approxFx": "≈ {value} dengan kurs di Pengaturan",
 
-  "snype.title": "Snype",
-  "snype.dispatchMode": "Mode pengiriman",
-  "snype.autoLabel": "Kirim otomatis sinyal snype",
-  "snype.autoHint":
-    "{count} snype masih berjalan. Dompetmu tetap meminta tanda tangan setiap kali — biarkan perangkat tidak terkunci dan aplikasi terbuka agar berjalan.",
+  "bots.title": "Strategi",
+  "bots.tabSnype": "Snype",
+  "bots.dispatchMode": "Mode pengiriman",
+  "bots.autoLabel": "Kirim otomatis sinyal strategi",
+  "bots.autoHint":
+    "{count} strategi masih berjalan. Dompetmu tetap meminta tanda tangan setiap kali — biarkan perangkat tidak terkunci dan aplikasi terbuka agar berjalan.",
   "snype.delete": "Hapus",
   "snype.pairOn": "Pasangan · {chain}",
   "snype.poolMid": "Harga tengah pool",
