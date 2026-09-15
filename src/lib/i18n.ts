@@ -106,7 +106,8 @@ const en = {
   "swap.ctaNoRoute": "No route found",
   "swap.ctaNoVenue": "No routing venue on {chain}",
   "swap.noVenueNote":
-    "{chain} has no Uniswap v3 deployment configured, so nothing can be priced or executed here. Balances and token detection still work.",
+    "Snyper has not resolved {chain}'s Uniswap v3 deployment yet, so nothing can be priced or executed. Balances and token detection still work. Look again, or enter the router and factory yourself in Settings.",
+  "swap.noVenueRetry": "Look for the venue again",
   "swap.ctaApproving": "Approving…",
   "swap.ctaSigning": "Confirm in wallet…",
   "swap.ctaSettling": "Settling…",
@@ -318,7 +319,10 @@ const en = {
   "settings.venueStable": "USD unit",
   "settings.venueStableSymbol": "USD symbol",
   "settings.venueStableDecimals": "USD decimals",
+  "settings.venueRetry": "Look again",
   "settings.venueEdit": "Enter addresses by hand",
+  "settings.venueRouterHint":
+    "The router on its own is enough — Snyper reads the factory and the wrapped native off it and fills the rest in.",
   "settings.venueSave": "Use these",
   "settings.venueClear": "Clear",
   "settings.venueWarning":
@@ -718,7 +722,8 @@ const id: Record<TKey, string> = {
   "swap.ctaNoRoute": "Rute tidak ditemukan",
   "swap.ctaNoVenue": "Belum ada tempat routing di {chain}",
   "swap.noVenueNote":
-    "{chain} belum punya deployment Uniswap v3 yang dikonfigurasi, jadi harga dan eksekusi tidak tersedia di sini. Saldo dan deteksi token tetap jalan.",
+    "Snyper belum menemukan deployment Uniswap v3 di {chain}, jadi harga dan eksekusi belum tersedia. Saldo dan deteksi token tetap jalan. Coba cari lagi, atau isi sendiri alamat router dan factory-nya di Pengaturan.",
+  "swap.noVenueRetry": "Cari tempat routing lagi",
   "swap.ctaApproving": "Menyetujui…",
   "swap.ctaSigning": "Konfirmasi di dompet…",
   "swap.ctaSettling": "Menyelesaikan…",
@@ -931,7 +936,10 @@ const id: Record<TKey, string> = {
   "settings.venueStable": "Satuan dolar",
   "settings.venueStableSymbol": "Simbol dolar",
   "settings.venueStableDecimals": "Desimal dolar",
+  "settings.venueRetry": "Cari lagi",
   "settings.venueEdit": "Isi alamatnya sendiri",
+  "settings.venueRouterHint":
+    "Cukup isi router-nya saja — factory dan wrapped native dibaca dari router itu dan diisikan sendiri.",
   "settings.venueSave": "Pakai ini",
   "settings.venueClear": "Kosongkan",
   "settings.venueWarning":
