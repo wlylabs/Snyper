@@ -27,6 +27,14 @@ export type ChainMeta = {
   /** Short mark drawn in the chain badge. */
   mark: string;
   explorer: string;
+  /**
+   * What to call the coin on screen, when that differs from the chain
+   * definition. viem names chain 4663's currency "Ether", which is correct and
+   * is not what any wallet a reader compares this against says — Robinhood,
+   * Coinbase and MetaMask all write Ethereum — and nobody should have to work
+   * out that the two are the same asset.
+   */
+  nativeName?: string;
 };
 
 export const CHAIN_META: Record<number, ChainMeta> = {
@@ -35,6 +43,7 @@ export const CHAIN_META: Record<number, ChainMeta> = {
     label: "Robinhood",
     mark: "RH",
     explorer: robinhood.blockExplorers.default.url,
+    nativeName: "Ethereum",
   },
 };
 

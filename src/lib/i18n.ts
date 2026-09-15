@@ -197,6 +197,8 @@ const en = {
     "No market feed reported a 24-hour change for this token. An explorer quote and a pool's mid price are each a single reading, with no yesterday to compare against.",
   "assets.marketCap": "MC",
   "assets.fdv": "FDV",
+  "assets.capLine": "Market cap {value} — circulating supply at the market price.",
+  "assets.fdvLine": "Fully diluted {value} — total supply at the market price.",
   "assets.capHint": "Market cap — circulating supply at the market price.",
   "assets.fdvHint": "Fully diluted — total supply at the market price. No feed reported a circulating supply.",
   "assets.priceHint": "Price {price}",
@@ -645,6 +647,8 @@ const id: Record<TKey, string> = {
   "assets.change24hHint": "Perubahan 24 jam terakhir, dari feed pasar.",
   "assets.changeUnknownHint":
     "Tidak ada feed pasar yang melaporkan perubahan 24 jam untuk token ini. Kutipan explorer dan harga tengah pool sama-sama hanya satu pembacaan, tanpa data kemarin untuk dibandingkan.",
+  "assets.capLine": "Market cap {value} — suplai beredar dikali harga pasar.",
+  "assets.fdvLine": "Terdilusi penuh {value} — total suplai dikali harga pasar.",
   "assets.capHint": "Market cap — suplai beredar dikali harga pasar.",
   "assets.fdvHint": "Terdilusi penuh — total suplai dikali harga pasar. Tidak ada feed yang melaporkan suplai beredar.",
   "assets.priceHint": "Harga {price}",

@@ -384,7 +384,10 @@ function HoldingRow({
   const signal = holding.token.native ? undefined : memeSignal(token, listed);
   const ownMoney = !signal || (!signal.unlisted && !signal.launchpad);
 
-  const leadsWithCap = !ownMoney && holding.marketCap !== undefined;
+  /* A cap is worth naming for anything that is not the chain's own money —
+     which on this chain is the memecoins, and they are what a cap is read
+     for. It is a tooltip line now rather than a column. */
+  const hasCap = !ownMoney && holding.marketCap !== undefined;
 
   /*
    * A price nothing corroborates. The feed aggregates every pair a token
@@ -403,26 +406,6 @@ function HoldingRow({
       holding.liquidity < THIN_LIQUIDITY);
 
   /*
-   * What one unit is worth. That is a fact about the token rather than about
-   * the position, so it sits with the quantity on the left and leaves the right
-   * column to say what the holding is worth and where it is going.
-   */
-  const perUnit = leadsWithCap ? (
-    <>
-      <span className="lbl mr-1">
-        {holding.diluted ? t("assets.fdv") : t("assets.marketCap")}
-      </span>
-      {formatCompactMoney(holding.marketCap, money)}
-    </>
-  ) : holding.price !== undefined ? (
-    formatPriceMoney(holding.price, money)
-  ) : holding.token.native ? (
-    t("token.native")
-  ) : (
-    truncateAddress(holding.token.address, 6, 4)
-  );
-
-  /*
    * Everything the figure is standing on, said once where it can be checked. A
    * price with no depth behind it and no pool this app read is exactly the kind
    * that arrives from a ticker collision, and the reader deserves to know that
@@ -431,7 +414,10 @@ function HoldingRow({
   const provenance = [
     holding.price !== undefined &&
       t("assets.priceHint", { price: formatPriceMoney(holding.price, money) }),
-    leadsWithCap && (holding.diluted ? t("assets.fdvHint") : t("assets.capHint")),
+    hasCap &&
+      t(holding.diluted ? "assets.fdvLine" : "assets.capLine", {
+        value: formatCompactMoney(holding.marketCap, money),
+      }),
     holding.priceSource === "feed"
       ? t("assets.sourceFeed")
       : holding.priceSource === "indexer"
@@ -479,12 +465,14 @@ function HoldingRow({
             </span>
           )}
         </p>
-        {/* The quantity carries its own unit. A bare number under a dollar
-            figure is two magnitudes in two units with nothing saying so. The
-            per-unit figure trails it: both describe the token, while the right
-            column describes the position. */}
+        {/* The quantity, and nothing else. It carries its own unit, because a
+            bare number under a dollar figure is two magnitudes in two units
+            with nothing saying which is which. What one unit costs, and the cap
+            that price implies, are facts about the token rather than about this
+            holding — they belong on the token's own screen, not competing with
+            the balance on every row of a list. Both are still in the tooltip. */}
         <p className="num truncate text-[11px] text-faint" title={provenance || undefined}>
-          {formatAmount(holding.amount, 5)} {holding.token.symbol} · {perUnit}
+          {formatAmount(holding.amount, 5)} {holding.token.symbol}
         </p>
       </div>
       <div className="shrink-0 text-right">
