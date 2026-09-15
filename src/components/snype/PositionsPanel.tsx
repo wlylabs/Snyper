@@ -1,7 +1,6 @@
 "use client";
 
 import { useAccount, useChainId } from "wagmi";
-import { PairBadge } from "@/components/ui/TokenBadge";
 import { Icon } from "@/components/ui/Icon";
 import { Empty, Panel } from "@/components/ui/Panel";
 import { useI18n } from "@/hooks/useI18n";
@@ -111,11 +110,15 @@ function PositionRow({
 
   return (
     <div className="flex items-center gap-3 border-t border-line px-3 py-2.5 first:border-t-0">
-      <PairBadge base={position.base} quote={position.cash} />
       <div className="min-w-0 flex-1">
-        <p className="flex items-center gap-1.5 text-[13px] font-semibold">
-          <span className="truncate">{position.base.symbol}</span>
-          <span className="text-[10px] font-normal text-faint">/ {position.cash.symbol}</span>
+        <p className="flex items-baseline gap-1.5">
+          <span
+            className="ticker ticker-inline"
+            data-native={position.base.native ? "true" : undefined}
+          >
+            {position.base.symbol}
+          </span>
+          <span className="text-[10px] text-faint">/ {position.cash.symbol}</span>
         </p>
         <p className="num truncate text-[11px] text-faint">
           {closed

@@ -46,7 +46,6 @@ export type IndexedPayload = {
     name: string;
     decimals: number;
     balance: string;
-    logoURI?: string;
     /** USD per token, when the indexer carries market data for it. */
     priceUsd?: number;
   }[];
@@ -70,7 +69,6 @@ type RawTokenBalance = {
     name?: string | null;
     decimals?: string | number | null;
     type?: string | null;
-    icon_url?: string | null;
     exchange_rate?: string | null;
   } | null;
 };
@@ -130,15 +128,12 @@ function toToken(row: RawTokenBalance): IndexedPayload["tokens"][number] | undef
   const balance = amount(row.value);
   if (balance === undefined) return undefined;
 
-  const icon = token.icon_url?.trim();
-
   return {
     address: address as `0x${string}`,
     symbol: token.symbol?.trim() || "???",
     name: token.name?.trim() || address,
     decimals,
     balance: balance.toString(),
-    ...(icon && icon.startsWith("https://") ? { logoURI: icon } : {}),
     ...(price(token.exchange_rate) !== undefined
       ? { priceUsd: price(token.exchange_rate) }
       : {}),

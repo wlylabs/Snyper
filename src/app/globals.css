@@ -200,6 +200,45 @@
     letter-spacing: -0.01em;
   }
 
+  /*
+   * An asset's mark is its ticker. Robinhood Chain publishes no curated list,
+   * so a memecoin pasted in as a contract address has a symbol, a name and
+   * eighteen decimals — and a drawn badge would be decoration repeating the
+   * symbol beside it. The symbol carries the row instead: mono, tracked out,
+   * and held to one width so a column of them can be read down rather than
+   * across.
+   */
+  .ticker {
+    flex: none;
+    min-width: 4.25rem;
+    max-width: 7rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-ink);
+  }
+
+  /*
+   * The chain's own money is the one asset on the network that is not somebody's
+   * contract, so it is the one that wears the accent.
+   */
+  .ticker[data-native="true"] {
+    color: var(--color-accent-text);
+  }
+
+  /*
+   * Beside its quote a ticker is half of a phrase rather than the head of a
+   * column, so it gives up the width that was holding the column straight.
+   */
+  .ticker-inline {
+    min-width: 0;
+  }
+
   .panel {
     position: relative;
     background: var(--color-panel);
@@ -893,12 +932,13 @@
   /* ---------- identity ---------- */
 
   /*
-   * The face of anything that has one: a token, a wallet, an account. The
-   * ground is painted inline from `tokenArt` because it is derived per address,
-   * so this rule only owns the shape — round, clipped, and lit from the top
-   * left so a flat gradient reads as a minted thing rather than a swatch.
+   * An account's face. The ground is painted inline from `avatarArt` because it
+   * is derived per address, so this rule only owns the shape — round, clipped,
+   * and lit from the top left so a flat gradient reads as a minted thing rather
+   * than a swatch. Tokens have no counterpart here: an asset is named by its
+   * ticker, which is the mark.
    */
-  .badge {
+  .avatar {
     position: relative;
     display: inline-flex;
     align-items: center;
@@ -906,15 +946,11 @@
     flex: none;
     overflow: hidden;
     border-radius: var(--radius-pill);
-    font-family: var(--font-sans);
-    font-weight: 700;
-    line-height: 1;
-    letter-spacing: -0.02em;
     user-select: none;
     box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.1);
   }
 
-  .badge::after {
+  .avatar::after {
     content: "";
     position: absolute;
     inset: 0;
@@ -922,43 +958,21 @@
     background: linear-gradient(180deg, rgb(255 255 255 / 0.16), transparent 58%);
   }
 
-  .badge-img {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-
-  /* The chain's own money carries the accent, so its edge is drawn in ink. */
-  .badge[data-native="true"] {
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent-ink) 22%, transparent);
-  }
-
   /* A wallet Privy holds the keys for is marked, the way it is in the modal. */
-  .badge-avatar[data-embedded="true"] {
+  .avatar[data-embedded="true"] {
     box-shadow:
       inset 0 0 0 1px rgb(255 255 255 / 0.1),
       0 0 0 1.5px var(--color-accent-line);
   }
 
-  /* The quote asset tucked behind the base needs to cut its own silhouette. */
-  .badge-stacked {
-    box-shadow: 0 0 0 2px var(--color-panel);
-  }
-
-  .badge-stacked::after {
-    display: none;
-  }
-
-  /* Nothing picked yet: the slot keeps the shape so the row does not resize. */
-  .badge-empty {
+  /* Nothing there yet: the slot keeps the shape so the row does not resize. */
+  .avatar-empty {
     background: var(--color-raise);
     border: 1px dashed var(--color-edge);
     box-shadow: none;
   }
 
-  .badge-empty::after {
+  .avatar-empty::after {
     display: none;
   }
 

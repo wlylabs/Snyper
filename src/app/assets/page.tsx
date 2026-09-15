@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import { useAccount } from "wagmi";
 import { TokenTags } from "@/components/terminal/TokenPicker";
-import { TokenBadge } from "@/components/ui/TokenBadge";
 import { Icon } from "@/components/ui/Icon";
 import { Empty, Panel, Skeleton } from "@/components/ui/Panel";
 import { useConnectPrompt } from "@/hooks/useConnectPrompt";
@@ -163,16 +162,23 @@ export default function AssetsPage() {
                   key={holding.token.address}
                   className="flex items-center gap-3 border-t border-line px-3 py-2.5"
                 >
-                  <TokenBadge token={holding.token} />
+                  <span
+                    className="ticker"
+                    data-native={holding.token.native ? "true" : undefined}
+                  >
+                    {holding.token.symbol}
+                  </span>
                   <div className="min-w-0 flex-1">
-                    <p className="flex items-center gap-1.5 text-[13px] font-semibold">
-                      <span className="truncate">{holding.token.symbol}</span>
+                    <p className="flex items-center gap-1.5 text-[12px] text-dim">
+                      <span className="truncate">{holding.token.name}</span>
                       <TokenTags token={holding.token} listed={listed} />
                     </p>
-                    <p className="truncate text-[11px] text-faint">
+                    <p className="num truncate text-[11px] text-faint">
                       {holding.price !== undefined
                         ? formatMoney(holding.price, { currency, fx, locale })
-                        : holding.token.name}
+                        : holding.token.native
+                          ? t("token.native")
+                          : truncateAddress(holding.token.address, 6, 4)}
                     </p>
                   </div>
                   <div className="text-right">

@@ -1,7 +1,6 @@
 "use client";
 
 import { Icon } from "@/components/ui/Icon";
-import { TokenBadge } from "@/components/ui/TokenBadge";
 import type { Token } from "@/lib/tokens";
 
 export function PairButton({
@@ -21,16 +20,18 @@ export function PairButton({
       className="row-link panel flex items-center gap-2.5 p-2.5"
       onClick={onClick}
     >
-      {token ? (
-        <TokenBadge token={token} size={26} />
-      ) : (
-        <span className="badge badge-empty" style={{ width: 26, height: 26 }} />
-      )}
       <span className="min-w-0 flex-1 text-left">
         <span className="lbl block">{caption}</span>
-        <span className="block truncate text-[13px] font-semibold">
-          {token?.symbol ?? placeholder}
-        </span>
+        {token ? (
+          <span
+            className="ticker mt-1 block"
+            data-native={token.native ? "true" : undefined}
+          >
+            {token.symbol}
+          </span>
+        ) : (
+          <span className="mt-1 block truncate text-[13px] text-dim">{placeholder}</span>
+        )}
       </span>
       <Icon name="chevron" size={12} className="text-faint" />
     </button>

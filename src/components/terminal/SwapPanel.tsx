@@ -24,7 +24,6 @@ import type { Token } from "@/lib/tokens";
 import { useAppStore } from "@/store/useAppStore";
 import { useI18n } from "@/hooks/useI18n";
 import { TokenPicker } from "./TokenPicker";
-import { TokenBadge } from "@/components/ui/TokenBadge";
 
 const SLIPPAGE_PRESETS = [10, 50, 100];
 
@@ -384,10 +383,7 @@ function TokenButton({
   return (
     <button type="button" className="btn btn-sm shrink-0 gap-2" onClick={onClick}>
       {token ? (
-        <>
-          <TokenBadge token={token} size={20} />
-          <span className="normal-case tracking-normal">{token.symbol}</span>
-        </>
+        <span className="normal-case tracking-normal">{token.symbol}</span>
       ) : (
         <span>{label}</span>
       )}

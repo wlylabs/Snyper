@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { Flash } from "@/components/ui/Flash";
 import { Icon } from "@/components/ui/Icon";
-import { PairBadge } from "@/components/ui/TokenBadge";
 import { useI18n } from "@/hooks/useI18n";
 import { chainMeta } from "@/lib/chains";
 import { formatAmount, formatDuration, formatPrice, formatSigned } from "@/lib/format";
@@ -91,7 +90,6 @@ export function SnypeCard({ snype }: { snype: Snype }) {
       <div className="p-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <span className="flex min-w-0 items-center gap-2">
-            <PairBadge base={snype.base} quote={snype.quote} size={24} />
             <span className="num truncate text-[15px]">
               {snype.base.symbol}
               <span className="text-faint"> / </span>
