@@ -242,11 +242,6 @@ const en = {
   "settings.autoLabel": "Auto-submit snype signals",
   "settings.autoHint":
     "Every transaction is still signed in your wallet — Snyper holds no keys and cannot move funds on its own.",
-  "settings.install": "Install",
-  "settings.installed": "Running as an installed app.",
-  "settings.installIntro":
-    "Install Snyper to run it fullscreen with its own launcher entry. It keeps working offline for anything already cached; live prices still need a connection.",
-  "settings.installAction": "Install app",
   "settings.connectivity": "Connectivity",
   "settings.privy": "Privy",
   "settings.configured": "Configured",
@@ -292,6 +287,8 @@ const en = {
   "reason.zeroSize": "Zero size",
 
   "toast.approving": "Approving {symbol}",
+  "toast.allowanceReset":
+    "Clearing the old {symbol} allowance — this token only accepts a new one from zero.",
   "toast.swapSubmitted": "Swap submitted · {from} → {to}",
   "toast.swapConfirmed": "Swap confirmed",
   "toast.swapReverted": "Swap reverted",
@@ -672,11 +669,6 @@ const id: Record<TKey, string> = {
   "settings.autoLabel": "Kirim otomatis sinyal snype",
   "settings.autoHint":
     "Setiap transaksi tetap ditandatangani di dompetmu — Snyper tidak menyimpan kunci dan tidak bisa memindahkan dana sendiri.",
-  "settings.install": "Pasang",
-  "settings.installed": "Berjalan sebagai aplikasi terpasang.",
-  "settings.installIntro":
-    "Pasang Snyper agar berjalan layar penuh dengan ikon sendiri. Bagian yang sudah tersimpan tetap bisa dibuka offline; harga langsung tetap butuh koneksi.",
-  "settings.installAction": "Pasang aplikasi",
   "settings.connectivity": "Konektivitas",
   "settings.privy": "Privy",
   "settings.configured": "Terkonfigurasi",
@@ -722,6 +714,8 @@ const id: Record<TKey, string> = {
   "reason.zeroSize": "Ukuran nol",
 
   "toast.approving": "Menyetujui {symbol}",
+  "toast.allowanceReset":
+    "Menghapus izin {symbol} yang lama — token ini hanya menerima izin baru dari nol.",
   "toast.swapSubmitted": "Penukaran terkirim · {from} → {to}",
   "toast.swapConfirmed": "Penukaran terkonfirmasi",
   "toast.swapReverted": "Penukaran gagal di chain",

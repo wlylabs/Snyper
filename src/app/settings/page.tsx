@@ -5,8 +5,6 @@ import { usePublicClient } from "wagmi";
 import { Icon } from "@/components/ui/Icon";
 import { Panel, Row } from "@/components/ui/Panel";
 import { Segmented } from "@/components/ui/Segmented";
-import { InstallSheet } from "@/components/shell/InstallPrompt";
-import { useInstallPrompt } from "@/hooks/useInstallPrompt";
 import { useMounted } from "@/hooks/useMounted";
 import { CHAIN_ID, CHAIN_META } from "@/lib/chains";
 import { CURRENCIES, formatRate } from "@/lib/currency";
@@ -29,9 +27,7 @@ export default function SettingsPage() {
   const setSettings = useAppStore((state) => state.setSettings);
   // Forced on: the reader is here to look at the rate, whichever currency is active.
   const { fx, isLoading: fxLoading } = useFxRate(true);
-  const { standalone } = useInstallPrompt();
   const [wipeArmed, setWipeArmed] = useState(false);
-  const [installOpen, setInstallOpen] = useState(false);
 
   const wipe = () => {
     useAppStore.setState({
@@ -176,30 +172,6 @@ export default function SettingsPage() {
             </span>
           </span>
         </label>
-      </Panel>
-
-      <Panel label={t("settings.install")} bodyClassName="p-3">
-        {mounted && standalone ? (
-          <p className="flex items-center gap-2 text-[12px] long">
-            <Icon name="check" size={14} />
-            {t("settings.installed")}
-          </p>
-        ) : (
-          <>
-            <p className="text-[11px] leading-relaxed text-dim">
-              {t("settings.installIntro")}
-            </p>
-            <button
-              type="button"
-              className="btn btn-accent btn-sm mt-3 w-full"
-              onClick={() => setInstallOpen(true)}
-            >
-              <Icon name="download" size={13} />
-              {t("settings.installAction")}
-            </button>
-          </>
-        )}
-        <InstallSheet open={installOpen} onClose={() => setInstallOpen(false)} />
       </Panel>
 
       <Panel label={t("settings.connectivity")} bodyClassName="p-3">

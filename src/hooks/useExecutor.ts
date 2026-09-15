@@ -1,9 +1,20 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { parseGwei } from "viem";
+import {
+  BaseError,
+  ContractFunctionRevertedError,
+  ExecutionRevertedError,
+  InsufficientFundsError,
+  parseGwei,
+} from "viem";
 import { useAccount, useConfig, useWriteContract } from "wagmi";
-import { getPublicClient, readContract, waitForTransactionReceipt } from "wagmi/actions";
+import {
+  getPublicClient,
+  readContract,
+  simulateContract,
+  waitForTransactionReceipt,
+} from "wagmi/actions";
 import { erc20Abi } from "@/lib/abi";
 import { chainMeta, explorerTx } from "@/lib/chains";
 import type { Quote } from "@/lib/quote";
@@ -56,6 +67,23 @@ async function feeOverrides(
     // A fee read that fails is not worth failing the trade over.
     return {};
   }
+}
+
+/**
+ * Whether a failed call is the chain refusing the transaction, as opposed to
+ * the node failing to answer. Only the first kind is worth stopping a trade
+ * over: an endpoint that blinked is not evidence against a swap the chain
+ * would have accepted, and treating it as one would cost the reader the trade.
+ */
+const REFUSALS = [
+  ContractFunctionRevertedError,
+  ExecutionRevertedError,
+  InsufficientFundsError,
+] as const;
+
+function isRefusal(error: unknown): boolean {
+  if (!(error instanceof BaseError)) return false;
+  return REFUSALS.some((kind) => Boolean(error.walk((cause) => cause instanceof kind)));
 }
 
 export function useExecutor() {
@@ -121,45 +149,101 @@ export function useExecutor() {
         })) as bigint;
 
         if (allowance < amountIn) {
-          const approveHash = await writeContractAsync({
-            address: tokenIn.address,
-            abi: erc20Abi,
-            functionName: "approve",
-            args: [plan.target, amountIn],
-            chainId: tokenIn.chainId,
-            ...fees,
-          });
-          pushTrade({
-            id: approveHash,
-            kind: "approval",
-            chainId: tokenIn.chainId,
-            createdAt: Date.now(),
-            hash: approveHash,
-            status: "submitted",
-            source: args.source,
-            tokenIn,
-            amountIn: amountIn.toString(),
-            snypeName: args.snypeName,
-          });
-          toast.push({
-            tone: "info",
-            message: t("toast.approving", { symbol: tokenIn.symbol }),
-            detail: approveHash,
-            href: explorerTx(tokenIn.chainId, approveHash),
-          });
-          const receipt = await waitForTransactionReceipt(config, {
-            hash: approveHash,
-            chainId: tokenIn.chainId,
-          });
-          updateTrade(approveHash, {
-            status: receipt.status === "success" ? "confirmed" : "failed",
-          });
-          if (receipt.status !== "success") throw new Error(t("error.approvalReverted"));
+          /** One approval: signed, recorded in the ledger, and waited out. */
+          const approve = async (value: bigint, message: string) => {
+            const hash = await writeContractAsync({
+              address: tokenIn.address,
+              abi: erc20Abi,
+              functionName: "approve",
+              args: [plan.target, value],
+              chainId: tokenIn.chainId,
+              ...fees,
+            });
+            pushTrade({
+              id: hash,
+              kind: "approval",
+              chainId: tokenIn.chainId,
+              createdAt: Date.now(),
+              hash,
+              status: "submitted",
+              source: args.source,
+              tokenIn,
+              amountIn: value.toString(),
+              snypeName: args.snypeName,
+            });
+            toast.push({
+              tone: "info",
+              message,
+              detail: hash,
+              href: explorerTx(tokenIn.chainId, hash),
+            });
+            const receipt = await waitForTransactionReceipt(config, {
+              hash,
+              chainId: tokenIn.chainId,
+            });
+            updateTrade(hash, {
+              status: receipt.status === "success" ? "confirmed" : "failed",
+            });
+            if (receipt.status !== "success") throw new Error(t("error.approvalReverted"));
+          };
+
+          /*
+           * Tokens written before the standard settled — USDT is the one
+           * everybody has met — refuse to move an allowance from one non-zero
+           * value to another, and nothing on the token says so in advance. The
+           * raise is asked as a read first: a token that refuses it gets the
+           * old allowance cleared to zero, which is what every wallet and
+           * front end has done about this for years, and a token that accepts
+           * it is approved once as before. Asking costs a call rather than a
+           * wallet prompt the reader would have to reject.
+           */
+          const raisable =
+            allowance === 0n ||
+            (await simulateContract(config, {
+              account: address,
+              address: tokenIn.address,
+              abi: erc20Abi,
+              functionName: "approve",
+              args: [plan.target, amountIn],
+              chainId: tokenIn.chainId,
+            })
+              .then(() => true)
+              .catch((cause) => !isRefusal(cause)));
+
+          if (!raisable) {
+            await approve(0n, t("toast.allowanceReset", { symbol: tokenIn.symbol }));
+          }
+          await approve(amountIn, t("toast.approving", { symbol: tokenIn.symbol }));
         }
       }
 
-      setPhase("signing");
       const request = swapRequest(plan);
+
+      /*
+       * The trade, sent as a read before it is sent as a transaction. This is
+       * what a wallet does behind its own confirmation screen, done here so a
+       * trade the chain will not take is refused with a reason the reader can
+       * act on — a tax on the token, a pool that moved, a bound too tight —
+       * instead of costing a signature and a failed transaction. A simulation
+       * that fails for any reason other than a refusal is ignored: the chain
+       * has the last word either way, and an unreachable node must not stand
+       * between a reader and a trade that would have settled.
+       */
+      try {
+        await simulateContract(config, {
+          account: address,
+          address: request.address,
+          abi: request.abi,
+          functionName: request.functionName,
+          args: request.args,
+          value: request.value,
+          chainId: tokenIn.chainId,
+        });
+      } catch (cause) {
+        if (isRefusal(cause)) throw cause;
+      }
+
+      setPhase("signing");
       const hash = await writeContractAsync({
         address: request.address,
         abi: request.abi,
