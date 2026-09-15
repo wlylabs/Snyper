@@ -2,7 +2,7 @@
 
 import { useEffect, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Icon } from "./Icon";
+import { IconButton } from "./IconButton";
 import { useI18n } from "@/hooks/useI18n";
 
 type SheetProps = {
@@ -39,14 +39,13 @@ export function Sheet({ open, title, onClose, children, footer }: SheetProps) {
         <div className="grab md:hidden" />
         <header className="panel-head shrink-0">
           <span className="lbl">{title}</span>
-          <button
-            type="button"
-            className="icon-btn"
+          <IconButton
+            icon="close"
+            act="dismiss"
+            size={16}
             onClick={onClose}
             aria-label={t("common.close")}
-          >
-            <Icon name="close" size={16} />
-          </button>
+          />
         </header>
         <div className="scroll-thin flex-1 overflow-y-auto">{children}</div>
         {footer && <div className="shrink-0 border-t border-line p-3">{footer}</div>}

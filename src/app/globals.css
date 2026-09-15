@@ -92,10 +92,21 @@
   --dur-tap: 140ms;
   --dur-enter: 200ms;
   --dur-travel: 260ms;
+  --dur-wash: 420ms;
   --dur-flash: 640ms;
   --ease-out: cubic-bezier(0, 0, 0.3, 1);
   --ease-emphasis: cubic-bezier(0.2, 0, 0, 1);
   --ease-settle: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /*
+   * A press is not symmetrical. Going down is the reader's own movement and
+   * should track the finger, so it takes the shortest step on the scale; coming
+   * back up is the control's answer and is given room to settle. Every
+   * pressable sets the release duration in its base rule and overrides it with
+   * `--dur-press` inside `:active`, which is what makes the whole app feel
+   * quick under the thumb without anything snapping back.
+   */
+  --dur-release: 300ms;
 }
 
 [data-theme="light"] {
@@ -311,6 +322,120 @@
     background: var(--color-line);
   }
 
+  /* ---------- press ---------- */
+
+  /*
+   * One press language, worn differently by every control.
+   *
+   * Two things happen when a pressable is pressed. It moves — by an amount its
+   * own rule sets, because a 30px chip and a full-width slab cannot travel the
+   * same distance and read as the same weight of press. And a wash of light
+   * runs out from the point the finger actually landed on, which is the part
+   * generic feedback always misses: a button that dims uniformly answers the
+   * click, while a button that lights up *where it was touched* answers the
+   * reader. Material's ripple is built on the same observation; this is that
+   * idea in Snyper's hand — no soft bloom, but a hard-edged charge that clears
+   * in under half a second, the way a readout settles rather than a card
+   * bounces.
+   *
+   * `PressWash` writes the coordinates and the radius as custom properties on
+   * whatever was pressed and stamps `data-press`, so no control has to be
+   * wired up for this: anything carrying one of these classes gets it, keyboard
+   * presses included, where the wash starts from the middle instead.
+   */
+  .btn,
+  .icon-btn,
+  button.chip,
+  .tile,
+  .pill,
+  .row-link,
+  .seg-item {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+  }
+
+  .btn::after,
+  .icon-btn::after,
+  button.chip::after,
+  .tile::after,
+  .pill::after,
+  .row-link::after,
+  .seg-item::after {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    top: var(--press-y, 50%);
+    left: var(--press-x, 50%);
+    width: calc(var(--press-r, 60px) * 2);
+    height: calc(var(--press-r, 60px) * 2);
+    border-radius: var(--radius-pill);
+    pointer-events: none;
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.12);
+    background: radial-gradient(
+      circle,
+      color-mix(in srgb, var(--color-accent-line) 42%, transparent),
+      color-mix(in srgb, var(--color-accent-line) 14%, transparent) 62%,
+      transparent 72%
+    );
+  }
+
+  /*
+   * The animation is named twice and alternated by the parity the handler
+   * writes. A CSS animation does not replay because an attribute changed, only
+   * because the animation itself changed — so two names that do the same thing
+   * are what let a reader tap the same button four times and see four washes.
+   */
+  [data-press="0"]::after {
+    animation: wash-a var(--dur-wash) var(--ease-out);
+  }
+
+  [data-press="1"]::after {
+    animation: wash-b var(--dur-wash) var(--ease-out);
+  }
+
+  @keyframes wash-a {
+    from {
+      opacity: 0.85;
+      transform: translate(-50%, -50%) scale(0.12);
+    }
+    to {
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(1);
+    }
+  }
+
+  @keyframes wash-b {
+    from {
+      opacity: 0.85;
+      transform: translate(-50%, -50%) scale(0.12);
+    }
+    to {
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(1);
+    }
+  }
+
+  /* On a filled primary an accent wash is invisible, so that one washes dark. */
+  .btn-accent::after {
+    background: radial-gradient(
+      circle,
+      color-mix(in srgb, var(--color-accent-ink) 34%, transparent),
+      transparent 70%
+    );
+  }
+
+  /* Anything that destroys something answers in the colour of the consequence. */
+  .btn-short::after,
+  .tile-danger::after {
+    background: radial-gradient(
+      circle,
+      color-mix(in srgb, var(--color-short-line) 38%, transparent),
+      transparent 70%
+    );
+  }
+
   /* ---------- controls ---------- */
 
   .btn {
@@ -333,7 +458,8 @@
       background-color var(--dur-tap) var(--ease-out),
       border-color var(--dur-tap) var(--ease-out),
       color var(--dur-tap) var(--ease-out),
-      transform var(--dur-press) var(--ease-out);
+      box-shadow var(--dur-tap) var(--ease-out),
+      transform var(--dur-release) var(--ease-settle);
     white-space: nowrap;
   }
 
@@ -343,17 +469,36 @@
   }
 
   /*
-   * Press feedback: the control gives a little under the finger and springs
-   * back the moment it is released. 2.5% is enough to feel and small enough
-   * that a row of buttons does not appear to wobble.
+   * Press feedback: the control gives a little under the finger and settles
+   * back when it is released. 2.5% is enough to feel and small enough that a
+   * row of buttons does not appear to wobble; the pixel of travel is what
+   * turns a resize into a press. Down is instant, up takes the release curve —
+   * one `transition-duration` covers the whole list, which is right, because a
+   * colour that lags the finger reads as latency.
    */
   .btn:active:not(:disabled) {
-    transform: scale(0.975);
+    transform: scale(0.975) translateY(1px);
+    transition-duration: var(--dur-press);
   }
 
-  /* A wide slab scaled by the same factor travels much further at its edges. */
+  /*
+   * A wide slab cannot shrink: scaled by the same factor its corners travel far
+   * enough to read as a wobble. It sinks instead — down a notch, with the
+   * ground darkening under it, the way a key on a deck goes down rather than in.
+   */
   .btn-block:active:not(:disabled) {
-    transform: scale(0.99);
+    transform: translateY(2px) scale(0.995);
+    box-shadow: inset 0 2px 8px -4px rgb(0 0 0 / 0.55);
+  }
+
+  /*
+   * A pressed-in option — a slippage preset, a filter — stays lit rather than
+   * being marked with an inline style at the call site.
+   */
+  .btn[data-active="true"] {
+    border-color: var(--color-accent-line);
+    color: var(--color-accent-text);
+    background: color-mix(in srgb, var(--color-accent-soft) 70%, transparent);
   }
 
   .btn:disabled {
@@ -382,6 +527,61 @@
     color: var(--color-faint);
   }
 
+  /*
+   * Work in progress. A primary that has been pressed and is now waiting on a
+   * wallet, a signature or a block spends seconds disabled, and a disabled grey
+   * slab is indistinguishable from one that was never pressable — the reader is
+   * left asking whether their tap landed. So the running state keeps the accent
+   * and runs a rail along its bottom edge: something is happening, the app is
+   * still holding the thread, and no progress is being claimed that the chain
+   * has not given.
+   */
+  .btn-accent[data-run="true"]:disabled {
+    opacity: 1;
+    background: var(--color-accent-soft);
+    border-color: color-mix(in srgb, var(--color-accent-line) 55%, transparent);
+    color: var(--color-accent-text);
+  }
+
+  .btn[data-run="true"]::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    left: 0;
+    bottom: 0;
+    width: 36%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--color-accent-line), transparent);
+    animation: run-rail 1.15s linear infinite;
+  }
+
+  @keyframes run-rail {
+    from {
+      transform: translateX(-110%);
+    }
+    to {
+      transform: translateX(390%);
+    }
+  }
+
+  /*
+   * And when it lands, the slab says so once. A ring leaves the button and is
+   * gone inside a second: the receipt is the toast and the balance, this is
+   * only the control acknowledging that the thing it was pressed for happened.
+   */
+  .btn[data-done="true"] {
+    animation: cta-done 760ms var(--ease-out);
+  }
+
+  @keyframes cta-done {
+    from {
+      box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent-line) 60%, transparent);
+    }
+    to {
+      box-shadow: 0 0 0 16px transparent;
+    }
+  }
+
   .btn-short {
     border-color: color-mix(in srgb, var(--color-short-line) 60%, transparent);
     color: var(--color-short);
@@ -403,6 +603,80 @@
     height: 48px;
   }
 
+  /*
+   * A button that spends its own figure. The quarter, the half and the max
+   * under the amount field all do the same kind of thing at different sizes,
+   * and pressing them used to look identical — so now each one paints the
+   * fraction it is about to take. A quarter fills a quarter of the button, max
+   * floods it, and the fill stays up for as long as the amount in the field is
+   * still the one that button put there. It is the reading the control already
+   * owed the reader: which of the three is currently in force.
+   */
+  .btn-fill::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    inset: 0;
+    background: color-mix(in srgb, var(--color-accent-line) 16%, transparent);
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition:
+      transform var(--dur-release) var(--ease-settle),
+      opacity var(--dur-tap) var(--ease-out);
+  }
+
+  .btn-fill:active:not(:disabled)::before,
+  .btn-fill[data-filled="true"]::before {
+    transform: scaleX(var(--fill, 1));
+  }
+
+  .btn-fill:active:not(:disabled)::before {
+    transition-duration: var(--dur-press);
+  }
+
+  /*
+   * Press and hold. Disconnecting a wallet and deleting a strategy are the two
+   * actions in the app that cannot be taken back, and both used to be one tap
+   * away — or worse, one tap plus a second button that reads exactly like the
+   * first. Holding is the better guard: nothing is confirmed by accident, there
+   * is no dialog to dismiss on reflex, and the fill sweeping across the button
+   * tells the reader precisely how much longer their finger has to stay put.
+   * Letting go early drains it and nothing happens.
+   */
+  .btn-hold::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    inset: 0;
+    background: color-mix(in srgb, var(--color-short-line) 28%, transparent);
+    transform: scaleX(var(--hold, 0));
+    transform-origin: left center;
+    transition: transform var(--dur-tap) var(--ease-out);
+  }
+
+  /* While the finger is down the fill is driven frame by frame, not eased. */
+  .btn-hold[data-holding="true"]::before {
+    transition: none;
+  }
+
+  .btn-hold[data-holding="true"] {
+    border-color: var(--color-short-line);
+    color: var(--color-short);
+  }
+
+  .btn-hold[data-armed="true"] {
+    animation: hold-fired var(--dur-flash) var(--ease-out);
+  }
+
+  @keyframes hold-fired {
+    from {
+      box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-short-line) 55%, transparent);
+    }
+    to {
+      box-shadow: 0 0 0 14px transparent;
+    }
+  }
+
   .icon-btn {
     display: inline-flex;
     align-items: center;
@@ -418,18 +692,273 @@
       color var(--dur-tap) var(--ease-out),
       border-color var(--dur-tap) var(--ease-out),
       background-color var(--dur-tap) var(--ease-out),
-      transform var(--dur-press) var(--ease-out);
+      transform var(--dur-release) var(--ease-settle);
   }
 
-  .icon-btn:hover {
+  .icon-btn:hover:not(:disabled) {
     color: var(--color-ink);
     border-color: var(--color-edge);
     background: var(--color-raise);
     transform: translateY(-1px);
   }
 
-  .icon-btn:active {
-    transform: scale(0.94);
+  .icon-btn:active:not(:disabled) {
+    transform: scale(0.88);
+    transition-duration: var(--dur-press);
+  }
+
+  .icon-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  /*
+   * An icon button should answer in the shape of the thing it does, because
+   * that glyph is the only label it has. A refresh turns once per press and
+   * keeps turning while the request is out. A close turns on approach, so the
+   * cross is already leaning away before it is hit. A plus opens into the same
+   * cross it is about to add a row with. None of this is decoration: it is the
+   * icon behaving like the verb, and it is what stops a row of identical
+   * 34-pixel squares from feeling like one button drawn four times.
+   */
+  .icon-btn svg {
+    transition: transform var(--dur-travel) var(--ease-settle);
+  }
+
+  .icon-btn[data-act="spin"] svg {
+    transform: rotate(calc(var(--turn, 0) * 360deg));
+  }
+
+  .icon-btn[data-act="spin"][data-busy="true"] svg {
+    animation: spin 900ms linear infinite;
+  }
+
+  /*
+   * A labelled button that carries a glyph for the same verb turns it too, so a
+   * retry that is still out is legible from the icon rather than only from its
+   * caption changing tense.
+   */
+  .btn[data-busy="true"] svg {
+    animation: spin 900ms linear infinite;
+  }
+
+  .icon-btn[data-act="dismiss"]:hover:not(:disabled) svg {
+    transform: rotate(90deg);
+  }
+
+  .icon-btn[data-act="dismiss"]:active:not(:disabled) svg {
+    transform: rotate(90deg) scale(0.86);
+  }
+
+  .icon-btn[data-act="add"]:hover:not(:disabled) svg,
+  .btn[data-act="add"]:hover:not(:disabled) svg {
+    transform: rotate(90deg);
+  }
+
+  .btn[data-act] svg {
+    transition: transform var(--dur-travel) var(--ease-settle);
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  /* ---------- invert ---------- */
+
+  /*
+   * The control that turns the trade around, and the one press in the app that
+   * earns a piece of choreography.
+   *
+   * It used to be a 34-pixel square with two arrows in it that shrank 6% when
+   * tapped — the same answer the refresh beside it gave, for an action that
+   * rewrites both halves of the panel. Now the press is the swap: the glyph
+   * turns a half-circle and *stays* turned, counting up so it never rewinds
+   * against the reader; a ring leaves the button; the rule it sits on charges
+   * out to both edges; and the two legs trade places, the one being paid dipping
+   * as the one being received rises. Uniswap taught the rotation, which is the
+   * part every trader already reads. The rest is the panel showing its work.
+   */
+  .flip {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border: 1px solid var(--color-edge);
+    border-radius: var(--radius-xs);
+    background: var(--color-panel);
+    color: var(--color-dim);
+    cursor: pointer;
+    transition:
+      color var(--dur-tap) var(--ease-out),
+      border-color var(--dur-tap) var(--ease-out),
+      background-color var(--dur-tap) var(--ease-out),
+      transform var(--dur-release) var(--ease-settle);
+  }
+
+  .flip:hover {
+    color: var(--color-accent-text);
+    border-color: var(--color-accent-line);
+    background: var(--color-accent-soft);
+  }
+
+  .flip:active {
+    transform: scale(0.9);
+    transition-duration: var(--dur-press);
+  }
+
+  .flip svg {
+    transform: rotate(calc(var(--turn, 0) * 180deg));
+    transition: transform var(--dur-travel) var(--ease-emphasis);
+  }
+
+  .flip::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border: 1px solid var(--color-accent-line);
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0;
+  }
+
+  [data-parity="0"] .flip::before {
+    animation: flip-ring-a 520ms var(--ease-out);
+  }
+
+  [data-parity="1"] .flip::before {
+    animation: flip-ring-b 520ms var(--ease-out);
+  }
+
+  @keyframes flip-ring-a {
+    from {
+      opacity: 0.9;
+      transform: scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: scale(1.75);
+    }
+  }
+
+  @keyframes flip-ring-b {
+    from {
+      opacity: 0.9;
+      transform: scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: scale(1.75);
+    }
+  }
+
+  /* The hairline the button straddles, lit from the middle outwards. */
+  .rule-charge {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 1px;
+    pointer-events: none;
+    opacity: 0;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      var(--color-accent-line) 35%,
+      var(--color-accent-line) 65%,
+      transparent
+    );
+  }
+
+  [data-parity="0"] .rule-charge {
+    animation: charge-a 520ms var(--ease-out);
+  }
+
+  [data-parity="1"] .rule-charge {
+    animation: charge-b 520ms var(--ease-out);
+  }
+
+  @keyframes charge-a {
+    0% {
+      opacity: 0;
+      transform: scaleX(0.05);
+    }
+    30% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+      transform: scaleX(1);
+    }
+  }
+
+  @keyframes charge-b {
+    0% {
+      opacity: 0;
+      transform: scaleX(0.05);
+    }
+    30% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+      transform: scaleX(1);
+    }
+  }
+
+  /*
+   * The legs themselves. They pass each other rather than cross-fade: the leg
+   * being paid goes down and the leg being received comes up, both dimming
+   * through the middle of the move, so the eye follows the exchange instead of
+   * being handed a new panel. Nothing is keyed or remounted — the field keeps
+   * its focus and the quote keeps ticking underneath.
+   */
+  [data-parity="0"] .leg-pay {
+    animation: leg-down-a var(--dur-travel) var(--ease-emphasis);
+  }
+
+  [data-parity="1"] .leg-pay {
+    animation: leg-down-b var(--dur-travel) var(--ease-emphasis);
+  }
+
+  [data-parity="0"] .leg-get {
+    animation: leg-up-a var(--dur-travel) var(--ease-emphasis);
+  }
+
+  [data-parity="1"] .leg-get {
+    animation: leg-up-b var(--dur-travel) var(--ease-emphasis);
+  }
+
+  @keyframes leg-down-a {
+    50% {
+      opacity: 0.4;
+      transform: translateY(9px);
+    }
+  }
+
+  @keyframes leg-down-b {
+    50% {
+      opacity: 0.4;
+      transform: translateY(9px);
+    }
+  }
+
+  @keyframes leg-up-a {
+    50% {
+      opacity: 0.4;
+      transform: translateY(-9px);
+    }
+  }
+
+  @keyframes leg-up-b {
+    50% {
+      opacity: 0.4;
+      transform: translateY(-9px);
+    }
   }
 
   .field {
@@ -457,6 +986,17 @@
     outline: none;
   }
 
+  /*
+   * The leg being spent lights its edge while the amount is being typed into
+   * it. The big field carries no border of its own — it is a figure on the
+   * panel, not a box — so the panel is what has to show that this is the half
+   * of the trade the reader is working in.
+   */
+  .leg-pay:focus-within {
+    border-color: var(--color-accent-line);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent-line) 18%, transparent);
+  }
+
   .field-lg {
     height: 52px;
     font-size: 22px;
@@ -465,9 +1005,16 @@
     padding: 0;
   }
 
+  /*
+   * The big figure takes no ring of its own: the leg around it is already
+   * carrying the focus, and a box inside a lit box is two answers to one
+   * question. The treatment is the same one `.field:focus` uses, moved out to
+   * the edge of the panel where the whole half of the trade lights up.
+   */
   .field-lg:focus {
     border: none;
     box-shadow: none;
+    outline: none;
   }
 
   /*
@@ -488,11 +1035,12 @@
     transition:
       background-color var(--dur-tap) var(--ease-out),
       border-color var(--dur-tap) var(--ease-out),
-      transform var(--dur-press) var(--ease-out);
+      transform var(--dur-release) var(--ease-settle);
   }
 
   .check:active {
-    transform: scale(0.92);
+    transform: scale(0.88);
+    transition-duration: var(--dur-press);
   }
 
   .check::after {
@@ -570,11 +1118,22 @@
     cursor: pointer;
     transition:
       background-color var(--dur-tap) var(--ease-out),
-      color var(--dur-tap) var(--ease-out);
+      color var(--dur-tap) var(--ease-out),
+      transform var(--dur-release) var(--ease-settle);
   }
 
   .seg-item:hover:not([data-active="true"]) {
     color: var(--color-ink);
+  }
+
+  /*
+   * The marker is already travelling to meet the press, so the item itself only
+   * has to acknowledge it — and an option that is already selected answers
+   * nothing at all, because pressing it changes nothing.
+   */
+  .seg-item:active:not(:disabled):not([data-active="true"]) {
+    transform: scale(0.94);
+    transition-duration: var(--dur-press);
   }
 
   .seg-item[data-active="true"] {
@@ -608,7 +1167,7 @@
       color var(--dur-tap) var(--ease-out),
       border-color var(--dur-tap) var(--ease-out),
       background-color var(--dur-tap) var(--ease-out),
-      transform var(--dur-press) var(--ease-out);
+      transform var(--dur-release) var(--ease-settle);
   }
 
   button.chip:hover:not(:disabled) {
@@ -616,8 +1175,11 @@
     border-color: var(--color-edge);
   }
 
+  /* The lightest control in the app, so it takes the deepest press: there is
+     no travel and no shadow to carry the feedback, only the shape itself. */
   button.chip:active:not(:disabled) {
-    transform: scale(0.95);
+    transform: scale(0.93);
+    transition-duration: var(--dur-press);
   }
 
   .chip-live {
@@ -710,7 +1272,7 @@
     cursor: pointer;
     transition:
       background-color var(--dur-tap) var(--ease-out),
-      transform var(--dur-press) var(--ease-out);
+      transform var(--dur-release) var(--ease-settle);
   }
 
   /*
@@ -741,6 +1303,12 @@
 
   .row-link:active {
     transform: scale(0.995);
+    transition-duration: var(--dur-press);
+  }
+
+  /* Pressed, the edge is already fully drawn — there is no hover on a thumb. */
+  .row-link:active::before {
+    transform: scaleY(1);
   }
 
   /* ---------- shell ---------- */
@@ -840,6 +1408,18 @@
   .rail-link[data-active="true"] svg,
   .tab-link[data-active="true"] svg {
     transform: translateY(-1px) scale(1.06);
+  }
+
+  /*
+   * The tab bar is the most-pressed thing in the app on a phone and it was the
+   * one surface answering with nothing at all — the page simply changed. Now
+   * the glyph presses in under the thumb and comes back up on the release
+   * curve, whether or not the tab it belongs to is the one being left.
+   */
+  .rail-link:active svg,
+  .tab-link:active svg {
+    transform: translateY(1px) scale(0.9);
+    transition-duration: var(--dur-press);
   }
 
   .tab-bar {
@@ -1001,7 +1581,7 @@
     transition:
       background-color var(--dur-tap) var(--ease-out),
       border-color var(--dur-tap) var(--ease-out),
-      transform var(--dur-press) var(--ease-out);
+      transform var(--dur-release) var(--ease-settle);
   }
 
   .pill:hover {
@@ -1011,6 +1591,7 @@
 
   .pill:active {
     transform: scale(0.97);
+    transition-duration: var(--dur-press);
   }
 
   /* While Privy's modal is open the control it was opened from stays lit. */
@@ -1033,6 +1614,7 @@
    */
   .tile {
     display: flex;
+    position: relative;
     width: 100%;
     align-items: center;
     gap: 10px;
@@ -1049,7 +1631,7 @@
       background-color var(--dur-tap) var(--ease-out),
       border-color var(--dur-tap) var(--ease-out),
       color var(--dur-tap) var(--ease-out),
-      transform var(--dur-press) var(--ease-out);
+      transform var(--dur-release) var(--ease-settle);
   }
 
   .tile:hover {
@@ -1057,8 +1639,49 @@
     border-color: var(--color-edge);
   }
 
+  /*
+   * A tile is a row, and a row answers the way rows answer everywhere else in
+   * the app: an accent edge draws down its leading side. Pressing it nudges it
+   * along that edge rather than shrinking it, so a column of wallets reads as a
+   * list being worked down rather than a stack of cards being squeezed.
+   */
+  .tile::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 2px;
+    background: var(--color-accent-line);
+    transform: scaleY(0);
+    transform-origin: top;
+    transition: transform var(--dur-tap) var(--ease-out);
+  }
+
+  a.tile:hover::before,
+  button.tile:hover::before,
+  .tile:active::before {
+    transform: scaleY(1);
+  }
+
+  .tile-danger:hover::before,
+  .tile-danger:active::before {
+    background: var(--color-short-line);
+  }
+
   .tile:active {
-    transform: scale(0.99);
+    transform: translateX(2px) scale(0.995);
+    transition-duration: var(--dur-press);
+  }
+
+  /* A tile that has just done its one job — copied an address, say. */
+  .tile[data-done="true"] {
+    border-color: var(--color-accent-line);
+    color: var(--color-accent-text);
+  }
+
+  .tile[data-done="true"]::before {
+    transform: scaleY(1);
   }
 
   .tile[data-active="true"] {
@@ -1109,6 +1732,18 @@
     animation: toast-in var(--dur-enter) var(--ease-emphasis) both;
   }
 
+  /* And leaves the same way it came, rather than being cut from the screen. */
+  .toast[data-leaving="true"] {
+    animation: toast-out var(--dur-tap) var(--ease-out) both;
+  }
+
+  @keyframes toast-out {
+    to {
+      opacity: 0;
+      transform: translateY(6px) scale(0.98);
+    }
+  }
+
   @keyframes toast-in {
     from {
       opacity: 0;
@@ -1150,6 +1785,23 @@
     }
     to {
       opacity: 0;
+    }
+  }
+
+  /*
+   * A glyph that has replaced another one — a copy that became a tick, an
+   * amount that became a confirmation. It lands on the spot the old one left
+   * rather than cutting to it, which is the difference between a state change
+   * the reader sees happen and one they have to notice afterwards.
+   */
+  .pop {
+    animation: pop var(--dur-tap) var(--ease-emphasis);
+  }
+
+  @keyframes pop {
+    from {
+      opacity: 0;
+      transform: scale(0.4);
     }
   }
 

@@ -13,6 +13,7 @@ import {
 import { useSetActiveWallet } from "@privy-io/wagmi";
 import { useAccount, useBalance } from "wagmi";
 import { Icon } from "@/components/ui/Icon";
+import { HoldButton } from "@/components/ui/HoldButton";
 import { Sheet } from "@/components/ui/Sheet";
 import { WalletAvatar } from "@/components/ui/WalletAvatar";
 import { useToast } from "@/components/ui/Toast";
@@ -254,8 +255,24 @@ function AccountSheet({
 
       <div className="px-3 pb-4">
         <div className="grid grid-cols-2 gap-2">
-          <button type="button" className="tile justify-center" onClick={copy}>
-            <Icon name={copied ? "check" : "copy"} size={14} className="text-dim" />
+          {/*
+           * The tile keeps the confirmation rather than handing it to a toast:
+           * the tick lands on the spot the clipboard glyph left, the row lights
+           * its edge, and both drop away on their own. Keying the icon on the
+           * state is what replays the landing on a second copy.
+           */}
+          <button
+            type="button"
+            className="tile justify-center"
+            data-done={copied ? "true" : undefined}
+            onClick={copy}
+          >
+            <Icon
+              key={copied ? "check" : "copy"}
+              name={copied ? "check" : "copy"}
+              size={14}
+              className={`pop ${copied ? "text-accent-text" : "text-dim"}`}
+            />
             {copied ? t("common.copied") : t("common.copy")}
           </button>
           <a
@@ -337,18 +354,23 @@ function AccountSheet({
           </button>
         )}
 
-        <button
-          type="button"
-          className="tile tile-danger mt-2 justify-center"
-          onClick={() => {
+        {/*
+         * Dropping the wallet is held rather than tapped. It is one press away
+         * from an empty app, it sits directly under a list of wallets a reader
+         * is tapping through to switch between them, and it is the one control
+         * in this sheet where the wrong press costs them the session.
+         */}
+        <HoldButton
+          className="btn-short mt-2 w-full"
+          icon="power"
+          label={t("wallet.disconnect")}
+          holdLabel={t("common.holdToConfirm")}
+          onConfirm={() => {
             void logout();
             onClose();
             toast.push({ tone: "info", message: t("wallet.disconnected") });
           }}
-        >
-          <Icon name="power" size={14} />
-          {t("wallet.disconnect")}
-        </button>
+        />
 
 
         {/* The same line Privy prints under its own modal, in the same words. */}

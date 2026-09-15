@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Icon } from "@/components/ui/Icon";
+import { IconButton } from "@/components/ui/IconButton";
 import { Logo } from "@/components/ui/Logo";
 import { Sheet } from "@/components/ui/Sheet";
 import { useInstallPrompt } from "@/hooks/useInstallPrompt";
@@ -34,14 +35,12 @@ export function InstallBanner() {
         <button type="button" className="btn btn-accent btn-sm" onClick={() => setOpen(true)}>
           {t("install.short")}
         </button>
-        <button
-          type="button"
-          className="icon-btn"
+        <IconButton
+          icon="close"
+          act="dismiss"
           onClick={dismiss}
           aria-label={t("common.close")}
-        >
-          <Icon name="close" size={14} />
-        </button>
+        />
       </div>
       <InstallSheet open={open} onClose={() => setOpen(false)} />
     </div>
@@ -90,6 +89,7 @@ function InstallSheet({ open, onClose }: { open: boolean; onClose: () => void })
           <button
             type="button"
             className="btn btn-accent btn-block mt-4"
+            data-run={busy ? "true" : undefined}
             onClick={() => void run()}
             disabled={busy}
           >

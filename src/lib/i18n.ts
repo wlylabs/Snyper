@@ -29,6 +29,8 @@ const en = {
   "common.receipt": "Receipt",
   "common.cancel": "Cancel",
   "common.close": "Close",
+  /* Shown in place of a destructive button's label while it is being held. */
+  "common.holdToConfirm": "Keep holding…",
   "common.refresh": "Refresh",
   "common.ago": "{value} ago",
   "common.none": "None",
@@ -466,6 +468,7 @@ const id: Record<TKey, string> = {
   "common.receipt": "Bukti",
   "common.cancel": "Batal",
   "common.close": "Tutup",
+  "common.holdToConfirm": "Tahan terus…",
   "common.refresh": "Muat ulang",
   "common.ago": "{value} lalu",
   "common.none": "Tidak ada",

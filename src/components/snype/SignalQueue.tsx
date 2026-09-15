@@ -152,6 +152,7 @@ function SignalRow({ signal, actionable }: { signal: Signal; actionable?: boolea
               <button
                 type="button"
                 className="btn btn-accent btn-sm"
+                data-run={busy || signal.status === "executing" ? "true" : undefined}
                 disabled={busy || !address || signal.status === "executing"}
                 onClick={async () => {
                   setBusy(true);

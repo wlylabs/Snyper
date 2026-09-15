@@ -1,7 +1,7 @@
 "use client";
 
 import { useAccount, useChainId } from "wagmi";
-import { Icon } from "@/components/ui/Icon";
+import { IconButton } from "@/components/ui/IconButton";
 import { Empty, Panel } from "@/components/ui/Panel";
 import { useI18n } from "@/hooks/useI18n";
 import { useMounted } from "@/hooks/useMounted";
@@ -35,14 +35,13 @@ export function PositionsPanel() {
         </span>
       }
       action={
-        <button
-          type="button"
-          className="icon-btn"
+        <IconButton
+          icon="refresh"
+          act="spin"
+          busy={isFetching}
           onClick={() => void refetch()}
           aria-label={t("common.refresh")}
-        >
-          <Icon name="refresh" size={14} />
-        </button>
+        />
       }
       bodyClassName="p-0"
     >

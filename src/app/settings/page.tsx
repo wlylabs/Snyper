@@ -382,6 +382,7 @@ function VenuePanel() {
         <button
           type="button"
           className="btn btn-sm"
+          data-busy={isResolving ? "true" : undefined}
           disabled={isResolving}
           onClick={retryVenue}
         >
@@ -440,6 +441,7 @@ function VenuePanel() {
             <button
               type="button"
               className="btn btn-accent btn-sm"
+              data-run={saving ? "true" : undefined}
               disabled={saving}
               onClick={() => void saveManual()}
             >

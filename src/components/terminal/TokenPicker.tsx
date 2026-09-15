@@ -127,6 +127,7 @@ export function TokenPicker({
                 <button
                   type="button"
                   className="btn btn-sm mt-3 w-full"
+                  data-run={importing ? "true" : undefined}
                   onClick={importToken}
                   disabled={importing}
                 >
