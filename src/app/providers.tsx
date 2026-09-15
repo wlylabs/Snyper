@@ -1,11 +1,14 @@
 "use client";
 
+import { PrivyProvider } from "@privy-io/react-auth";
+import { WagmiProvider } from "@privy-io/wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState, type ReactNode } from "react";
-import { WagmiProvider } from "wagmi";
+import { WagmiProvider as BareWagmiProvider } from "wagmi";
 import { config } from "@/lib/wagmi";
+import { PRIVY_APP_ID, PRIVY_CLIENT_ID, PRIVY_CONFIGURED, privyConfig } from "@/lib/privy";
 import { ToastProvider } from "@/components/ui/Toast";
-import { EngineRunner } from "@/components/bots/EngineRunner";
+import { SnypeRunner } from "@/components/snype/SnypeRunner";
 import { VenueSync } from "@/hooks/useVenue";
 import { useAppStore } from "@/store/useAppStore";
 import { setNumberLocale } from "@/lib/format";
@@ -67,6 +70,30 @@ function ServiceWorker() {
   return null;
 }
 
+/**
+ * Privy owns the wallet session, so its provider wraps wagmi rather than the
+ * other way round. Without an app id there is nothing to wrap: the app still
+ * renders and still reads the chain, and the connect control says why nothing
+ * can be connected.
+ */
+function WalletProviders({ children }: { children: ReactNode }) {
+  const theme = useAppStore((state) => state.settings.theme);
+
+  if (!PRIVY_CONFIGURED) {
+    return <BareWagmiProvider config={config}>{children}</BareWagmiProvider>;
+  }
+
+  return (
+    <PrivyProvider
+      appId={PRIVY_APP_ID}
+      {...(PRIVY_CLIENT_ID ? { clientId: PRIVY_CLIENT_ID } : {})}
+      config={privyConfig(theme)}
+    >
+      <WagmiProvider config={config}>{children}</WagmiProvider>
+    </PrivyProvider>
+  );
+}
+
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
     () =>
@@ -82,17 +109,17 @@ export function Providers({ children }: { children: ReactNode }) {
   );
 
   return (
-    <WagmiProvider config={config}>
-      <QueryClientProvider client={queryClient}>
+    <QueryClientProvider client={queryClient}>
+      <WalletProviders>
         <ToastProvider>
           <ThemeSync />
           <LocaleSync />
           <ServiceWorker />
           <VenueSync />
-          <EngineRunner />
+          <SnypeRunner />
           {children}
         </ToastProvider>
-      </QueryClientProvider>
-    </WagmiProvider>
+      </WalletProviders>
+    </QueryClientProvider>
   );
 }

@@ -68,8 +68,8 @@ export default function ActivityPage() {
             : `${trade.tokenIn?.symbol ?? "?"} → ${trade.tokenOut?.symbol ?? "?"}`,
         detail: [
           amount && `${amount} ${trade.tokenIn?.symbol ?? ""}`,
-          trade.botName ??
-            (trade.source === "terminal" ? t("activity.terminal") : t("activity.strategy")),
+          trade.snypeName ??
+            (trade.source === "terminal" ? t("activity.terminal") : t("activity.snype")),
         ]
           .filter(Boolean)
           .join(" · "),
@@ -88,7 +88,7 @@ export default function ActivityPage() {
         from: signal.tokenIn.symbol,
         to: signal.tokenOut.symbol,
       }),
-      detail: `${signal.botName} · ${r(signal.reason)}`,
+      detail: `${signal.snypeName} · ${r(signal.reason)}`,
       status: signal.status,
       tone:
         signal.status === "confirmed"

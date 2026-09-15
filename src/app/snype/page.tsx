@@ -1,0 +1,96 @@
+"use client";
+
+import { useState } from "react";
+import { PositionsPanel } from "@/components/snype/PositionsPanel";
+import { SignalQueue } from "@/components/snype/SignalQueue";
+import { SnypeCard } from "@/components/snype/SnypeCard";
+import { SnypeComposer } from "@/components/snype/SnypeComposer";
+import { Icon } from "@/components/ui/Icon";
+import { Empty, Panel } from "@/components/ui/Panel";
+import { useMounted } from "@/hooks/useMounted";
+import { useI18n } from "@/hooks/useI18n";
+import { useAppStore } from "@/store/useAppStore";
+
+export default function SnypePage() {
+  const mounted = useMounted();
+  const { t } = useI18n();
+  const snypes = useAppStore((state) => state.snypes);
+  const settings = useAppStore((state) => state.settings);
+  const setSettings = useAppStore((state) => state.setSettings);
+  const [composerOpen, setComposerOpen] = useState(false);
+
+  const live = snypes.filter((snype) => !snype.runtime.completed).length;
+
+  const summary = !mounted
+    ? t("common.loadingLocal")
+    : t("snype.summary", { total: snypes.length, live });
+
+  return (
+    <div className="grid gap-3 lg:grid-cols-12">
+      <div className="min-w-0 lg:col-span-7 xl:col-span-8">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <h1 className="text-[15px] font-bold tracking-[0.12em] uppercase">
+              {t("snype.title")}
+            </h1>
+            <p className="mt-0.5 text-[11px] text-faint">{summary}</p>
+          </div>
+          <button
+            type="button"
+            className="btn btn-accent btn-sm"
+            onClick={() => setComposerOpen(true)}
+          >
+            <Icon name="plus" size={13} />
+            {t("snype.new")}
+          </button>
+        </div>
+
+        {mounted && snypes.length === 0 ? (
+          <Panel bodyClassName="p-0">
+            <Empty
+              title={t("snype.emptyTitle")}
+              hint={t("snype.emptyHint")}
+              action={
+                <button
+                  type="button"
+                  className="btn btn-sm mt-1"
+                  onClick={() => setComposerOpen(true)}
+                >
+                  {t("snype.emptyAction")}
+                </button>
+              }
+            />
+          </Panel>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {mounted && snypes.map((snype) => <SnypeCard key={snype.id} snype={snype} />)}
+          </div>
+        )}
+      </div>
+
+      <div className="flex min-w-0 flex-col gap-3 lg:col-span-5 xl:col-span-4">
+        <Panel label={t("snype.dispatchMode")} bodyClassName="p-3">
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              className="check mt-0.5"
+              checked={settings.autoDispatch}
+              onChange={(event) => setSettings({ autoDispatch: event.target.checked })}
+            />
+            <span>
+              <span className="block text-[12px] font-semibold">{t("snype.autoLabel")}</span>
+              <span className="mt-1 block text-[11px] leading-relaxed text-faint">
+                {t("snype.autoHint", { count: live })}
+              </span>
+            </span>
+          </label>
+        </Panel>
+
+        <PositionsPanel />
+        <SignalQueue />
+      </div>
+
+      <SnypeComposer open={composerOpen} onClose={() => setComposerOpen(false)} />
+    </div>
+  );
+}

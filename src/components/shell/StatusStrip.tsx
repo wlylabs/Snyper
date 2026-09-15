@@ -17,22 +17,22 @@ export function StatusStrip() {
     query: { enabled: mounted && isConnected && Boolean(meta) },
   });
 
-  const bots = useAppStore((state) => state.bots);
+  const snypes = useAppStore((state) => state.snypes);
   const signals = useAppStore((state) => state.signals);
   const series = useAppStore((state) => state.series);
 
-  const armed = bots.filter((bot) => bot.status === "armed").length;
+  const armed = snypes.filter((snype) => snype.status === "armed").length;
   const open = signals.filter((s) => s.status === "pending" || s.status === "executing").length;
 
-  const feeds = bots.slice(0, 6).map((bot) => {
-    const key = `${bot.chainId}:${bot.base.address.toLowerCase()}:${bot.quote.address.toLowerCase()}`;
+  const feeds = snypes.slice(0, 6).map((snype) => {
+    const key = `${snype.chainId}:${snype.base.address.toLowerCase()}:${snype.quote.address.toLowerCase()}`;
     const points = series[key] ?? [];
     const last = points[points.length - 1];
     const first = points[0];
     const change = last && first && first.p > 0 ? last.p / first.p - 1 : undefined;
     return {
-      id: bot.id,
-      pair: `${bot.base.symbol}/${bot.quote.symbol}`,
+      id: snype.id,
+      pair: `${snype.base.symbol}/${snype.quote.symbol}`,
       price: last?.p,
       at: last?.t,
       change,

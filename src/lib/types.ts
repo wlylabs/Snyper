@@ -2,21 +2,11 @@ import type { DisplayCurrency } from "./currency";
 import type { Locale, TKey, TVars } from "./i18n";
 import type { Token } from "./tokens";
 
-export type StrategyKind =
-  | "dca"
-  | "grid"
-  | "limit"
-  | "trail"
-  | "order"
-  | "snipe"
-  | "protect";
-
 /**
- * Lifecycle of a staged strategy — a one-shot order or a snipe. The entry stage
- * is the only one that can time out: once the position exists, its protection
- * runs until it is closed.
+ * Lifecycle of a snype. The entry stage is the only one that can time out:
+ * once the position exists, its protection runs until it is closed.
  */
-export type OrderStage =
+export type SnypeStage =
   | "waiting"
   | "entering"
   | "holding"
@@ -25,7 +15,7 @@ export type OrderStage =
   | "expired"
   | "cancelled";
 
-export type OrderLeg = "entry" | "tp" | "cl" | "manual";
+export type SnypeLeg = "entry" | "tp" | "cl" | "manual";
 
 /**
  * A message stored as a dictionary key so it renders in the reader's language
@@ -34,132 +24,49 @@ export type OrderLeg = "entry" | "tp" | "cl" | "manual";
  */
 export type Reason = { key: TKey; vars?: TVars };
 
-export type Strategy =
-  | {
-      kind: "dca";
-      /** Minutes between scheduled buys. */
-      intervalMin: number;
-      /** Quote currency spent per buy. */
-      amountQuote: number;
-      /** Skip a leg when price trades above this ceiling. 0 disables. */
-      priceCeiling: number;
-      /** Stop after this much quote has been deployed. 0 disables. */
-      budgetQuote: number;
-    }
-  | {
-      kind: "grid";
-      lower: number;
-      upper: number;
-      levels: number;
-      /** Quote currency committed at each level. */
-      amountQuote: number;
-    }
-  | {
-      kind: "limit";
-      side: "buy" | "sell";
-      trigger: number;
-      /** Quote amount for a buy, base amount for a sell. */
-      amount: number;
-    }
-  | {
-      kind: "order";
-      /** Quote currency spent once the entry fills. */
-      amountQuote: number;
-      /** The order buys at or below this price. */
-      entryPrice: number;
-      /** Take profit, percent above the price the entry actually filled at. */
-      takeProfitPct: number;
-      /** Cut loss, percent below the price the entry actually filled at. */
-      cutLossPct: number;
-      /** The entry stage gives up here. Exits are never time limited. */
-      expiresAt: number;
-    }
-  | {
-      kind: "snipe";
-      /** Quote currency committed the moment the pool becomes tradable. */
-      amountQuote: number;
-      /** Pool depth, in quote units, the entry refuses to trade under. */
-      minLiquidityQuote: number;
-      /** Ceiling on the entry's own price impact, in basis points. */
-      maxImpactBps: number;
-      /** Refuse to buy above this price. 0 disables. */
-      maxEntryPrice: number;
-      /** Take profit above the fill price. 0 leaves the fill unmanaged. */
-      takeProfitPct: number;
-      /** Cut loss below the fill price. 0 leaves the fill unmanaged. */
-      cutLossPct: number;
-      /** The watch gives up here. Exits are never time limited. */
-      expiresAt: number;
-    }
-  | {
-      kind: "protect";
-      /** Share of the wallet's holding sold when a target hits. 1 = all of it. */
-      sellFraction: number;
-      /** Sell this far above the reference price. 0 disables. */
-      takeProfitPct: number;
-      /** Sell this far below the reference price. 0 disables. */
-      cutLossPct: number;
-      /** Price both targets hang off. 0 reads the first price the watch sees. */
-      referencePrice: number;
-    }
-  | {
-      kind: "trail";
-      /** Distance below the running peak that closes the position. */
-      trailPercent: number;
-      /** Base amount sold when the stop fires. */
-      amountBase: number;
-      /** Optional floor that must be reclaimed before the stop arms. */
-      activation: number;
-    };
+/** The numbers a snype is armed with. They never change once it is confirmed. */
+export type SnypePlan = {
+  /** Quote currency spent once the entry fills. */
+  amountQuote: number;
+  /** The snype buys at or below this price. */
+  entryPrice: number;
+  /** Take profit, percent above the price the entry actually filled at. */
+  takeProfitPct: number;
+  /** Cut loss, percent below the price the entry actually filled at. */
+  cutLossPct: number;
+  /** The entry stage gives up here. Exits are never time limited. */
+  expiresAt: number;
+};
 
-export type BotRuntime = {
+export type SnypeRuntime = {
   lastTickAt?: number;
   lastFireAt?: number;
   lastPrice?: number;
-  peak?: number;
-  activated?: boolean;
-  filledLevels: number[];
-  spentDate?: string;
-  spentQuote: number;
-  deployedQuote: number;
   fills: number;
   completed?: boolean;
   error?: string;
-  /** Order lifecycle. Undefined for every other strategy. */
-  stage?: OrderStage;
+  stage?: SnypeStage;
   /** Price the entry actually filled at, which is what TP and CL hang off. */
   fillPrice?: number;
   /** Base units of the asset actually received, held as a string. */
   positionBase?: string;
-  exitReason?: Exclude<OrderLeg, "entry">;
-  /** Base units the wallet holds, re-read each tick for a protect watch. */
-  heldBase?: string;
-  /** Price a protect watch measures its targets against, fixed on arming. */
-  refPrice?: number;
-  /**
-   * What the watch is waiting on, as opposed to something that went wrong. A
-   * snipe with no pool yet is working exactly as intended.
-   */
-  note?: string;
+  exitReason?: Exclude<SnypeLeg, "entry">;
 };
 
-export type Bot = {
+export type Snype = {
   id: string;
   name: string;
   chainId: number;
-  /** Asset the strategy accumulates or unwinds. */
+  /** Asset the snype accumulates. */
   base: Token;
-  /** Funding asset the strategy prices against. */
+  /** Funding asset the snype prices against. */
   quote: Token;
-  strategy: Strategy;
+  plan: SnypePlan;
   slippageBps: number;
   cooldownSec: number;
-  /** Maximum quote spend per rolling day. 0 disables. */
-  dailyCapQuote: number;
-  execution: "manual" | "auto";
   status: "idle" | "armed";
   createdAt: number;
-  runtime: BotRuntime;
+  runtime: SnypeRuntime;
 };
 
 export type SignalStatus =
@@ -172,8 +79,8 @@ export type SignalStatus =
 
 export type Signal = {
   id: string;
-  botId: string;
-  botName: string;
+  snypeId: string;
+  snypeName: string;
   chainId: number;
   createdAt: number;
   side: "buy" | "sell";
@@ -186,10 +93,8 @@ export type Signal = {
   status: SignalStatus;
   hash?: `0x${string}`;
   error?: string;
-  /** Grid level this signal belongs to, when applicable. */
-  level?: number;
-  /** Which leg of an order this signal settles, when applicable. */
-  leg?: OrderLeg;
+  /** Which leg of the snype this signal settles. */
+  leg?: SnypeLeg;
 };
 
 export type TradeKind = "swap" | "approval";
@@ -201,12 +106,12 @@ export type Trade = {
   createdAt: number;
   hash: `0x${string}`;
   status: "submitted" | "confirmed" | "failed";
-  source: "terminal" | "bot";
+  source: "terminal" | "snype";
   tokenIn?: Token;
   tokenOut?: Token;
   amountIn?: string;
   amountOut?: string;
-  botName?: string;
+  snypeName?: string;
 };
 
 export type PricePoint = { t: number; p: number };
@@ -222,10 +127,6 @@ export type Settings = {
   theme: "dark" | "light";
   /** Auto execution still needs a wallet signature; this gates dispatch. */
   autoDispatch: boolean;
-  /** One-tap buy sizes offered when the funding asset is the native coin. */
-  presetsNative: number[];
-  /** One-tap buy sizes offered when the funding asset is the chain's stable. */
-  presetsStable: number[];
   /** Tip added on top of the base fee, in gwei. 0 leaves it to the wallet. */
   priorityFeeGwei: number;
   /** Swaps above this much price impact are refused outright. 0 disables. */

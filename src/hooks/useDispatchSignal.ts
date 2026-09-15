@@ -5,10 +5,9 @@ import { useAccount, useConfig } from "wagmi";
 import { getPublicClient, readContract } from "wagmi/actions";
 import { erc20Abi } from "@/lib/abi";
 import { quoteExactIn } from "@/lib/quote";
-import { hasExitTargets, isStaged } from "@/lib/strategies";
 import type { Token } from "@/lib/tokens";
 import type { Signal } from "@/lib/types";
-import { todayKey, useAppStore } from "@/store/useAppStore";
+import { useAppStore } from "@/store/useAppStore";
 import { readableError, useExecutor } from "./useExecutor";
 import { useI18n } from "./useI18n";
 
@@ -37,8 +36,8 @@ async function heldBalance(
 }
 
 /**
- * Turns a strategy signal into a wallet transaction and folds the result back
- * into the bot's runtime. Shared by the headless engine and the manual queue.
+ * Turns a snype signal into a wallet transaction and folds the result back into
+ * the snype's runtime. Shared by the headless runner and the manual queue.
  */
 export function useDispatchSignal() {
   const config = useConfig();
@@ -49,14 +48,13 @@ export function useDispatchSignal() {
   return useCallback(
     async (signal: Signal) => {
       const store = useAppStore.getState();
-      const bot = store.bots.find((item) => item.id === signal.botId);
-      if (!bot) return;
+      const snype = store.snypes.find((item) => item.id === signal.snypeId);
+      if (!snype) return;
 
       const client = getPublicClient(config, { chainId: signal.chainId });
       if (!client) return;
 
-      const staged = isStaged(bot.strategy);
-      const closingPosition = staged && signal.side === "sell";
+      const closingPosition = signal.side === "sell";
       let amountIn = BigInt(signal.amountIn);
 
       // A full exit sells what the wallet is holding right now, not what the
@@ -67,14 +65,14 @@ export function useDispatchSignal() {
         if (held !== undefined && held < amountIn) {
           if (held <= 0n) {
             store.updateSignal(signal.id, { status: "cancelled" });
-            useAppStore.getState().patchRuntime(bot.id, {
+            useAppStore.getState().patchRuntime(snype.id, {
               stage: "done",
               exitReason: "manual",
               positionBase: "0",
               completed: true,
               error: t("error.positionGone"),
             });
-            useAppStore.getState().setBotStatus(bot.id, "idle");
+            useAppStore.getState().setSnypeStatus(snype.id, "idle");
             return;
           }
           amountIn = held;
@@ -83,9 +81,7 @@ export function useDispatchSignal() {
       }
 
       store.updateSignal(signal.id, { status: "executing", error: undefined });
-      if (staged) {
-        store.patchRuntime(bot.id, { stage: closingPosition ? "exiting" : "entering" });
-      }
+      store.patchRuntime(snype.id, { stage: closingPosition ? "exiting" : "entering" });
 
       try {
         const quote = await quoteExactIn(client, signal.tokenIn, signal.tokenOut, amountIn);
@@ -93,20 +89,19 @@ export function useDispatchSignal() {
 
         // Read before the swap so the delta afterwards is the real fill, taxes
         // and price impact included.
-        const balanceBefore =
-          staged && !closingPosition
-            ? await heldBalance(config, signal.tokenOut, address)
-            : undefined;
+        const balanceBefore = closingPosition
+          ? undefined
+          : await heldBalance(config, signal.tokenOut, address);
 
         const hash = await execute({
           tokenIn: signal.tokenIn,
           tokenOut: signal.tokenOut,
           amountIn,
           quote,
-          slippageBps: bot.slippageBps,
+          slippageBps: snype.slippageBps,
           deadlineMinutes: store.settings.deadlineMinutes,
-          source: "bot",
-          botName: bot.name,
+          source: "snype",
+          snypeName: snype.name,
         });
 
         // A bonding-curve buy that clears the last of the sellable supply is
@@ -114,39 +109,15 @@ export function useDispatchSignal() {
         // derived from it — is what the venue actually took, not what was sent.
         const spent = amountIn - (quote.refund ?? 0n);
         const sizeIn = Number(spent) / 10 ** signal.tokenIn.decimals;
-        const notional = signal.side === "buy" ? sizeIn : sizeIn * signal.price;
-        const today = todayKey();
-        const current = useAppStore.getState().bots.find((item) => item.id === bot.id) ?? bot;
-        const previousSpend = current.runtime.spentDate === today ? current.runtime.spentQuote : 0;
+        const current = useAppStore.getState().snypes.find((item) => item.id === snype.id) ?? snype;
 
-        const filled = new Set(current.runtime.filledLevels);
-        if (signal.level !== undefined) {
-          if (signal.side === "buy") filled.add(signal.level);
-          else filled.delete(signal.level);
-        }
-
-        const oneShot =
-          current.strategy.kind === "limit" ||
-          current.strategy.kind === "trail" ||
-          // A protect watch guards a bag once. What it leaves behind is the
-          // wallet's to manage, or to put under a fresh watch.
-          current.strategy.kind === "protect";
-
-        useAppStore.getState().patchRuntime(bot.id, {
+        useAppStore.getState().patchRuntime(snype.id, {
           lastFireAt: Date.now(),
           fills: current.runtime.fills + 1,
-          spentDate: today,
-          spentQuote: previousSpend + notional,
-          deployedQuote:
-            signal.side === "buy"
-              ? current.runtime.deployedQuote + notional
-              : current.runtime.deployedQuote,
-          filledLevels: [...filled],
-          completed: oneShot ? true : current.runtime.completed,
           error: undefined,
         });
 
-        if (staged && !closingPosition && isStaged(current.strategy)) {
+        if (!closingPosition) {
           const balanceAfter = await heldBalance(config, signal.tokenOut, address);
           const received =
             balanceBefore !== undefined &&
@@ -155,43 +126,33 @@ export function useDispatchSignal() {
               ? balanceAfter - balanceBefore
               : quote.amountOut;
           const receivedSize = Number(received) / 10 ** signal.tokenOut.decimals;
-          // A snipe may carry no targets at all, in which case the fill is
-          // simply handed to the wallet rather than watched from here.
-          const guarded = hasExitTargets(current.strategy);
 
           // Take profit and cut loss hang off what was actually paid, so a leg
           // that slipped moves both targets with it.
-          useAppStore.getState().patchRuntime(bot.id, {
-            stage: guarded ? "holding" : "done",
+          useAppStore.getState().patchRuntime(snype.id, {
+            stage: "holding",
             fillPrice: receivedSize > 0 ? sizeIn / receivedSize : signal.price,
             positionBase: received.toString(),
-            completed: guarded ? current.runtime.completed : true,
           });
-          if (!guarded) useAppStore.getState().setBotStatus(bot.id, "idle");
-        }
-
-        if (closingPosition) {
-          useAppStore.getState().patchRuntime(bot.id, {
+        } else {
+          useAppStore.getState().patchRuntime(snype.id, {
             stage: "done",
             exitReason: signal.leg === "tp" || signal.leg === "cl" ? signal.leg : "manual",
             positionBase: "0",
             completed: true,
           });
-          useAppStore.getState().setBotStatus(bot.id, "idle");
+          useAppStore.getState().setSnypeStatus(snype.id, "idle");
         }
 
-        if (oneShot) useAppStore.getState().setBotStatus(bot.id, "idle");
         useAppStore.getState().updateSignal(signal.id, { status: "confirmed", hash });
       } catch (error) {
         const message = readableError(error, t);
         useAppStore.getState().updateSignal(signal.id, { status: "failed", error: message });
-        useAppStore.getState().patchRuntime(bot.id, {
+        useAppStore.getState().patchRuntime(snype.id, {
           error: message,
           // Hand the entry back to the stage it came from so the next tick can
           // try again — a failed exit especially must not leave it stranded.
-          ...(staged
-            ? { stage: closingPosition ? ("holding" as const) : ("waiting" as const) }
-            : {}),
+          stage: closingPosition ? "holding" : "waiting",
         });
       }
     },

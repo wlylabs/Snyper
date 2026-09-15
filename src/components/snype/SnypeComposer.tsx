@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useAccount, useChainId } from "wagmi";
-import { Field, PairButton } from "@/components/bots/fields";
+import { Field, PairButton } from "@/components/snype/fields";
 import { TokenPicker } from "@/components/terminal/TokenPicker";
 import { Icon } from "@/components/ui/Icon";
 import { Sheet } from "@/components/ui/Sheet";
@@ -13,9 +13,9 @@ import { useTokenList } from "@/hooks/useTokenList";
 import { chainMeta } from "@/lib/chains";
 import { formatMoney } from "@/lib/currency";
 import { formatAmount, formatPrice } from "@/lib/format";
-import { ORDER_TTL_MS } from "@/lib/strategies";
+import { SNYPE_DEFAULTS, SNYPE_TTL_MS } from "@/lib/snype";
 import { nativeToken, stableToken, type Token } from "@/lib/tokens";
-import type { Bot, Strategy } from "@/lib/types";
+import type { Snype } from "@/lib/types";
 import { emptyRuntime, useAppStore } from "@/store/useAppStore";
 
 /** Entry shortcuts, as a discount to the price on screen right now. */
@@ -40,14 +40,14 @@ function num(value: string, fallback = 0): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-export function OrderComposer({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function SnypeComposer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { t, locale } = useI18n();
   const activeChainId = useChainId();
   const { chainId: accountChainId } = useAccount();
   const chainId = accountChainId ?? activeChainId;
   const meta = chainMeta(chainId);
   const { tokens, listed } = useTokenList(chainId);
-  const addBot = useAppStore((state) => state.addBot);
+  const addSnype = useAppStore((state) => state.addSnype);
   const customTokens = useAppStore((state) => state.customTokens);
   const venueKey = useAppStore((state) => state.venueKey);
   const settings = useAppStore((state) => state.settings);
@@ -104,7 +104,7 @@ export function OrderComposer({ open, onClose }: { open: boolean; onClose: () =>
   const offsetLabel = useMemo(() => {
     if (!price || entryPrice <= 0) return undefined;
     const delta = (entryPrice / price - 1) * 100;
-    return t("order.entryOffset", {
+    return t("snype.entryOffset", {
       percent: `${delta > 0 ? "+" : ""}${delta.toFixed(1)}%`,
     });
   }, [entryPrice, price, t]);
@@ -121,14 +121,14 @@ export function OrderComposer({ open, onClose }: { open: boolean; onClose: () =>
   }, [amountQuote, cutLossPct, entryPrice, takeProfitPct]);
 
   const validate = (): string | undefined => {
-    if (!base || !quote) return t("composer.errPair");
+    if (!base || !quote) return t("snype.errPair");
     if (base.address.toLowerCase() === quote.address.toLowerCase())
-      return t("composer.errSame");
-    if (amountQuote <= 0) return t("order.errAmount");
-    if (entryPrice <= 0) return t("order.errEntry");
-    if (price !== undefined && entryPrice > price) return t("order.errEntryAbove");
-    if (takeProfitPct <= 0) return t("order.errTakeProfit");
-    if (cutLossPct <= 0 || cutLossPct >= 100) return t("order.errCutLoss");
+      return t("snype.errSame");
+    if (amountQuote <= 0) return t("snype.errAmount");
+    if (entryPrice <= 0) return t("snype.errEntry");
+    if (price !== undefined && entryPrice > price) return t("snype.errEntryAbove");
+    if (takeProfitPct <= 0) return t("snype.errTakeProfit");
+    if (cutLossPct <= 0 || cutLossPct >= 100) return t("snype.errCutLoss");
     return undefined;
   };
 
@@ -152,37 +152,32 @@ export function OrderComposer({ open, onClose }: { open: boolean; onClose: () =>
     if (!base || !quote || !chainId) return;
 
     const now = Date.now();
-    const strategy: Strategy = {
-      kind: "order",
-      amountQuote,
-      entryPrice,
-      takeProfitPct,
-      cutLossPct,
-      expiresAt: now + ORDER_TTL_MS,
-    };
-
-    const bot: Bot = {
+    const snype: Snype = {
       id: `${now.toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
-      name: `${base.symbol} ${t("order.title")}`,
+      name: `${base.symbol} ${t("snype.one")}`,
       chainId,
       base,
       quote,
-      strategy,
-      slippageBps: 100,
-      cooldownSec: 30,
-      dailyCapQuote: 0,
-      execution: "auto",
-      // An order is armed by confirming it; there is no second switch to find.
+      plan: {
+        amountQuote,
+        entryPrice,
+        takeProfitPct,
+        cutLossPct,
+        expiresAt: now + SNYPE_TTL_MS,
+      },
+      slippageBps: SNYPE_DEFAULTS.slippageBps,
+      cooldownSec: SNYPE_DEFAULTS.cooldownSec,
+      // A snype is armed by confirming it; there is no second switch to find.
       status: "armed",
       createdAt: now,
       runtime: { ...emptyRuntime(), stage: "waiting" },
     };
 
-    addBot(bot);
+    addSnype(snype);
     onClose();
   };
 
-  const expiryDate = new Date(Date.now() + ORDER_TTL_MS).toLocaleDateString(
+  const expiryDate = new Date(Date.now() + SNYPE_TTL_MS).toLocaleDateString(
     locale === "id" ? "id-ID" : "en-US",
     { day: "numeric", month: "short" },
   );
@@ -190,7 +185,7 @@ export function OrderComposer({ open, onClose }: { open: boolean; onClose: () =>
   return (
     <Sheet
       open={open}
-      title={step === "setup" ? t("order.new") : t("order.confirmTitle")}
+      title={step === "setup" ? t("snype.new") : t("snype.confirmTitle")}
       onClose={onClose}
       footer={
         step === "setup" ? (
@@ -199,7 +194,7 @@ export function OrderComposer({ open, onClose }: { open: boolean; onClose: () =>
               {t("common.cancel")}
             </button>
             <button type="button" className="btn btn-accent btn-sm flex-1" onClick={review}>
-              {t("order.review")}
+              {t("snype.review")}
             </button>
           </div>
         ) : (
@@ -209,10 +204,10 @@ export function OrderComposer({ open, onClose }: { open: boolean; onClose: () =>
               className="btn btn-sm flex-1"
               onClick={() => setStep("setup")}
             >
-              {t("order.edit")}
+              {t("snype.edit")}
             </button>
             <button type="button" className="btn btn-accent btn-sm flex-1" onClick={arm}>
-              {t("order.confirm")}
+              {t("snype.confirm")}
             </button>
           </div>
         )
@@ -222,7 +217,7 @@ export function OrderComposer({ open, onClose }: { open: boolean; onClose: () =>
         <div className="flex flex-col gap-4 p-3">
           <section>
             <p className="lbl mb-2">
-              {t("composer.pairOn", { chain: meta?.label ?? t("common.network") })}
+              {t("snype.pairOn", { chain: meta?.label ?? t("common.network") })}
             </p>
             <div className="grid grid-cols-2 gap-2">
               <PairButton
@@ -239,18 +234,18 @@ export function OrderComposer({ open, onClose }: { open: boolean; onClose: () =>
               />
             </div>
             <div className="mt-2 flex items-center justify-between border border-line bg-base px-3 py-2">
-              <span className="lbl">{t("composer.poolMid")}</span>
+              <span className="lbl">{t("snype.poolMid")}</span>
               <span className="num text-[13px]">
                 {price !== undefined
                   ? `${formatPrice(price)} ${quote?.symbol ?? ""}`
-                  : t("composer.reading")}
+                  : t("snype.reading")}
               </span>
             </div>
           </section>
 
           <section className="flex flex-col gap-3">
             <Field
-              label={t("order.spend", { symbol: quote?.symbol ?? "" })}
+              label={t("snype.spend", { symbol: quote?.symbol ?? "" })}
               value={draft.amountQuote}
               onChange={(value) => patch("amountQuote", value)}
               hint={amountQuote > 0 ? money(amountQuote) : undefined}
@@ -258,7 +253,7 @@ export function OrderComposer({ open, onClose }: { open: boolean; onClose: () =>
 
             <div>
               <Field
-                label={t("order.entry", { symbol: quote?.symbol ?? "" })}
+                label={t("snype.entry", { symbol: quote?.symbol ?? "" })}
                 value={draft.entryPrice}
                 onChange={(value) => patch("entryPrice", value)}
                 hint={offsetLabel}
@@ -272,7 +267,10 @@ export function OrderComposer({ open, onClose }: { open: boolean; onClose: () =>
                     disabled={price === undefined}
                     onClick={() =>
                       price !== undefined &&
-                      patch("entryPrice", String(Number((price * (1 - offset / 100)).toPrecision(8))))
+                      patch(
+                        "entryPrice",
+                        String(Number((price * (1 - offset / 100)).toPrecision(8))),
+                      )
                     }
                   >
                     −{offset}%
@@ -282,22 +280,22 @@ export function OrderComposer({ open, onClose }: { open: boolean; onClose: () =>
             </div>
 
             <Field
-              label={t("order.takeProfit")}
+              label={t("snype.takeProfit")}
               value={draft.takeProfitPct}
               onChange={(value) => patch("takeProfitPct", value)}
               hint={
                 projection
-                  ? t("order.exitAt", { price: formatPrice(projection.takeProfitPrice) })
+                  ? t("snype.exitAt", { price: formatPrice(projection.takeProfitPrice) })
                   : undefined
               }
             />
             <Field
-              label={t("order.cutLoss")}
+              label={t("snype.cutLoss")}
               value={draft.cutLossPct}
               onChange={(value) => patch("cutLossPct", value)}
               hint={
                 projection
-                  ? t("order.exitAt", { price: formatPrice(projection.cutLossPrice) })
+                  ? t("snype.exitAt", { price: formatPrice(projection.cutLossPrice) })
                   : undefined
               }
             />
@@ -311,30 +309,30 @@ export function OrderComposer({ open, onClose }: { open: boolean; onClose: () =>
             <span className="text-[13px] font-semibold">
               {base?.symbol} / {quote?.symbol}
             </span>
-            <span className="lbl">{t("order.once")}</span>
+            <span className="lbl">{t("snype.once")}</span>
           </div>
 
           <div className="panel p-3">
             <Line
-              k={t("order.buyLabel")}
-              v={t("order.buyLine", {
+              k={t("snype.buyLabel")}
+              v={t("snype.buyLine", {
                 amount: amountQuote,
                 quote: quote?.symbol ?? "",
                 size: projection ? formatAmount(projection.size) : "—",
                 base: base?.symbol ?? "",
               })}
             />
-            <Line k={t("order.atPrice")} v={formatPrice(entryPrice)} />
+            <Line k={t("snype.atPrice")} v={formatPrice(entryPrice)} />
             <div className="my-2 h-px bg-line" />
             <Line
-              k={t("order.ifTakeProfit")}
+              k={t("snype.ifTakeProfit")}
               v={`+${formatAmount(projection?.profit ?? 0)} ${quote?.symbol ?? ""}${
                 money(projection?.profit ?? 0) ? ` · ${money(projection?.profit ?? 0)}` : ""
               }`}
               tone="long"
             />
             <Line
-              k={t("order.ifCutLoss")}
+              k={t("snype.ifCutLoss")}
               v={`−${formatAmount(projection?.loss ?? 0)} ${quote?.symbol ?? ""}${
                 money(projection?.loss ?? 0) ? ` · ${money(projection?.loss ?? 0)}` : ""
               }`}
@@ -343,19 +341,19 @@ export function OrderComposer({ open, onClose }: { open: boolean; onClose: () =>
           </div>
 
           <p className="text-[11px] leading-relaxed text-faint">
-            {t("order.terms", {
-              slippage: "1%",
+            {t("snype.terms", {
+              slippage: `${SNYPE_DEFAULTS.slippageBps / 100}%`,
               loss: formatAmount(projection?.loss ?? 0),
               symbol: quote?.symbol ?? "",
             })}
           </p>
           <p className="flex items-start gap-2 text-[11px] leading-relaxed text-warn">
             <Icon name="alert" size={13} className="mt-0.5 shrink-0" />
-            {t("order.expiryNote", { date: expiryDate, price: formatPrice(entryPrice) })}
+            {t("snype.expiryNote", { date: expiryDate, price: formatPrice(entryPrice) })}
           </p>
           <p className="flex items-start gap-2 text-[11px] leading-relaxed text-faint">
             <Icon name="alert" size={13} className="mt-0.5 shrink-0" />
-            {t("composer.autoNote")}
+            {t("snype.autoNote")}
           </p>
 
           {error && <p className="text-[11px] short">{error}</p>}

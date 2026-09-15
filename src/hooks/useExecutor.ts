@@ -22,8 +22,8 @@ export type ExecuteArgs = {
   quote: Quote;
   slippageBps: number;
   deadlineMinutes: number;
-  source: "terminal" | "bot";
-  botName?: string;
+  source: "terminal" | "snype";
+  snypeName?: string;
 };
 
 export type ExecutePhase = "idle" | "approving" | "signing" | "pending";
@@ -139,7 +139,7 @@ export function useExecutor() {
             source: args.source,
             tokenIn,
             amountIn: amountIn.toString(),
-            botName: args.botName,
+            snypeName: args.snypeName,
           });
           toast.push({
             tone: "info",
@@ -182,7 +182,7 @@ export function useExecutor() {
         tokenOut,
         amountIn: amountIn.toString(),
         amountOut: quote.amountOut.toString(),
-        botName: args.botName,
+        snypeName: args.snypeName,
       });
       toast.push({
         tone: "info",

@@ -104,7 +104,7 @@ function SignalRow({ signal, actionable }: { signal: Signal; actionable?: boolea
             <span className="num text-dim">{signal.tokenOut.symbol}</span>
           </p>
           <p className="mt-1 truncate text-[11px] text-faint">
-            {signal.botName} · {r(signal.reason)}
+            {signal.snypeName} · {r(signal.reason)}
           </p>
         </div>
         <div className="shrink-0 text-right">

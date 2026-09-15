@@ -6,76 +6,75 @@ import { Icon } from "@/components/ui/Icon";
 import { useI18n } from "@/hooks/useI18n";
 import { chainMeta } from "@/lib/chains";
 import { formatAmount, formatDuration, formatPrice, formatSigned } from "@/lib/format";
-import { orderPosition, orderTargets } from "@/lib/strategies";
-import type { Bot, OrderStage } from "@/lib/types";
+import { describeSnype, exitTargets, position } from "@/lib/snype";
+import type { Snype, SnypeStage } from "@/lib/types";
 import { useAppStore } from "@/store/useAppStore";
 import type { TKey } from "@/lib/i18n";
 
-const STAGE_LABEL: Record<OrderStage, TKey> = {
-  waiting: "order.stage.waiting",
-  entering: "order.stage.entering",
-  holding: "order.stage.holding",
-  exiting: "order.stage.exiting",
-  done: "order.stage.done",
-  expired: "order.stage.expired",
-  cancelled: "order.stage.cancelled",
+const STAGE_LABEL: Record<SnypeStage, TKey> = {
+  waiting: "snype.stage.waiting",
+  entering: "snype.stage.entering",
+  holding: "snype.stage.holding",
+  exiting: "snype.stage.exiting",
+  done: "snype.stage.done",
+  expired: "snype.stage.expired",
+  cancelled: "snype.stage.cancelled",
 };
 
 const EXIT_LABEL = {
-  tp: "order.exit.tp",
-  cl: "order.exit.cl",
-  manual: "order.exit.manual",
+  tp: "snype.exit.tp",
+  cl: "snype.exit.cl",
+  manual: "snype.exit.manual",
 } satisfies Record<string, TKey>;
 
-export function OrderCard({ bot }: { bot: Bot }) {
+export function SnypeCard({ snype }: { snype: Snype }) {
   const { t, r } = useI18n();
-  const closeOrder = useAppStore((state) => state.closeOrder);
-  const removeBot = useAppStore((state) => state.removeBot);
+  const closeSnype = useAppStore((state) => state.closeSnype);
+  const removeSnype = useAppStore((state) => state.removeSnype);
   const pushSignal = useAppStore((state) => state.pushSignal);
   const patchRuntime = useAppStore((state) => state.patchRuntime);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  if (bot.strategy.kind !== "order") return null;
-  const strategy = bot.strategy;
-  const runtime = bot.runtime;
-  const stage: OrderStage = runtime.stage ?? "waiting";
-  const meta = chainMeta(bot.chainId);
+  const plan = snype.plan;
+  const runtime = snype.runtime;
+  const stage: SnypeStage = runtime.stage ?? "waiting";
+  const meta = chainMeta(snype.chainId);
   const price = runtime.lastPrice;
 
   const waiting = stage === "waiting" || stage === "entering";
   const holding = stage === "holding" || stage === "exiting";
   const finished = stage === "done" || stage === "expired" || stage === "cancelled";
 
-  const { takeProfit, cutLoss } = orderTargets(strategy, runtime.fillPrice);
-  const position = orderPosition(bot);
-  const positionSize = Number(position) / 10 ** bot.base.decimals;
+  const { takeProfit, cutLoss } = exitTargets(plan, runtime.fillPrice);
+  const held = position(snype);
+  const heldSize = Number(held) / 10 ** snype.base.decimals;
 
-  const toEntry = price !== undefined ? strategy.entryPrice / price - 1 : undefined;
+  const toEntry = price !== undefined ? plan.entryPrice / price - 1 : undefined;
   const pnl =
     holding && runtime.fillPrice && price !== undefined
       ? price / runtime.fillPrice - 1
       : undefined;
-  const msLeft = strategy.expiresAt - Date.now();
+  const msLeft = plan.expiresAt - Date.now();
 
   /** Manual full exit. It joins the same queue every other leg goes through. */
   const sellNow = () => {
-    if (position <= 0n || price === undefined) return;
+    if (held <= 0n || price === undefined) return;
     pushSignal({
       id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
-      botId: bot.id,
-      botName: bot.name,
-      chainId: bot.chainId,
+      snypeId: snype.id,
+      snypeName: snype.name,
+      chainId: snype.chainId,
       createdAt: Date.now(),
       side: "sell",
-      reason: { key: "order.exit.manual" },
-      tokenIn: bot.base,
-      tokenOut: bot.quote,
-      amountIn: position.toString(),
+      reason: { key: "snype.exit.manual" },
+      tokenIn: snype.base,
+      tokenOut: snype.quote,
+      amountIn: held.toString(),
       price,
       status: "pending",
       leg: "manual",
     });
-    patchRuntime(bot.id, { error: undefined });
+    patchRuntime(snype.id, { error: undefined });
   };
 
   return (
@@ -83,21 +82,21 @@ export function OrderCard({ bot }: { bot: Bot }) {
       <header className="panel-head">
         <span className="flex min-w-0 items-center gap-2">
           <span className={`dot ${holding ? "dot-live" : ""}`} />
-          <span className="truncate text-[13px] font-semibold">{bot.name}</span>
+          <span className="truncate text-[13px] font-semibold">{snype.name}</span>
         </span>
-        <span className="chip shrink-0">{meta?.mark ?? bot.chainId}</span>
+        <span className="chip shrink-0">{meta?.mark ?? snype.chainId}</span>
       </header>
 
       <div className="p-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <span className="num text-[15px]">
-            {bot.base.symbol}
+            {snype.base.symbol}
             <span className="text-faint"> / </span>
-            {bot.quote.symbol}
+            {snype.quote.symbol}
           </span>
           <span className="num text-[15px]">
             <Flash value={price}>{price !== undefined ? formatPrice(price) : "—"}</Flash>
-            <span className="ml-1.5 text-[10px] text-faint">{bot.quote.symbol}</span>
+            <span className="ml-1.5 text-[10px] text-faint">{snype.quote.symbol}</span>
           </span>
         </div>
 
@@ -105,11 +104,9 @@ export function OrderCard({ bot }: { bot: Bot }) {
           className={`mt-2 inline-block border px-1.5 py-0.5 text-[10px] tracking-[0.1em] uppercase ${
             stage === "expired" || stage === "cancelled"
               ? "border-line text-faint"
-              : holding
+              : holding || stage === "done"
                 ? "border-[var(--color-accent-text)] text-accent-text"
-                : stage === "done"
-                  ? "border-[var(--color-accent-text)] text-accent-text"
-                  : "border-[var(--color-warn)] warn"
+                : "border-[var(--color-warn)] warn"
           }`}
         >
           {t(STAGE_LABEL[stage])}
@@ -119,45 +116,47 @@ export function OrderCard({ bot }: { bot: Bot }) {
           {waiting && (
             <>
               <Metric
-                label={t("order.entryAt")}
-                value={`${formatPrice(strategy.entryPrice)}${
-                  toEntry !== undefined ? ` · ${t("order.away", { percent: formatSigned(toEntry) })}` : ""
+                label={t("snype.entryAt")}
+                value={`${formatPrice(plan.entryPrice)}${
+                  toEntry !== undefined
+                    ? ` · ${t("snype.away", { percent: formatSigned(toEntry) })}`
+                    : ""
                 }`}
               />
               <Metric
-                label={t("order.expiresIn")}
+                label={t("snype.expiresIn")}
                 value={msLeft > 0 ? formatDuration(msLeft / 1000) : "—"}
                 tone="warn"
               />
-              <p className="text-[11px] leading-relaxed text-faint">{t("order.noSpendYet")}</p>
+              <p className="text-[11px] leading-relaxed text-faint">{t("snype.noSpendYet")}</p>
             </>
           )}
 
           {holding && (
             <>
-              <Metric label={t("order.fillPrice")} value={formatPrice(runtime.fillPrice)} />
+              <Metric label={t("snype.fillPrice")} value={formatPrice(runtime.fillPrice)} />
               <Metric
-                label={t("order.received")}
-                value={`${formatAmount(positionSize)} ${bot.base.symbol}`}
+                label={t("snype.received")}
+                value={`${formatAmount(heldSize)} ${snype.base.symbol}`}
               />
               <Metric
-                label={t("order.result")}
+                label={t("snype.result")}
                 value={formatSigned(pnl)}
                 tone={pnl !== undefined && pnl < 0 ? "short" : "long"}
               />
               <Targets takeProfit={takeProfit} cutLoss={cutLoss} />
-              <p className="text-[11px] leading-relaxed text-faint">{t("order.recalcNote")}</p>
+              <p className="text-[11px] leading-relaxed text-faint">{t("snype.recalcNote")}</p>
             </>
           )}
 
           {finished && (
             <>
               {runtime.exitReason && (
-                <Metric label={t("order.result")} value={t(EXIT_LABEL[runtime.exitReason])} />
+                <Metric label={t("snype.result")} value={t(EXIT_LABEL[runtime.exitReason])} />
               )}
               {stage === "expired" && (
                 <p className="text-[11px] leading-relaxed text-faint">
-                  {t("order.expiredAfter")}
+                  {t("snype.expiredAfter")}
                 </p>
               )}
             </>
@@ -171,13 +170,7 @@ export function OrderCard({ bot }: { bot: Bot }) {
           </p>
         )}
 
-        <p className="mt-2 text-[11px] text-faint">{r({ key: "strategy.orderDesc", vars: {
-          amount: strategy.amountQuote,
-          quote: bot.quote.symbol,
-          entry: formatPrice(strategy.entryPrice),
-          tp: strategy.takeProfitPct,
-          cl: strategy.cutLossPct,
-        } })}</p>
+        <p className="mt-2 text-[11px] text-faint">{r(describeSnype(snype))}</p>
 
         <div className="mt-3 flex gap-2">
           {holding && (
@@ -185,18 +178,18 @@ export function OrderCard({ bot }: { bot: Bot }) {
               type="button"
               className="btn btn-sm flex-1"
               onClick={sellNow}
-              disabled={stage === "exiting" || position <= 0n}
+              disabled={stage === "exiting" || held <= 0n}
             >
-              {t("order.sellNow")}
+              {t("snype.sellNow")}
             </button>
           )}
           {waiting && (
             <button
               type="button"
               className="btn btn-sm flex-1"
-              onClick={() => closeOrder(bot.id, "cancelled")}
+              onClick={() => closeSnype(snype.id, "cancelled")}
             >
-              {t("order.cancelOrder")}
+              {t("snype.cancel")}
             </button>
           )}
           {finished &&
@@ -212,9 +205,9 @@ export function OrderCard({ bot }: { bot: Bot }) {
                 <button
                   type="button"
                   className="btn btn-sm flex-1 short"
-                  onClick={() => removeBot(bot.id)}
+                  onClick={() => removeSnype(snype.id)}
                 >
-                  {t("bots.delete")}
+                  {t("snype.delete")}
                 </button>
               </>
             ) : (
@@ -223,7 +216,7 @@ export function OrderCard({ bot }: { bot: Bot }) {
                 className="btn btn-sm flex-1"
                 onClick={() => setConfirmDelete(true)}
               >
-                {t("bots.delete")}
+                {t("snype.delete")}
               </button>
             ))}
         </div>
@@ -237,11 +230,11 @@ function Targets({ takeProfit, cutLoss }: { takeProfit: number; cutLoss: number 
   return (
     <div className="grid grid-cols-2 gap-2">
       <div className="border border-line bg-base px-2 py-1.5">
-        <span className="lbl block">{t("order.exit.tp")}</span>
+        <span className="lbl block">{t("snype.exit.tp")}</span>
         <span className="num text-[12.5px] long">{formatPrice(takeProfit)}</span>
       </div>
       <div className="border border-line bg-base px-2 py-1.5">
-        <span className="lbl block">{t("order.exit.cl")}</span>
+        <span className="lbl block">{t("snype.exit.cl")}</span>
         <span className="num text-[12.5px] short">{formatPrice(cutLoss)}</span>
       </div>
     </div>
