@@ -48,7 +48,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {items.map((item) => (
           <div
             key={item.id}
-            className="panel pointer-events-auto flex items-start gap-3 p-3"
+            className="panel toast pointer-events-auto flex items-start gap-3 p-3"
             role="status"
           >
             <span

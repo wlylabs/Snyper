@@ -6,6 +6,7 @@ import { formatUnits, isAddress } from "viem";
 import { useAccount, useChainId, usePublicClient } from "wagmi";
 import { Field } from "@/components/bots/fields";
 import { TokenBadge, TokenTags } from "@/components/terminal/TokenPicker";
+import { Flash } from "@/components/ui/Flash";
 import { Icon } from "@/components/ui/Icon";
 import { Panel, Row } from "@/components/ui/Panel";
 import { Segmented } from "@/components/ui/Segmented";
@@ -426,9 +427,11 @@ export function ContractDesk() {
             <Row
               k={t("desk.price")}
               v={
-                price !== undefined
-                  ? `${formatPrice(price)} ${quoteToken?.symbol ?? ""}`
-                  : "—"
+                <Flash value={price}>
+                  {price !== undefined
+                    ? `${formatPrice(price)} ${quoteToken?.symbol ?? ""}`
+                    : "—"}
+                </Flash>
               }
             />
             {mode === "buy" && (

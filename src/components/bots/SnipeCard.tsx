@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Flash } from "@/components/ui/Flash";
 import { Icon } from "@/components/ui/Icon";
 import { useI18n } from "@/hooks/useI18n";
 import { chainMeta } from "@/lib/chains";
@@ -98,7 +99,7 @@ export function SnipeCard({ bot }: { bot: Bot }) {
             {bot.quote.symbol}
           </span>
           <span className="num text-[15px]">
-            {price !== undefined ? formatPrice(price) : "—"}
+            <Flash value={price}>{price !== undefined ? formatPrice(price) : "—"}</Flash>
             <span className="ml-1.5 text-[10px] text-faint">{bot.quote.symbol}</span>
           </span>
         </div>
