@@ -5,17 +5,16 @@ import { PONS_V1_FACTORY } from "./pons";
 
 /**
  * Where a routing venue's addresses came from. The interface says which one is
- * in force, because an address read off the launchpad and an address typed by
- * hand deserve different amounts of trust.
+ * in force, because an address read off the launchpad, an address typed by hand
+ * and the deployment shipped with the app deserve different amounts of trust.
  */
-export type VenueSource = "env" | "manual" | "pons";
+export type VenueSource = "env" | "manual" | "pons" | "bundled";
 
 /**
  * The Uniswap v3 deployment the app routes through. Robinhood Chain publishes
- * no canonical deployment list the app can bundle, so every field here is
- * resolved at runtime rather than hardcoded: from the build's environment, from
- * the operator's own entry, or read off the Pons launchpad, which stores the
- * DEX it launches into on chain.
+ * no canonical deployment list, so this is assembled from whichever source
+ * answered: the build's environment, the operator's own entry, the Pons
+ * launchpad's on-chain DEX config, or the deployment recorded below.
  */
 export type Venue = {
   /**
@@ -33,6 +32,7 @@ export type Venue = {
   /** USD unit used for pricing. Robinhood Chain may not have one configured. */
   stable?: `0x${string}`;
   stableSymbol?: string;
+  stableName?: string;
   stableDecimals?: number;
   /** Fee tiers probed when routing, most likely first. */
   feeTiers: readonly number[];
@@ -48,6 +48,7 @@ export type VenueConfig = {
   wrappedSymbol?: string;
   stable?: string;
   stableSymbol?: string;
+  stableName?: string;
   stableDecimals?: string | number;
   /** Fee tier the venue launches into, probed ahead of the standard ladder. */
   poolFee?: string | number;
@@ -101,6 +102,7 @@ export function normalizeVenue(
     wrappedSymbol: config.wrappedSymbol?.trim() || "WETH",
     stable,
     stableSymbol: stable ? config.stableSymbol?.trim() || "USDC" : undefined,
+    stableName: stable ? config.stableName?.trim() || undefined : undefined,
     stableDecimals: stable ? (Number.isFinite(decimals) ? decimals : 6) : undefined,
     feeTiers: feeTiers(config.poolFee),
     source,
@@ -118,6 +120,7 @@ export function envVenue(): Venue | undefined {
       wrappedSymbol: process.env.NEXT_PUBLIC_WRAPPED_SYMBOL_4663,
       stable: process.env.NEXT_PUBLIC_STABLE_4663,
       stableSymbol: process.env.NEXT_PUBLIC_STABLE_SYMBOL_4663,
+      stableName: process.env.NEXT_PUBLIC_STABLE_NAME_4663,
       stableDecimals: process.env.NEXT_PUBLIC_STABLE_DECIMALS_4663,
       poolFee: process.env.NEXT_PUBLIC_POOL_FEE_4663,
     },
@@ -126,28 +129,115 @@ export function envVenue(): Venue | undefined {
 }
 
 /**
+ * Robinhood Chain's Uniswap v3 deployment, as read off chain 4663 itself.
+ *
+ * This is the app's floor, not its authority: the launchpad is still asked
+ * first on every load and a live answer wins. It is written down because a
+ * public endpoint that rate-limits one burst of reads used to cost the reader
+ * every price and every trade in the session, and none of these addresses can
+ * change — a Uniswap v3 factory is immutable, and so are the router and quoter
+ * that pin themselves to it in their constructors.
+ *
+ * Each one was confirmed on chain rather than taken from a list:
+ *
+ *   factory  0x1f7d…2EfA  the DEX config the Pons V1 factory launches into,
+ *                         and the address `router.factory()` returns
+ *   router   0xCaf6…5cb2  `swapRouter` in that same config; its bytecode
+ *                         carries SwapRouter02's selectors — `exactInputSingle`
+ *                         with no deadline in the params, `multicall(uint256,
+ *                         bytes[])`, `positionManager()` — which is the shape
+ *                         `swapRouter02Abi` encodes against
+ *   quoter   0x33e8…2e0e  the one contract by the factory's deployer that
+ *                         answers QuoterV2's `quoteExactInputSingle((address,
+ *                         address,uint256,uint24,uint160))`, with `factory()`
+ *                         and `WETH9()` matching the two above
+ *   wrapped  0x0Bd7…aD73  `router.WETH9()`, symbol WETH, 18 decimals, and the
+ *                         pair token every V1 launch config trades against
+ *   stable   0x5fc5…d168  Global Dollar, 6 decimals, pooled against WETH at
+ *                         every fee tier — the chain's own USD unit, which the
+ *                         launchpad record has no field for
+ *
+ * The fee tier is the one the launchpad opens its pools at, so a memecoin's
+ * pool is found on the first probe; the standard ladder still follows.
+ */
+const ROBINHOOD_V3: VenueConfig = {
+  factory: "0x1f7d7550B1b028f7571E69A784071F0205FD2EfA",
+  router: "0xCaf681a66D020601342297493863E78C959E5cb2",
+  quoter: "0x33e885eD0Ec9bF04EcfB19341582aADCb4c8A9E7",
+  wrapped: "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+  wrappedSymbol: "WETH",
+  stable: "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
+  stableSymbol: "USDG",
+  stableName: "Global Dollar",
+  stableDecimals: 6,
+  poolFee: 10000,
+};
+
+/** The deployment written down above, as a venue. */
+export function bundledVenue(): Venue | undefined {
+  return normalizeVenue(ROBINHOOD_V3, "bundled");
+}
+
+/**
+ * Fills in what a resolved venue does not carry from the deployment above, and
+ * only when it is demonstrably the same deployment: a quoter belongs to one
+ * factory and a USD unit to one chain, so both are withheld the moment either
+ * the factory or the router differs. That is what keeps a launchpad answer —
+ * which has no field for either — from pricing worse than the fallback it beat,
+ * without ever attaching this deployment's contracts to someone else's venue.
+ */
+function withBundledExtras(venue: Venue): Venue {
+  const bundled = bundledVenue();
+  if (
+    !bundled ||
+    venue.factory !== bundled.factory ||
+    venue.router !== bundled.router
+  ) {
+    return venue;
+  }
+
+  return {
+    ...venue,
+    quoter: venue.quoter ?? bundled.quoter,
+    ...(venue.stable
+      ? {}
+      : {
+          stable: bundled.stable,
+          stableSymbol: bundled.stableSymbol,
+          stableName: bundled.stableName,
+          stableDecimals: bundled.stableDecimals,
+        }),
+  };
+}
+
+/**
  * Precedence: what the build pins beats what the operator typed, which beats
- * what was read off the launchpad. Each layer is a deliberate act by someone
- * closer to the deployment than the one under it.
+ * what was read off the launchpad, which beats the deployment shipped with the
+ * app. Each layer is a deliberate act by someone closer to the deployment than
+ * the one under it, and the last one is there so that a lookup which never
+ * answered leaves the reader with a venue rather than with balances only.
  */
 export function resolveVenue(
   manual: VenueConfig | undefined,
   discovered: VenueConfig | undefined,
 ): Venue | undefined {
-  return (
+  const venue =
     envVenue() ??
     normalizeVenue(manual, "manual") ??
-    normalizeVenue(discovered, "pons")
-  );
+    normalizeVenue(discovered, "pons") ??
+    bundledVenue();
+  return venue && withBundledExtras(venue);
 }
 
 /**
  * The venue every non-React caller reads. Kept as a module mirror of the stored
  * configuration rather than threaded through every signature: `dexMeta` is read
  * deep inside quoting, routing and position maths, all of which stay
- * synchronous. `VenueSync` writes it whenever the stored value changes.
+ * synchronous. It starts at whatever resolves without the chain, so the first
+ * render already prices; `VenueSync` writes it whenever the stored value
+ * changes.
  */
-let active: Venue | undefined = envVenue();
+let active: Venue | undefined = resolveVenue(undefined, undefined);
 
 export function activeVenue(): Venue | undefined {
   return active;
@@ -161,9 +251,11 @@ export function setActiveVenue(venue: Venue | undefined): void {
  * Reads the DEX the Pons launchpad itself routes into. The V1 factory stores
  * its venue on chain — the Uniswap v3 factory, the router it swaps through and
  * the fee tier it opens pools at — and its launch configs carry the pair token,
- * which is Robinhood Chain's wrapped native. That makes the launchpad a first
- * party source for the one thing the app cannot bundle, with no indexer and no
- * address anyone had to trust a third party for.
+ * which is Robinhood Chain's wrapped native. That makes the launchpad the first
+ * party answer to where a token trades, read live and with no indexer in the
+ * way, which is why it is asked on every load even though `ROBINHOOD_V3` would
+ * already have served: the day the launchpad moves to another DEX, this is what
+ * follows it there.
  *
  * Nothing here is batched through multicall3, and every read is allowed to fail
  * on its own. Both are deliberate: an aggregator that is missing or a single

@@ -10,7 +10,7 @@ import { useInstallPrompt } from "@/hooks/useInstallPrompt";
 import { useMounted } from "@/hooks/useMounted";
 import { CHAIN_ID, CHAIN_META } from "@/lib/chains";
 import { CURRENCIES, formatRate } from "@/lib/currency";
-import { LOCALES } from "@/lib/i18n";
+import { LOCALES, type TKey } from "@/lib/i18n";
 import { useI18n } from "@/hooks/useI18n";
 import { useFxRate } from "@/hooks/useFxRate";
 import { formatClock, timeAgo } from "@/lib/format";
@@ -19,7 +19,7 @@ import { PRIVY_CONFIGURED } from "@/lib/privy";
 import { PONS_V1_FACTORY, PONS_V2_FACTORY } from "@/lib/pons";
 import { useVenue, useVenueDiscovery } from "@/hooks/useVenue";
 import { truncateAddress } from "@/lib/format";
-import { completeVenueConfig, type VenueConfig } from "@/lib/venue";
+import { completeVenueConfig, type VenueConfig, type VenueSource } from "@/lib/venue";
 import { DEFAULT_SETTINGS, useAppStore } from "@/store/useAppStore";
 
 export default function SettingsPage() {
@@ -275,12 +275,20 @@ function NumberField({
   );
 }
 
+/** Label for each place a venue can have come from. */
+const VENUE_SOURCE_KEY = {
+  env: "settings.venueEnv",
+  manual: "settings.venueManual",
+  pons: "settings.venuePons",
+  bundled: "settings.venueBundled",
+} as const satisfies Record<VenueSource, TKey>;
+
 /**
- * Where the routing venue came from, and a way to override it. The app resolves
- * Uniswap's addresses by asking the Pons launchpad which DEX it opens its pools
- * in, because Robinhood Chain ships no deployment list worth bundling. What the
- * launchpad cannot answer — a QuoterV2 for exact pricing, a USD unit to value a
- * portfolio against — is what these fields are for.
+ * Where the routing venue came from, and a way to override it. The app asks the
+ * Pons launchpad which DEX it opens its pools in and falls back to the
+ * deployment it ships with, because Robinhood Chain publishes no list to resolve
+ * against. These fields are for pointing the app somewhere else entirely, or at
+ * a USD unit of your own.
  */
 function VenuePanel() {
   const { t } = useI18n();
@@ -319,11 +327,7 @@ function VenuePanel() {
     ? isResolving
       ? t("settings.venueResolving")
       : t("settings.venueNone")
-    : venue.source === "env"
-      ? t("settings.venueEnv")
-      : venue.source === "manual"
-        ? t("settings.venueManual")
-        : t("settings.venuePons");
+    : t(VENUE_SOURCE_KEY[venue.source]);
 
   return (
     <Panel label={t("settings.venue")} bodyClassName="p-3">

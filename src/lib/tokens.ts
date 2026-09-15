@@ -56,7 +56,8 @@ export function baseTokens(chainId: number): Token[] {
       chainId,
       address: dex.stable,
       symbol: dex.stableSymbol ?? "USDC",
-      name: "USD Coin",
+      // Every chain's dollar has its own name, and this one's is not USD Coin.
+      name: dex.stableName ?? dex.stableSymbol ?? "USD Coin",
       decimals: dex.stableDecimals ?? 6,
     });
   }
