@@ -198,6 +198,13 @@ const en = {
   "assets.capUnknown": "no cap",
   "assets.unverifiedHint":
     "Nothing this app read corroborates this figure: no market feed covers the token, or the pair behind it is too thin for the price to mean much. Treat it as a guess.",
+  "assets.live": "Live",
+  "assets.liveHint":
+    "The coin balance follows the chain block by block. Token balances and prices are re-read every 45 seconds.",
+  "assets.elsewhereRow": "{amount} on {chain}",
+  "assets.walletTotal": "Across all networks",
+  "assets.elsewhereHint":
+    "A wallet folds one asset across every network it knows about and prints a single figure. Snyper trades Robinhood Chain and shows that balance above; this is the same coin sitting on the other networks, read only — it cannot be swapped from here. The total is what your wallet is showing you.",
   "assets.address": "Address",
   "assets.openExplorer": "Open in explorer",
   "assets.connectHint": "Connect a wallet to read balances.",
@@ -611,6 +618,13 @@ const id: Record<TKey, string> = {
   "assets.capUnknown": "tanpa cap",
   "assets.unverifiedHint":
     "Tidak ada yang menguatkan angka ini: tidak ada feed pasar yang meliput token ini, atau pair di baliknya terlalu tipis untuk membuat harganya berarti. Anggap saja perkiraan.",
+  "assets.live": "Live",
+  "assets.liveHint":
+    "Saldo koin mengikuti chain blok demi blok. Saldo token dan harganya dibaca ulang tiap 45 detik.",
+  "assets.elsewhereRow": "{amount} di {chain}",
+  "assets.walletTotal": "Seluruh jaringan",
+  "assets.elsewhereHint":
+    "Dompet menjumlahkan satu aset di semua jaringan yang dikenalnya lalu menampilkan satu angka. Snyper berdagang di Robinhood Chain dan itulah saldo di atas; baris ini koin yang sama di jaringan lain, hanya dibaca — tidak bisa di-swap dari sini. Totalnya adalah angka yang ditampilkan dompetmu.",
   "assets.address": "Alamat",
   "assets.openExplorer": "Buka di explorer",
   "assets.connectHint": "Hubungkan dompet untuk membaca saldo.",

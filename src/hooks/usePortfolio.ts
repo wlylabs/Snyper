@@ -1,8 +1,10 @@
 "use client";
 
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { formatUnits, type PublicClient } from "viem";
 import { useAccount, usePublicClient } from "wagmi";
+import { useLiveNative } from "@/hooks/useLiveNative";
 import { erc20Abi } from "@/lib/abi";
 import { dexMeta } from "@/lib/chains";
 import { readIndexedPortfolio, type IndexedPortfolio } from "@/lib/portfolioFeed";
@@ -314,6 +316,47 @@ function withMarketCap(holding: Holding): Holding {
 }
 
 /**
+ * The coin row, carrying the balance the live read returned rather than the one
+ * the timed query found.
+ *
+ * Only the coin, and only its balance: everything else here is as old as the
+ * last portfolio pass, and refreshing one number inside a row of stale ones
+ * would be worse than refreshing none. The list is deliberately not re-sorted
+ * either — a row that jumps position while its own figure ticks is harder to
+ * read than one slightly out of order.
+ */
+function withLiveNative(
+  portfolio: Portfolio | undefined,
+  balance: bigint | undefined,
+  chainId: number | undefined,
+): Portfolio | undefined {
+  if (!portfolio || balance === undefined || !chainId) return portfolio;
+
+  const index = portfolio.holdings.findIndex((holding) => holding.token.native);
+
+  // A wallet that was empty when the query ran and has since been funded: the
+  // coin earns its row now rather than at the next timed read.
+  if (index === -1) {
+    const native = nativeToken(chainId);
+    if (!native || balance <= 0n) return portfolio;
+    return { ...portfolio, holdings: [holdingOf(native, balance), ...portfolio.holdings] };
+  }
+
+  const current = portfolio.holdings[index];
+  if (current.balance === balance) return portfolio;
+
+  const amount = amountOf(balance, current.token.decimals);
+  const holdings = [...portfolio.holdings];
+  holdings[index] = {
+    ...current,
+    balance,
+    amount,
+    value: current.price === undefined ? undefined : amount * current.price,
+  };
+  return { ...portfolio, holdings };
+}
+
+/**
  * What an address holds, and what it is worth.
  *
  * The holdings list is asked of the chain's own indexer, which is how every
@@ -325,8 +368,9 @@ function withMarketCap(holding: Holding): Holding {
 export function usePortfolio(chainId: number | undefined, tokens: Token[]) {
   const { address } = useAccount();
   const client = usePublicClient({ chainId });
+  const live = useLiveNative(chainId);
 
-  return useQuery<Portfolio>({
+  const query = useQuery<Portfolio>({
     queryKey: [
       "portfolio",
       chainId,
@@ -390,4 +434,17 @@ export function usePortfolio(chainId: number | undefined, tokens: Token[]) {
       };
     },
   });
+
+  /*
+   * Spreading the query result opts out of react-query's tracked-property
+   * optimisation, which is the price of handing callers one object with the
+   * live balance already in it. The alternative — every caller merging two
+   * sources by hand — is how one screen ends up disagreeing with another.
+   */
+  const data = useMemo(
+    () => withLiveNative(query.data, live, chainId),
+    [query.data, live, chainId],
+  );
+
+  return { ...query, data };
 }

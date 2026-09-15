@@ -1,11 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { formatUnits } from "viem";
 import { useAccount } from "wagmi";
 import { Icon } from "@/components/ui/Icon";
 import { Empty, Panel, Skeleton } from "@/components/ui/Panel";
 import { useConnectPrompt } from "@/hooks/useConnectPrompt";
 import { useMounted } from "@/hooks/useMounted";
+import { useElsewhere } from "@/hooks/useElsewhere";
 import { usePortfolio } from "@/hooks/usePortfolio";
 import { useTokenList } from "@/hooks/useTokenList";
 import { useTokenDiscovery } from "@/hooks/useTokenDiscovery";
@@ -76,6 +78,7 @@ export default function AssetsPage() {
 
   const { data: portfolio, isFetching, refetch } = usePortfolio(chainId, scope);
   const holdings = portfolio?.holdings;
+  const { data: elsewhere } = useElsewhere();
   /*
    * The indexer answers with everything the address holds; the chain can only
    * answer for tokens the app already knew to name. When the second one is what
@@ -87,6 +90,39 @@ export default function AssetsPage() {
   const total = useMemo(
     () => (holdings ?? []).reduce((sum, holding) => sum + (holding.value ?? 0), 0),
     [holdings],
+  );
+
+  /*
+   * The same coin, on the networks this app does not trade, priced with the
+   * price the coin row above already carries.
+   *
+   * This is the whole reason the two screens disagreed. A wallet prints one
+   * ether row folded across every network it knows about; the terminal prints
+   * the Robinhood Chain half of it, which is the half that can be traded, and
+   * looks wrong beside the wallet for it. Both figures are now on the page with
+   * the difference named, so neither has to be taken on faith.
+   */
+  const nativePrice = useMemo(
+    () => (holdings ?? []).find((holding) => holding.token.native)?.price,
+    [holdings],
+  );
+
+  const offChain = useMemo(
+    () =>
+      (elsewhere ?? []).map((entry) => {
+        const amount = Number(formatUnits(entry.balance, entry.decimals));
+        return {
+          ...entry,
+          amount,
+          value: nativePrice === undefined ? undefined : amount * nativePrice,
+        };
+      }),
+    [elsewhere, nativePrice],
+  );
+
+  const walletTotal = useMemo(
+    () => offChain.reduce((sum, entry) => sum + (entry.value ?? 0), total),
+    [offChain, total],
   );
 
   /*
@@ -137,6 +173,11 @@ export default function AssetsPage() {
                   {t("assets.scopeOnly")}
                 </span>
               )}
+              {address && (
+                <span className="chip" title={t("assets.liveHint")}>
+                  {t("assets.live")}
+                </span>
+              )}
               <span className="chip">{meta?.label ?? t("common.network")}</span>
             </>
           }
@@ -165,6 +206,39 @@ export default function AssetsPage() {
                 : t("assets.count", { count: visible.length })}
             </p>
           </div>
+
+          {/* Where the wallet's bigger number went. Only drawn when another
+              network actually holds something: on the common case — everything
+              on chain 4663 — this would be a row of zeroes explaining a
+              difference that is not there. */}
+          {address && offChain.length > 0 && (
+            <div className="border-t border-line px-3 py-2.5" title={t("assets.elsewhereHint")}>
+              {offChain.map((entry) => (
+                <div
+                  key={entry.chainId}
+                  className="flex items-center justify-between gap-3"
+                >
+                  <span className="truncate text-[11px] text-faint">
+                    {t("assets.elsewhereRow", {
+                      amount: `${formatAmount(entry.amount, 5)} ${entry.symbol}`,
+                      chain: entry.label,
+                    })}
+                  </span>
+                  <span className="num shrink-0 text-[11px] text-faint">
+                    {entry.value === undefined
+                      ? t("assets.unpriced")
+                      : formatMoneyFloor(entry.value, { currency, fx, locale })}
+                  </span>
+                </div>
+              ))}
+              <div className="mt-2 flex items-center justify-between gap-3 border-t border-line pt-2">
+                <span className="lbl">{t("assets.walletTotal")}</span>
+                <span className="num text-[13px]">
+                  {formatMoney(walletTotal, { currency, fx, locale })}
+                </span>
+              </div>
+            </div>
+          )}
 
           {!address ? (
             <Empty
