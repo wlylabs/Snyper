@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { formatUnits } from "viem";
 import { useAccount, usePublicClient } from "wagmi";
 import { erc20Abi } from "@/lib/abi";
 import { dexMeta } from "@/lib/chains";
@@ -17,6 +18,17 @@ export type Holding = {
 };
 
 const MAX_PRICED = 24;
+
+/**
+ * Whole units of a balance. Scaling the raw integer by a power of ten would
+ * round it through a float twice — once past 2^53, once on a decimals count
+ * that has no exact float — and a wallet comparing this against its own display
+ * would find the last digits disagree. `formatUnits` does the scaling in
+ * integer arithmetic and only then meets a float.
+ */
+function amountOf(balance: bigint, decimals: number): number {
+  return Number(formatUnits(balance, decimals));
+}
 
 /**
  * Reads balances straight from the chain with one multicall, then prices the
@@ -65,7 +77,7 @@ export function usePortfolio(chainId: number | undefined, tokens: Token[]) {
           holdings.push({
             token,
             balance: nativeBalance,
-            amount: Number(nativeBalance) / 10 ** token.decimals,
+            amount: amountOf(nativeBalance, token.decimals),
           });
         }
       }
@@ -78,7 +90,7 @@ export function usePortfolio(chainId: number | undefined, tokens: Token[]) {
         holdings.push({
           token,
           balance,
-          amount: Number(balance) / 10 ** token.decimals,
+          amount: amountOf(balance, token.decimals),
         });
       });
 

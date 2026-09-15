@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useAccount, useChainId } from "wagmi";
+import { useAccount } from "wagmi";
 import { TokenTags } from "@/components/terminal/TokenPicker";
 import { TokenBadge } from "@/components/ui/TokenBadge";
 import { Icon } from "@/components/ui/Icon";
@@ -13,7 +13,7 @@ import { useTokenList } from "@/hooks/useTokenList";
 import { useTokenDiscovery } from "@/hooks/useTokenDiscovery";
 import { useI18n } from "@/hooks/useI18n";
 import { useFxRate } from "@/hooks/useFxRate";
-import { chainMeta, explorerAddress } from "@/lib/chains";
+import { CHAIN_ID, chainMeta, explorerAddress } from "@/lib/chains";
 import { formatAmount, truncateAddress } from "@/lib/format";
 import { formatMoney } from "@/lib/currency";
 import { baseTokens, mergeTokens, type Token } from "@/lib/tokens";
@@ -24,10 +24,16 @@ export default function AssetsPage() {
   const { t, locale } = useI18n();
   const currency = useAppStore((state) => state.settings.currency);
   const { fx } = useFxRate();
-  const activeChainId = useChainId();
-  const { address, chainId: accountChainId } = useAccount();
+  const { address } = useAccount();
   const connectPrompt = useConnectPrompt();
-  const chainId = accountChainId ?? activeChainId;
+  /*
+   * Holdings are read over the app's own RPC, so they do not depend on which
+   * network the wallet happens to have selected. Following the wallet's chain
+   * instead would empty this page the moment a reader left it on another
+   * network — the tokens are still there, and this is the page that says so.
+   * Switching networks is the header's job, and only signing needs it.
+   */
+  const chainId = CHAIN_ID;
   const meta = chainMeta(chainId);
 
   const { listed } = useTokenList(chainId);
@@ -60,6 +66,17 @@ export default function AssetsPage() {
     [holdings],
   );
 
+  /*
+   * What the total leaves out. A token with no route to the chain's USD unit
+   * has no price to add, so it counts as nothing here — which is the honest
+   * arithmetic and a poor thing to leave unsaid, because the figure then reads
+   * as the whole wallet to anyone comparing it against one.
+   */
+  const unpriced = useMemo(
+    () => (holdings ?? []).filter((holding) => holding.value === undefined).length,
+    [holdings],
+  );
+
   if (!mounted) {
     return <Skeleton className="h-64 w-full" />;
   }
@@ -89,6 +106,11 @@ export default function AssetsPage() {
               <p className="num text-[30px] leading-none">
                 {address ? formatMoney(total, { currency, fx, locale }) : "—"}
               </p>
+              {address && unpriced > 0 && (
+                <p className="mt-1.5 max-w-[42ch] text-[10px] leading-relaxed text-faint">
+                  {t("assets.unpricedNote", { count: unpriced })}
+                </p>
+              )}
             </div>
             <p className="lbl">
               {isFetching
@@ -187,7 +209,7 @@ export default function AssetsPage() {
             <>
               <p className="num text-[12px] break-all">{address}</p>
               <a
-                href={chainId ? explorerAddress(chainId, address) : undefined}
+                href={explorerAddress(chainId, address)}
                 target="_blank"
                 rel="noreferrer"
                 className="btn btn-sm mt-3 w-full"
@@ -217,7 +239,7 @@ export default function AssetsPage() {
                     <TokenTags token={token} listed={listed} />
                   </span>
                   <a
-                    href={chainId ? explorerAddress(chainId, token.address) : undefined}
+                    href={explorerAddress(chainId, token.address)}
                     target="_blank"
                     rel="noreferrer"
                     className="num shrink-0 text-[10px] text-faint hover:text-accent-text"

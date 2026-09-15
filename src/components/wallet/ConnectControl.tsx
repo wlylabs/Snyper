@@ -16,7 +16,7 @@ import { Icon } from "@/components/ui/Icon";
 import { Sheet } from "@/components/ui/Sheet";
 import { WalletAvatar } from "@/components/ui/TokenBadge";
 import { useToast } from "@/components/ui/Toast";
-import { chainMeta, explorerAddress } from "@/lib/chains";
+import { CHAIN_ID, chainMeta, explorerAddress } from "@/lib/chains";
 import { formatAmount, truncateAddress } from "@/lib/format";
 import { PRIVY_CONFIGURED } from "@/lib/privy";
 import { useMounted } from "@/hooks/useMounted";
@@ -193,8 +193,19 @@ function AccountSheet({
   const { setActiveWallet } = useSetActiveWallet();
   const { chainId } = useAccount();
   const [copied, setCopied] = useState(false);
-  const meta = chainMeta(chainId);
-  const { data: balance } = useBalance({ address, query: { enabled: open } });
+  const meta = chainMeta(CHAIN_ID);
+  /*
+   * Read on the chain this app trades, not on whatever network the wallet is
+   * pointing at. Balances come off the app's own RPC rather than the wallet's
+   * session, so a wallet still sitting on another network sees what it holds
+   * here — and never another chain's balance under Robinhood Chain's name.
+   */
+  const { data: balance } = useBalance({
+    address,
+    chainId: CHAIN_ID,
+    query: { enabled: open },
+  });
+  const wrongNetwork = chainId !== undefined && chainId !== CHAIN_ID;
 
   const active = walletFor(wallets, address);
   const embedded = active?.walletClientType === "privy";
@@ -232,7 +243,12 @@ function AccountSheet({
             {balance ? formatAmount(Number(balance.formatted), 5) : "—"}
             {balance && <span className="ml-1.5 text-[13px] text-dim">{balance.symbol}</span>}
           </p>
-          <p className="lbl mt-2">{meta ? meta.label : t("wallet.unsupportedNetwork")}</p>
+          <p className="lbl mt-2">{meta?.label ?? t("common.network")}</p>
+          {wrongNetwork && (
+            <p className="mt-2 max-w-[34ch] text-[10px] leading-relaxed text-faint">
+              {t("wallet.otherNetwork", { chain: meta?.label ?? t("common.network") })}
+            </p>
+          )}
         </div>
       </div>
 
@@ -243,7 +259,7 @@ function AccountSheet({
             {copied ? t("common.copied") : t("common.copy")}
           </button>
           <a
-            href={chainId ? explorerAddress(chainId, address) : undefined}
+            href={explorerAddress(CHAIN_ID, address)}
             target="_blank"
             rel="noreferrer"
             className="tile justify-center"
