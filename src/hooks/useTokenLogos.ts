@@ -4,13 +4,15 @@ import { useEffect, useRef } from "react";
 import { usePublicClient } from "wagmi";
 import { CHAIN_ID } from "@/lib/chains";
 import { tokenKey } from "@/lib/tokens";
-import { readTokenLogos } from "@/lib/tokenMeta";
+import { resolveTokenLogos } from "@/lib/tokenFeed";
 import { useAppStore } from "@/store/useAppStore";
 
 /**
  * How many tokens one pass asks about. Each one costs six calls inside the
  * multicall, so this is the batch that keeps a single request comfortable while
- * still clearing a freshly scanned wallet in a few passes.
+ * still clearing a freshly scanned wallet in a few passes. It also stays under
+ * the thirty addresses the indexer takes in one request, so the second source
+ * is one request per pass too.
  */
 const BATCH = 20;
 
@@ -55,7 +57,7 @@ export function useTokenLogos() {
 
     const timer = window.setTimeout(() => {
       keys.forEach((key) => inFlight.current.add(key));
-      void readTokenLogos(
+      void resolveTokenLogos(
         client,
         pending.map((token) => token.address),
       )
