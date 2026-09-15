@@ -28,7 +28,6 @@ function Unconfigured() {
   return (
     <>
       <button type="button" className="btn btn-sm btn-short" onClick={() => setOpen(true)}>
-        <Icon name="alert" size={14} />
         {t("wallet.connect")}
       </button>
       <Sheet open={open} title={t("wallet.connectTitle")} onClose={() => setOpen(false)}>
@@ -56,7 +55,6 @@ function PrivyControl() {
   if (!authenticated || !address) {
     return (
       <button type="button" className="btn btn-accent btn-sm" onClick={() => login()}>
-        <Icon name="wallet" size={14} />
         {t("wallet.connect")}
       </button>
     );
