@@ -4,9 +4,10 @@ import { useCallback } from "react";
 import { useAccount, useConfig } from "wagmi";
 import { getPublicClient, readContract } from "wagmi/actions";
 import { erc20Abi } from "@/lib/abi";
+import { feeChargeable, profitFeeBps } from "@/lib/fees";
 import { quoteExactIn } from "@/lib/quote";
 import type { Token } from "@/lib/tokens";
-import type { Signal } from "@/lib/types";
+import type { Signal, Snype } from "@/lib/types";
 import { useAppStore } from "@/store/useAppStore";
 import { readableError, useExecutor } from "./useExecutor";
 import { useI18n } from "./useI18n";
@@ -32,6 +33,21 @@ async function heldBalance(
     })) as bigint;
   } catch {
     return undefined;
+  }
+}
+
+/**
+ * Quote units a snype's entry paid for the position it is now holding.
+ *
+ * A snype that filled before cost basis was recorded has none, and reads as
+ * zero — which is what stops it being charged rather than charged on a basis
+ * that was guessed.
+ */
+function costBasis(snype: Snype): bigint {
+  try {
+    return BigInt(snype.runtime.costQuote ?? "0");
+  } catch {
+    return 0n;
   }
 }
 
@@ -93,6 +109,24 @@ export function useDispatchSignal() {
           ? undefined
           : await heldBalance(config, signal.tokenOut, address);
 
+        /*
+         * What the exit owes, worked out before it is signed.
+         *
+         * A snype is charged on the way out and only on what it made: the
+         * entry's own cost basis against what this sale returns, with a loss
+         * costing nothing. An entry is never charged, so the fee below is zero
+         * on every leg but a profitable exit — and zero as well on a curve,
+         * which has nowhere to put one.
+         *
+         * An exit cut down to what the wallet still holds is measured against
+         * the whole entry all the same, which understates the profit and so
+         * undercharges it. That is the right way for it to be wrong.
+         */
+        const feeBps =
+          closingPosition && feeChargeable(quote.venue)
+            ? profitFeeBps({ grossOut: quote.amountOut, costBasis: costBasis(snype) })
+            : 0;
+
         const hash = await execute({
           tokenIn: signal.tokenIn,
           tokenOut: signal.tokenOut,
@@ -102,6 +136,10 @@ export function useDispatchSignal() {
           deadlineMinutes: store.settings.deadlineMinutes,
           source: "snype",
           snypeName: snype.name,
+          feeBps,
+          // Funded in the quote currency, so charged in it too: on the way in
+          // that is the input, on the way out it is the output.
+          feeOnInput: !closingPosition,
         });
 
         // A bonding-curve buy that clears the last of the sellable supply is
@@ -133,6 +171,10 @@ export function useDispatchSignal() {
             stage: "holding",
             fillPrice: receivedSize > 0 ? sizeIn / receivedSize : signal.price,
             positionBase: received.toString(),
+            // The cost basis the exit will be measured against: what the venue
+            // took, not what was sent, so a curve buy that was refunded part of
+            // its spend is not charged on the refund.
+            costQuote: spent.toString(),
           });
         } else {
           useAppStore.getState().patchRuntime(snype.id, {

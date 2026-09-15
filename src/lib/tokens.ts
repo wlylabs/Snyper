@@ -116,6 +116,16 @@ export function sameToken(a: Token | undefined, b: Token | undefined): boolean {
   return a.chainId === b.chainId && a.address.toLowerCase() === b.address.toLowerCase();
 }
 
+/**
+ * Address used when naming a token to a contract that settles native currency
+ * itself. SnyperRouter takes the zero address to mean "the chain's own money",
+ * which is the usual on-chain convention and is not the sentinel this app
+ * carries around in its own state.
+ */
+export function settlementAddress(token: Token): `0x${string}` {
+  return token.native ? "0x0000000000000000000000000000000000000000" : token.address;
+}
+
 /** Address used for routing: native currency routes through its wrapper. */
 export function routingAddress(token: Token): `0x${string}` {
   const dex = dexMeta(token.chainId);
