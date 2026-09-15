@@ -8,34 +8,12 @@ import { useInstallPrompt } from "@/hooks/useInstallPrompt";
 import { useMounted } from "@/hooks/useMounted";
 import { useI18n } from "@/hooks/useI18n";
 
-/** Header affordance: opens the install sheet instead of firing the prompt blind. */
-export function InstallButton() {
-  const mounted = useMounted();
-  const { canOffer, standalone } = useInstallPrompt();
-  const { t } = useI18n();
-  const [open, setOpen] = useState(false);
-
-  if (!mounted || !canOffer || standalone) return null;
-
-  return (
-    <>
-      <button
-        type="button"
-        className="btn btn-sm"
-        onClick={() => setOpen(true)}
-        aria-label={t("install.action")}
-      >
-        <Icon name="download" size={14} />
-        <span className="hidden sm:inline">{t("install.short")}</span>
-      </button>
-      <InstallSheet open={open} onClose={() => setOpen(false)} />
-    </>
-  );
-}
-
 /**
- * One-time banner under the status strip. It never returns once dismissed, so
- * the install path stays discoverable without nagging on every visit.
+ * The app's one install surface: a banner under the status strip, shown only
+ * where an install is actually possible and only until it is dismissed. There
+ * is deliberately nothing in the header or in settings repeating it — an offer
+ * to install is worth making once, and a terminal that keeps asking is asking
+ * about the wrong thing. Dismissing it is final, and so is installing.
  */
 export function InstallBanner() {
   const mounted = useMounted();
@@ -70,7 +48,7 @@ export function InstallBanner() {
   );
 }
 
-export function InstallSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+function InstallSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { canInstall, install, ios, platform, standalone } = useInstallPrompt();
   const { t } = useI18n();
   const [busy, setBusy] = useState(false);
