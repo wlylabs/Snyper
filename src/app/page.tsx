@@ -201,9 +201,6 @@ export default function TerminalPage() {
                     : "0"
                 }
               />
-              <p className="mt-3 text-[11px] leading-relaxed text-faint">
-                {t("terminal.sourceNote")}
-              </p>
             </>
           )}
         </Panel>

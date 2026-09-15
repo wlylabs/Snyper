@@ -69,7 +69,6 @@ export default function StrategiesPage() {
             <Panel bodyClassName="p-0">
               <Empty
                 title={t("snype.emptyTitle")}
-                hint={t("snype.emptyHint")}
                 action={
                   <button
                     type="button"
@@ -97,11 +96,11 @@ export default function StrategiesPage() {
               checked={settings.autoDispatch}
               onChange={(event) => setSettings({ autoDispatch: event.target.checked })}
             />
-            <span>
-              <span className="block text-[12px] font-semibold">{t("bots.autoLabel")}</span>
-              <span className="mt-1 block text-[11px] leading-relaxed text-faint">
-                {t("bots.autoHint", { count: live })}
-              </span>
+            <span
+              className="block text-[12px] font-semibold"
+              title={t("bots.autoHint", { count: live })}
+            >
+              {t("bots.autoLabel")}
             </span>
           </label>
         </Panel>

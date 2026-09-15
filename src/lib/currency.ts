@@ -200,16 +200,31 @@ export function formatMoneyFloor(
   floor = 0.01,
 ): string {
   if (usd === undefined || !Number.isFinite(usd)) return "—";
-  if (usd !== 0 && Math.abs(usd) < floor) {
-    const converted = convert(floor, options.currency, options.fx);
-    if (!converted) return "—";
-    return `< ${new Intl.NumberFormat(INTL_LOCALE[options.locale], {
+  const converted = convert(usd, options.currency, options.fx);
+  if (!converted) return "—";
+  const tag = INTL_LOCALE[options.locale];
+
+  /*
+   * Money written the way money is written: two places for a dollar, none for
+   * a rupiah. `formatMoney` opens four and six for figures small enough to
+   * need them, which is right for a unit price and wrong here — a holding
+   * worth `$0.1260` is worth twelve cents, and the extra digits are precision
+   * no reader will ever act on, in the column they check their wallet against.
+   */
+  const digits = converted.currency === "IDR" ? 0 : 2;
+  const money = (value: number): string =>
+    new Intl.NumberFormat(tag, {
       style: "currency",
       currency: converted.currency,
-      maximumFractionDigits: converted.currency === "IDR" ? 0 : 2,
-    }).format(converted.value)}`;
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+    }).format(value);
+
+  if (usd !== 0 && Math.abs(usd) < floor) {
+    const edge = convert(floor, options.currency, options.fx);
+    return edge ? `< ${money(edge.value)}` : "—";
   }
-  return formatMoney(usd, options);
+  return money(converted.value);
 }
 
 export function formatRate(rate: number, locale: Locale): string {

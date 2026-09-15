@@ -353,9 +353,6 @@ export function SwapPanel({
         {cta.label}
       </button>
 
-      <p className="mt-2 text-center text-[10px] leading-relaxed text-faint">
-        {t("swap.footnote")}
-      </p>
 
       <TokenPicker
         open={picker !== null}

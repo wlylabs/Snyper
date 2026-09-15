@@ -54,7 +54,6 @@ export default function SettingsPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[12px] font-semibold">{t("settings.theme")}</p>
-            <p className="mt-0.5 text-[11px] text-faint">{t("settings.themeHint")}</p>
           </div>
           <Segmented
             options={[
@@ -71,7 +70,6 @@ export default function SettingsPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[12px] font-semibold">{t("settings.language")}</p>
-            <p className="mt-0.5 text-[11px] text-faint">{t("settings.languageHint")}</p>
           </div>
           <Segmented
             options={LOCALES}
@@ -83,9 +81,6 @@ export default function SettingsPage() {
 
       <Panel label={t("settings.currency")} bodyClassName="p-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="min-w-0 flex-1 text-[11px] leading-relaxed text-faint">
-            {t("settings.currencyHint")}
-          </p>
           <Segmented
             options={CURRENCIES}
             value={settings.currency}
@@ -114,7 +109,6 @@ export default function SettingsPage() {
           )}
         </div>
 
-        <p className="mt-3 text-[10px] leading-relaxed text-faint">{t("settings.fxNote")}</p>
       </Panel>
 
       <Panel label={t("settings.execDefaults")} bodyClassName="p-3">
@@ -142,6 +136,7 @@ export default function SettingsPage() {
           />
           <NumberField
             label={t("settings.priorityFee")}
+            hint={t("settings.priorityFeeHint")}
             value={settings.priorityFeeGwei}
             min={0}
             max={500}
@@ -149,15 +144,13 @@ export default function SettingsPage() {
           />
           <NumberField
             label={t("settings.maxImpact")}
+            hint={t("settings.impactHint")}
             value={settings.maxImpactBps}
             min={0}
             max={9000}
             onChange={(value) => setSettings({ maxImpactBps: value })}
           />
         </div>
-        <p className="mt-2 text-[10px] leading-relaxed text-faint">
-          {t("settings.guardNote")}
-        </p>
         <label className="mt-4 flex items-start gap-3">
           <input
             type="checkbox"
@@ -165,11 +158,8 @@ export default function SettingsPage() {
             checked={settings.autoDispatch}
             onChange={(event) => setSettings({ autoDispatch: event.target.checked })}
           />
-          <span>
-            <span className="block text-[12px] font-semibold">{t("settings.autoLabel")}</span>
-            <span className="mt-1 block text-[11px] leading-relaxed text-faint">
-              {t("settings.autoHint")}
-            </span>
+          <span className="block text-[12px] font-semibold" title={t("settings.autoHint")}>
+            {t("settings.autoLabel")}
           </span>
         </label>
       </Panel>
@@ -192,9 +182,6 @@ export default function SettingsPage() {
               : t("settings.publicEndpoint")
           }
         />
-        <p className="wrap-any mt-3 text-[10px] leading-relaxed text-faint">
-          {t("settings.rpcNote")}
-        </p>
       </Panel>
 
       <VenuePanel />
@@ -216,19 +203,22 @@ export default function SettingsPage() {
 
 function NumberField({
   label,
+  hint,
   value,
   min,
   max,
   onChange,
 }: {
   label: string;
+  /** What the number does, for a control whose name does not say. */
+  hint?: string;
   value: number;
   min: number;
   max: number;
   onChange: (value: number) => void;
 }) {
   return (
-    <label className="block">
+    <label className="block" title={hint}>
       <span className="lbl mb-1.5 block">{label}</span>
       <input
         className="field"
@@ -303,8 +293,6 @@ function VenuePanel() {
 
   return (
     <Panel label={t("settings.venue")} bodyClassName="p-3">
-      <p className="text-[11px] leading-relaxed text-dim">{t("settings.venueNote")}</p>
-
       <div className="mt-3">
         <Row
           k={t("settings.venueSource")}
@@ -399,9 +387,6 @@ function VenuePanel() {
             />
           </div>
 
-          <p className="text-[10px] leading-relaxed text-dim">
-            {t("settings.venueRouterHint")}
-          </p>
           <p className="text-[10px] leading-relaxed warn">{t("settings.venueWarning")}</p>
 
           <div className="grid grid-cols-2 gap-2">

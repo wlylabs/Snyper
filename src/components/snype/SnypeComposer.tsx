@@ -351,10 +351,6 @@ export function SnypeComposer({ open, onClose }: { open: boolean; onClose: () =>
             <Icon name="alert" size={13} className="mt-0.5 shrink-0" />
             {t("snype.expiryNote", { date: expiryDate, price: formatPrice(entryPrice) })}
           </p>
-          <p className="flex items-start gap-2 text-[11px] leading-relaxed text-faint">
-            <Icon name="alert" size={13} className="mt-0.5 shrink-0" />
-            {t("snype.autoNote")}
-          </p>
 
           {error && <p className="text-[11px] short">{error}</p>}
         </div>

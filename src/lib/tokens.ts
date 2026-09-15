@@ -20,7 +20,7 @@ export function nativeToken(chainId: number): Token | undefined {
     chainId,
     address: NATIVE,
     symbol: meta.chain.nativeCurrency.symbol,
-    name: meta.chain.nativeCurrency.name,
+    name: meta.nativeName ?? meta.chain.nativeCurrency.name,
     decimals: meta.chain.nativeCurrency.decimals,
     native: true,
   };

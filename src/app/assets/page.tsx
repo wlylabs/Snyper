@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import { useAccount } from "wagmi";
-import { TokenTags } from "@/components/terminal/TokenPicker";
 import { Icon } from "@/components/ui/Icon";
 import { Empty, Panel, Skeleton } from "@/components/ui/Panel";
 import { useConnectPrompt } from "@/hooks/useConnectPrompt";
@@ -13,7 +12,7 @@ import { useTokenDiscovery } from "@/hooks/useTokenDiscovery";
 import { useI18n } from "@/hooks/useI18n";
 import { useFxRate } from "@/hooks/useFxRate";
 import { CHAIN_ID, chainMeta, explorerAddress } from "@/lib/chains";
-import { formatAmount, truncateAddress } from "@/lib/format";
+import { formatAmount, formatSigned } from "@/lib/format";
 import {
   formatCompactMoney,
   formatMoney,
@@ -27,6 +26,13 @@ import { memeSignal } from "@/lib/memecoin";
 import { baseTokens, mergeTokens, type Token } from "@/lib/tokens";
 import type { Holding } from "@/hooks/usePortfolio";
 import { useAppStore } from "@/store/useAppStore";
+
+/**
+ * What a holding has to be proven worth to earn a row of its own. A dollar is
+ * the line most wallets draw, and it is well clear of the fractions of a cent
+ * an airdropped contract arrives with.
+ */
+const DUST_FLOOR = 1;
 
 export default function AssetsPage() {
   const mounted = useMounted();
@@ -84,15 +90,35 @@ export default function AssetsPage() {
   );
 
   /*
-   * What the total leaves out. A token with no route to the chain's USD unit
-   * has no price to add, so it counts as nothing here — which is the honest
-   * arithmetic and a poor thing to leave unsaid, because the figure then reads
-   * as the whole wallet to anyone comparing it against one.
+   * Dust, and what counts as it.
+   *
+   * A wallet on a memecoin chain collects contracts it never asked for, and
+   * most of them are worth a fraction of a cent. Listed at the same weight as a
+   * real position they bury it, so only holdings that clear a dollar get a row
+   * and the rest fold into one line that opens on a tap. The bar is proof
+   * rather than suspicion: something has to have priced a holding at a dollar
+   * or more for it to be listed, which takes the unpriced with it — a token no
+   * feed and no pool could value is not known to be worth anything.
+   *
+   * The coin is the exception, at any size. It is not one of the contracts this
+   * is filtering, it is the balance the wallet is denominated in and the one
+   * gas comes out of, and a reader who cannot see it cannot work out why a
+   * trade will not sign.
    */
-  const unpriced = useMemo(
-    () => (holdings ?? []).filter((holding) => holding.value === undefined).length,
-    [holdings],
-  );
+  const [showDust, setShowDust] = useState(false);
+
+  const { visible, dust } = useMemo(() => {
+    const visible: Holding[] = [];
+    let dust = 0;
+    for (const holding of holdings ?? []) {
+      const listable =
+        holding.token.native ||
+        (holding.value !== undefined && holding.value >= DUST_FLOOR);
+      if (!listable) dust += 1;
+      if (listable || showDust) visible.push(holding);
+    }
+    return { visible, dust };
+  }, [holdings, showDust]);
 
   if (!mounted) {
     return <Skeleton className="h-64 w-full" />;
@@ -132,23 +158,17 @@ export default function AssetsPage() {
               <p className="num text-[30px] leading-none">
                 {address ? formatMoney(total, { currency, fx, locale }) : "—"}
               </p>
-              {address && unpriced > 0 && (
-                <p className="mt-1.5 max-w-[42ch] text-[10px] leading-relaxed text-faint">
-                  {t("assets.unpricedNote", { count: unpriced })}
-                </p>
-              )}
             </div>
-            <p className="lbl">
+            <p className="lbl shrink-0 whitespace-nowrap">
               {isFetching
                 ? t("assets.reading")
-                : t("assets.count", { count: holdings?.length ?? 0 })}
+                : t("assets.count", { count: visible.length })}
             </p>
           </div>
 
           {!address ? (
             <Empty
               title={t("assets.noWallet")}
-              hint={t("assets.noWalletHint")}
               /* Nothing to list until a wallet is connected, so offer that here
                  rather than sending the reader back up to the header. */
               action={
@@ -161,13 +181,10 @@ export default function AssetsPage() {
               }
             />
           ) : (holdings?.length ?? 0) === 0 ? (
-            <Empty
-              title={isFetching ? t("assets.scanning") : t("assets.emptyTitle")}
-              hint={scopeOnly ? t("assets.scopeOnlyHint") : t("assets.emptyHint")}
-            />
+            <Empty title={isFetching ? t("assets.scanning") : t("assets.emptyTitle")} />
           ) : (
             <div>
-              {holdings?.map((holding) => (
+              {visible.map((holding) => (
                 <HoldingRow
                   key={holding.token.address}
                   holding={holding}
@@ -175,6 +192,22 @@ export default function AssetsPage() {
                   money={{ currency, fx, locale }}
                 />
               ))}
+              {dust > 0 && (
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between gap-3 border-t border-line px-3 py-2.5 text-left hover:bg-line/40"
+                  onClick={() => setShowDust((open) => !open)}
+                >
+                  <span className="text-[11px] text-faint">
+                    {showDust
+                      ? t("assets.dustShown", { count: dust })
+                      : t("assets.dustHidden", { count: dust })}
+                  </span>
+                  <span className="lbl shrink-0">
+                    {showDust ? t("assets.dustHide") : t("assets.dustShow")}
+                  </span>
+                </button>
+              )}
             </div>
           )}
 
@@ -188,9 +221,6 @@ export default function AssetsPage() {
               <Icon name="crosshair" size={13} />
               {discovery.isScanning ? t("assets.detecting") : t("assets.detect")}
             </button>
-            <p className="mt-2 text-[10px] leading-relaxed text-faint">
-              {t("assets.detectNote")}
-            </p>
             {discovery.found && (
               <p className="mt-2 text-[10px] leading-relaxed text-dim">
                 {t("assets.detectResult", {
@@ -210,6 +240,14 @@ export default function AssetsPage() {
         </Panel>
       </div>
 
+      {/*
+       * What used to sit under this: a panel listing detected tokens and
+       * another listing imported ones, each a bordered box whose usual state
+       * was a centred line saying it was empty. Both were already answered by
+       * the list above — a token you hold appears there, and one you do not is
+       * the picker's business — so on most visits they were two screens of
+       * furniture between the reader and the end of the page.
+       */}
       <div className="flex min-w-0 flex-col gap-3 lg:col-span-4">
         <Panel label={t("assets.address")} bodyClassName="p-3">
           {address ? (
@@ -230,56 +268,6 @@ export default function AssetsPage() {
           )}
         </Panel>
 
-        <Panel label={t("assets.detected")} bodyClassName="p-0">
-          {discoveredTokens.filter((token) => token.chainId === chainId).length === 0 ? (
-            <Empty title={t("assets.noneDetected")} hint={t("assets.noneDetectedHint")} />
-          ) : (
-            discoveredTokens
-              .filter((token) => token.chainId === chainId)
-              .map((token) => (
-                <div
-                  key={token.address}
-                  className="flex items-center justify-between gap-3 border-b border-line px-3 py-2.5 last:border-b-0"
-                >
-                  <span className="flex min-w-0 items-center gap-1.5">
-                    <span className="truncate text-[12px] font-semibold">{token.symbol}</span>
-                    <TokenTags token={token} listed={listed} />
-                  </span>
-                  <a
-                    href={explorerAddress(chainId, token.address)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="num shrink-0 text-[10px] text-faint hover:text-accent-text"
-                  >
-                    {truncateAddress(token.address, 6, 4)}
-                  </a>
-                </div>
-              ))
-          )}
-        </Panel>
-
-        <Panel label={t("assets.imported")} bodyClassName="p-0">
-          {customTokens.filter((token) => token.chainId === chainId).length === 0 ? (
-            <Empty
-              title={t("assets.noneImported")}
-              hint={t("assets.noneImportedHint")}
-            />
-          ) : (
-            customTokens
-              .filter((token) => token.chainId === chainId)
-              .map((token) => (
-                <div
-                  key={token.address}
-                  className="flex items-center justify-between gap-3 border-b border-line px-3 py-2.5 last:border-b-0"
-                >
-                  <span className="text-[12px] font-semibold">{token.symbol}</span>
-                  <span className="num text-[10px] text-faint">
-                    {truncateAddress(token.address, 6, 4)}
-                  </span>
-                </div>
-              ))
-          )}
-        </Panel>
       </div>
     </div>
   );
@@ -295,17 +283,23 @@ type Money = { currency: DisplayCurrency; fx: FxRate | undefined; locale: Locale
 const THIN_LIQUIDITY = 1000;
 
 /**
- * One holding, and the argument for which number leads it.
+ * One holding, laid out the way a wallet lays one out.
  *
- * For the chain's own money, price is the figure a reader came for: ether has
- * one supply, everybody knows roughly what it is, and $2,475 means something on
- * its own. For everything else on this chain — which is to say the memecoins —
- * price means nothing without the supply behind it, and the supply is whatever
- * the launch decided that morning. A token at $9 and a token at $0.00007 are
- * not expensive and cheap; they are two launches that picked different numbers
- * of zeros, and the only way to tell which one is bigger is the market cap.
- * That is the number every chart, launchpad and group chat quotes, so that is
- * the number the row leads with, with the price kept a hover away.
+ * Each side of the row carries one thing per line. On the left the token names
+ * itself and then says how much of it there is, with the unit attached — a bare
+ * `0.000051` under a dollar figure is two magnitudes in two units with nothing
+ * saying which is which, and a reader comparing it against their wallet reads
+ * the wrong one. On the right the dollar value leads, because that is the line
+ * they came to check, with what the token is worth per unit underneath it.
+ *
+ * That last line is where the chain shows through. For the chain's own money it
+ * is a price: ether has one supply, everybody knows roughly what it is, and
+ * $2,475 means something on its own. For everything else here — which is to say
+ * the memecoins — price means nothing without the supply behind it, and the
+ * supply is whatever the launch decided that morning. A token at $9 and a token
+ * at $0.00007 are not expensive and cheap; they are two launches that picked
+ * different numbers of zeros, and the only way to tell which is bigger is the
+ * market cap. So that is what sits there instead.
  */
 function HoldingRow({
   holding,
@@ -324,7 +318,10 @@ function HoldingRow({
   const signal = holding.token.native ? undefined : memeSignal(token, listed);
   const ownMoney = !signal || (!signal.unlisted && !signal.launchpad);
 
-  const leadsWithCap = !ownMoney && holding.marketCap !== undefined;
+  /* A cap is worth naming for anything that is not the chain's own money —
+     which on this chain is the memecoins, and they are what a cap is read
+     for. It is a tooltip line now rather than a column. */
+  const hasCap = !ownMoney && holding.marketCap !== undefined;
 
   /*
    * A price nothing corroborates. The feed aggregates every pair a token
@@ -351,7 +348,10 @@ function HoldingRow({
   const provenance = [
     holding.price !== undefined &&
       t("assets.priceHint", { price: formatPriceMoney(holding.price, money) }),
-    leadsWithCap && (holding.diluted ? t("assets.fdvHint") : t("assets.capHint")),
+    hasCap &&
+      t(holding.diluted ? "assets.fdvLine" : "assets.capLine", {
+        value: formatCompactMoney(holding.marketCap, money),
+      }),
     holding.priceSource === "feed"
       ? t("assets.sourceFeed")
       : holding.priceSource === "indexer"
@@ -374,45 +374,74 @@ function HoldingRow({
 
   return (
     <div className="flex items-center gap-3 border-t border-line px-3 py-2.5">
-      <span className="ticker" data-native={holding.token.native ? "true" : undefined}>
-        {holding.token.symbol}
-      </span>
+      {/* The ticker is not repeated here. It already appears twice on this row
+          — once naming the token and once as the unit on the quantity — and a
+          third copy in its own column was three identifiers for one asset. The
+          one that stays is the one attached to the number, because that is the
+          copy doing work. */}
       <div className="min-w-0 flex-1">
-        <p className="flex items-center gap-1.5 text-[12px] text-dim">
-          <span className="truncate">{holding.token.name}</span>
-          <TokenTags token={token} listed={listed} />
-          {unverified && (
-            <span
-              className="chip chip-xs chip-warn"
-              title={t("assets.unverifiedHint")}
-            >
-              {t("assets.tagUnverified")}
-            </span>
-          )}
+        {/*
+         * The name, unadorned. The tags that used to sit here — unlisted, meme,
+         * Pons — are 24px bordered pills against a 13px name, and on a chain
+         * whose curated list is three addresses long, "unlisted" was true of
+         * every row but one. A badge that never varies is not a signal, it is
+         * furniture, and it was outweighing the thing it annotated. The picker
+         * still carries all of them, which is where they decide something: a
+         * reader holding a token has already made that choice.
+         *
+         * With no ticker column left to mark it, the coin's own row takes the
+         * accent instead — it is the balance the wallet is denominated in, and
+         * it should be findable among names that otherwise all look alike.
+         */}
+        <p
+          className={`truncate text-[13px] ${
+            holding.token.native ? "text-accent-text" : "text-dim"
+          }`}
+        >
+          {holding.token.name}
         </p>
+        {/* The quantity, and nothing else. It carries its own unit, because a
+            bare number under a dollar figure is two magnitudes in two units
+            with nothing saying which is which. What one unit costs, and the cap
+            that price implies, are facts about the token rather than about this
+            holding — they belong on the token's own screen, not competing with
+            the balance on every row of a list. Both are still in the tooltip. */}
         <p className="num truncate text-[11px] text-faint" title={provenance || undefined}>
-          {leadsWithCap ? (
-            <>
-              <span className="lbl mr-1">
-                {holding.diluted ? t("assets.fdv") : t("assets.marketCap")}
-              </span>
-              {formatCompactMoney(holding.marketCap, money)}
-            </>
-          ) : holding.price !== undefined ? (
-            formatPriceMoney(holding.price, money)
-          ) : holding.token.native ? (
-            t("token.native")
-          ) : (
-            truncateAddress(holding.token.address, 6, 4)
-          )}
+          {formatAmount(holding.amount, 5)} {holding.token.symbol}
         </p>
       </div>
-      <div className="text-right">
-        <p className="num text-[13px]">{formatAmount(holding.amount, 5)}</p>
-        <p className="num text-[11px] text-faint">
+      <div className="shrink-0 text-right">
+        {/* The doubt belongs against the figure it is about, not against the
+            token's name, and it is one glyph rather than a pill. */}
+        <p className="num flex items-center justify-end gap-1.5 text-[13px]">
+          {unverified && (
+            <span className="warn flex shrink-0" title={t("assets.unverifiedHint")}>
+              <Icon name="alert" size={12} />
+            </span>
+          )}
           {holding.value !== undefined
             ? formatMoneyFloor(holding.value, money)
             : t("assets.unpriced")}
+        </p>
+        {/* Where the holding is going, under what it is worth. Only a market
+            feed reports this: an explorer's quote and a pool's mid price are
+            each a single reading with no yesterday to compare against, so a row
+            says nothing here rather than guessing at a direction. */}
+        <p
+          className={`num text-[11px] ${
+            holding.change24h === undefined
+              ? "text-faint"
+              : holding.change24h >= 0
+                ? "long"
+                : "short"
+          }`}
+          title={
+            holding.change24h === undefined
+              ? t("assets.changeUnknownHint")
+              : t("assets.change24hHint")
+          }
+        >
+          {holding.change24h === undefined ? "—" : formatSigned(holding.change24h)}
         </p>
       </div>
     </div>

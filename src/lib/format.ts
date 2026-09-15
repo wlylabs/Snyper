@@ -20,7 +20,16 @@ export function truncateAddress(address: string, lead = 6, tail = 4): string {
   return `${address.slice(0, lead)}…${address.slice(-tail)}`;
 }
 
-/** Significant-digit aware amount formatting for token quantities. */
+/**
+ * Significant-digit aware amount formatting for token quantities.
+ *
+ * Never scientific notation. A balance is a quantity the reader has to check
+ * against their wallet, and `3.10e-5` is not a quantity — it is a quantity they
+ * have to decode first, next to a dollar figure that needs no decoding, which
+ * is how a reader ends up comparing two numbers that were never the same unit.
+ * Plain decimals hold down to a millionth; below that the zero run is counted,
+ * the same way prices are written elsewhere in the app.
+ */
 export function formatAmount(value: number, maxDecimals = 6): string {
   if (!Number.isFinite(value)) return "—";
   if (value === 0) return "0";
@@ -29,7 +38,7 @@ export function formatAmount(value: number, maxDecimals = 6): string {
   if (abs >= 1000) return value.toLocaleString(numberLocale, { maximumFractionDigits: 2 });
   if (abs >= 1) return value.toLocaleString(numberLocale, { maximumFractionDigits: 4 });
   if (abs >= 0.0001) return value.toLocaleString(numberLocale, { maximumFractionDigits: maxDecimals });
-  return value.toExponential(2);
+  return formatSignificant(value, 3, numberLocale, 6);
 }
 
 export function formatUnitsFixed(value: bigint, decimals: number, maxDecimals = 6): string {
@@ -165,6 +174,7 @@ export function formatSignificant(
   value: number,
   significant = 4,
   tag = numberLocale,
+  subscriptFloor = SUBSCRIPT_FLOOR,
 ): string {
   if (!Number.isFinite(value)) return "—";
   const abs = Math.abs(value);
@@ -179,7 +189,7 @@ export function formatSignificant(
   }
 
   const { zeros, digits } = leadingZeros(abs, significant);
-  if (zeros < SUBSCRIPT_FLOOR) {
+  if (zeros < subscriptFloor) {
     return value.toLocaleString(tag, {
       minimumFractionDigits: 2,
       maximumFractionDigits: zeros + significant,

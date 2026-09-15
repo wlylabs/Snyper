@@ -49,7 +49,7 @@ export function PositionsPanel() {
       {!mounted ? (
         <Empty title={t("common.loadingLocal")} />
       ) : positions.length === 0 ? (
-        <Empty title={t("positions.emptyTitle")} hint={t("positions.emptyHint")} />
+        <Empty title={t("positions.emptyTitle")} />
       ) : (
         <>
           {totals.byCash.length > 0 && (
