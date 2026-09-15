@@ -350,7 +350,6 @@ function AccountSheet({
           {t("wallet.disconnect")}
         </button>
 
-        <p className="mt-4 text-[10px] leading-relaxed text-faint">{t("wallet.privyNote")}</p>
 
         {/* The same line Privy prints under its own modal, in the same words. */}
         <a

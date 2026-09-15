@@ -48,8 +48,6 @@ const en = {
   "wallet.exportKey": "Export private key",
   "wallet.privyDisabled":
     "Wallet connection is switched off in this build. Set {env} to a Privy app id to turn it back on.",
-  "wallet.privyNote":
-    "Privy handles the sign-in. Keys stay in your own wallet — or, for an embedded one, in Privy's enclave, where only you can export them. Snyper signs nothing on your behalf.",
   "wallet.connecting": "Connecting…",
   "wallet.connected": "Wallet connected",
   "wallet.connectFailed": "That wallet could not be connected.",
@@ -99,7 +97,6 @@ const en = {
   "swap.poolTier": "{fee} pool",
   "swap.deepImpact":
     "This size moves the pool more than 5%. Consider splitting it across legs.",
-  "swap.footnote": "Routed through Uniswap v3 · signed in your wallet · no keys held",
   "swap.ctaConnect": "Connect a wallet first",
   "swap.ctaConnectAction": "Connect wallet",
   "swap.ctaSwitch": "Switch to {chain}",
@@ -129,8 +126,6 @@ const en = {
   "terminal.pool": "Pool",
   "terminal.ticksRecorded": "Ticks recorded",
   "terminal.ticksSince": "{count} since {time} ago",
-  "terminal.sourceNote":
-    "Prices come from the pool itself — sqrtPrice for the mid, QuoterV2 for executable size. Nothing is cached from a third-party feed.",
   "terminal.awaitingTicks": "Awaiting ticks",
   "terminal.noVenue": "No venue resolved yet",
   "terminal.venueUniswap": "Uniswap v3",
@@ -147,8 +142,6 @@ const en = {
   "snype.pairOn": "Pair · {chain}",
   "snype.poolMid": "Pool mid",
   "snype.reading": "reading…",
-  "snype.autoNote":
-    "Auto submit still opens your wallet for every signature. Nothing is pre-signed and no key ever leaves your device.",
   "snype.errPair": "Select both sides of the pair.",
   "snype.errSame": "Base and quote must differ.",
 
@@ -156,7 +149,6 @@ const en = {
   "signal.open": "{count} open",
   "signal.clearLog": "Clear log",
   "signal.emptyTitle": "No signals yet",
-  "signal.emptyHint": "An armed snype publishes a signal here the moment its price is met.",
   "signal.buy": "BUY",
   "signal.sell": "SELL",
   "signal.dismiss": "Dismiss",
@@ -219,14 +211,11 @@ const en = {
   "assets.noneImported": "None imported",
 
   "activity.title": "Activity",
-  "activity.subtitle": "Local ledger of everything this device submitted or signalled.",
   "activity.all": "All",
   "activity.swaps": "Swaps",
   "activity.approvals": "Approvals",
   "activity.signals": "Signals",
   "activity.emptyTitle": "Nothing recorded yet",
-  "activity.emptyHint":
-    "Swaps, approvals and snype signals land here with their transaction hashes.",
   "activity.approve": "Approve {symbol}",
   "activity.terminal": "Terminal",
   "activity.snype": "Snype",
@@ -235,20 +224,14 @@ const en = {
 
   "settings.appearance": "Appearance",
   "settings.theme": "Theme",
-  "settings.themeHint": "Applied instantly and remembered on this device.",
   "settings.dark": "Dark",
   "settings.light": "Light",
   "settings.language": "Language",
-  "settings.languageHint": "Interface text, number and date formatting.",
   "settings.currency": "Display currency",
-  "settings.currencyHint":
-    "Portfolio values are priced on-chain in USD, then converted for display.",
   "settings.fxRate": "USD / IDR rate",
   "settings.fxUpdated": "Rate updated",
   "settings.fxSource": "Rate source",
   "settings.fxUnavailable": "Unavailable — values stay in USD",
-  "settings.fxNote":
-    "The rate comes from a public FX feed and is refreshed hourly. It affects display only; every trade still settles in the pool's own tokens.",
   "settings.execDefaults": "Execution defaults",
   "settings.slippage": "Slippage (bps)",
   "settings.deadline": "Deadline (min)",
@@ -263,8 +246,6 @@ const en = {
   "settings.privateEndpoint": "Private endpoint",
   "settings.publicEndpoint": "Public endpoint",
   "settings.venue": "Routing venue",
-  "settings.venueNote":
-    "Robinhood Chain publishes no deployment list to ship against, so Snyper carries the Uniswap v3 deployment it read off chain 4663 itself and still asks the Pons launchpad, on every load, which deployment it opens its pools in. A live answer wins; the shipped one is what keeps prices and trades working when the lookup does not come back. Enter your own below to override both.",
   "settings.venueSource": "Resolved from",
   "settings.venueEnv": "Build configuration",
   "settings.venueManual": "Entered here",
@@ -282,16 +263,12 @@ const en = {
   "settings.venueStableDecimals": "USD decimals",
   "settings.venueRetry": "Look again",
   "settings.venueEdit": "Enter addresses by hand",
-  "settings.venueRouterHint":
-    "The router on its own is enough — Snyper reads the factory and the wrapped native off it and fills the rest in.",
   "settings.venueSave": "Use these",
   "settings.venueClear": "Clear",
   "settings.venueWarning":
     "A wrong router address sends funds to a contract that was never meant to receive them. Check every address against the explorer before saving.",
   "settings.ponsV1": "Pons V1 factory",
   "settings.ponsV2": "Pons V2 factory",
-  "settings.rpcNote":
-    "The endpoint is set at build time through NEXT_PUBLIC_RPC_4663. The public fallback rate-limits quickly under a fast engine tick.",
   "settings.localData": "Local data",
   "settings.localDataNote":
     "Snypes, signals, the activity ledger and recorded price ticks live in this browser only. Clearing them cannot be undone and does not touch anything on-chain.",
@@ -417,8 +394,6 @@ const en = {
   "snype.exit.cl": "Cut loss",
   "snype.exit.manual": "Closed by hand",
   "snype.emptyTitle": "No snypes yet",
-  "snype.emptyHint":
-    "A snype buys at your price, then protects the position with a take profit and a cut loss.",
   "snype.emptyAction": "Set up a snype",
   "snype.summary": "{total} snypes · {live} live",
 
@@ -428,8 +403,6 @@ const en = {
   "positions.title": "Positions",
   "positions.count": "{count} open",
   "positions.emptyTitle": "No positions yet",
-  "positions.emptyHint":
-    "Every confirmed swap sent from this browser builds an entry price, so a bag bought in legs reads as one line.",
   "positions.booked": "Booked ({symbol})",
   "positions.openResult": "Open {value}",
   "positions.closed": "Closed",
@@ -440,8 +413,10 @@ const en = {
 
   "settings.priorityFee": "Priority fee (gwei)",
   "settings.maxImpact": "Impact guard (bps)",
-  "settings.guardNote":
-    "The priority fee rides on top of the base fee; 0 leaves the tip to the wallet. The impact guard refuses any swap that would cost more than this in depth — which is what a drained pool looks like from the outside.",
+  "settings.priorityFeeHint":
+    "Rides on top of the base fee; 0 leaves the tip to the wallet.",
+  "settings.impactHint":
+    "Refuses any swap that would cost more than this in depth — which is what a drained pool looks like from the outside.",
 
   "error.impactGuard":
     "This swap would cost {impact} in depth, over the {limit} guard. Raise the guard in settings if that is what you meant.",
@@ -486,8 +461,6 @@ const id: Record<TKey, string> = {
   "wallet.exportKey": "Ekspor kunci privat",
   "wallet.privyDisabled":
     "Koneksi dompet dimatikan di build ini. Isi {env} dengan app id Privy untuk menyalakannya lagi.",
-  "wallet.privyNote":
-    "Privy yang menangani proses masuk. Kunci tetap di dompetmu sendiri — atau, untuk dompet bawaan, di enclave Privy, yang hanya kamu yang bisa mengekspornya. Snyper tidak menandatangani apa pun atas namamu.",
   "wallet.connecting": "Menghubungkan…",
   "wallet.connected": "Dompet terhubung",
   "wallet.connectFailed": "Dompet itu tidak bisa dihubungkan.",
@@ -537,8 +510,6 @@ const id: Record<TKey, string> = {
   "swap.poolTier": "pool {fee}",
   "swap.deepImpact":
     "Ukuran ini menggeser pool lebih dari 5%. Pertimbangkan memecahnya jadi beberapa bagian.",
-  "swap.footnote":
-    "Lewat Uniswap v3 · ditandatangani di dompetmu · tidak ada kunci yang disimpan",
   "swap.ctaConnect": "Hubungkan dompet dulu",
   "swap.ctaConnectAction": "Hubungkan dompet",
   "swap.ctaSwitch": "Pindah ke {chain}",
@@ -568,8 +539,6 @@ const id: Record<TKey, string> = {
   "terminal.pool": "Pool",
   "terminal.ticksRecorded": "Tick tercatat",
   "terminal.ticksSince": "{count} sejak {time} lalu",
-  "terminal.sourceNote":
-    "Harga diambil dari pool itu sendiri — sqrtPrice untuk harga tengah, QuoterV2 untuk ukuran yang bisa dieksekusi. Tidak ada data dari feed pihak ketiga.",
   "terminal.awaitingTicks": "Menunggu tick",
   "terminal.noVenue": "Belum ada tempat routing",
   "terminal.venueUniswap": "Uniswap v3",
@@ -586,8 +555,6 @@ const id: Record<TKey, string> = {
   "snype.pairOn": "Pasangan · {chain}",
   "snype.poolMid": "Harga tengah pool",
   "snype.reading": "membaca…",
-  "snype.autoNote":
-    "Kirim otomatis tetap membuka dompetmu untuk setiap tanda tangan. Tidak ada yang ditandatangani di muka dan tidak ada kunci yang keluar dari perangkatmu.",
   "snype.errPair": "Pilih kedua sisi pasangan.",
   "snype.errSame": "Aset dasar dan penilai harus berbeda.",
 
@@ -595,8 +562,6 @@ const id: Record<TKey, string> = {
   "signal.open": "{count} terbuka",
   "signal.clearLog": "Bersihkan log",
   "signal.emptyTitle": "Belum ada sinyal",
-  "signal.emptyHint":
-    "Snype yang aktif akan menerbitkan sinyal di sini begitu harganya tersentuh.",
   "signal.buy": "BELI",
   "signal.sell": "JUAL",
   "signal.dismiss": "Abaikan",
@@ -659,14 +624,11 @@ const id: Record<TKey, string> = {
   "assets.noneImported": "Belum ada",
 
   "activity.title": "Aktivitas",
-  "activity.subtitle": "Catatan lokal semua yang dikirim atau disinyalkan perangkat ini.",
   "activity.all": "Semua",
   "activity.swaps": "Tukar",
   "activity.approvals": "Persetujuan",
   "activity.signals": "Sinyal",
   "activity.emptyTitle": "Belum ada catatan",
-  "activity.emptyHint":
-    "Penukaran, persetujuan, dan sinyal snype akan muncul di sini beserta hash transaksinya.",
   "activity.approve": "Setujui {symbol}",
   "activity.terminal": "Terminal",
   "activity.snype": "Snype",
@@ -675,20 +637,14 @@ const id: Record<TKey, string> = {
 
   "settings.appearance": "Tampilan",
   "settings.theme": "Tema",
-  "settings.themeHint": "Langsung diterapkan dan diingat di perangkat ini.",
   "settings.dark": "Gelap",
   "settings.light": "Terang",
   "settings.language": "Bahasa",
-  "settings.languageHint": "Teks antarmuka, format angka, dan tanggal.",
   "settings.currency": "Mata uang tampilan",
-  "settings.currencyHint":
-    "Nilai portofolio dihitung on-chain dalam USD, lalu dikonversi untuk ditampilkan.",
   "settings.fxRate": "Kurs USD / IDR",
   "settings.fxUpdated": "Kurs diperbarui",
   "settings.fxSource": "Sumber kurs",
   "settings.fxUnavailable": "Tidak tersedia — nilai tetap dalam USD",
-  "settings.fxNote":
-    "Kurs berasal dari feed valas publik dan disegarkan tiap jam. Ini hanya memengaruhi tampilan; setiap transaksi tetap diselesaikan dalam token pool itu sendiri.",
   "settings.execDefaults": "Bawaan eksekusi",
   "settings.slippage": "Slippage (bps)",
   "settings.deadline": "Batas waktu (mnt)",
@@ -703,8 +659,6 @@ const id: Record<TKey, string> = {
   "settings.privateEndpoint": "Endpoint pribadi",
   "settings.publicEndpoint": "Endpoint publik",
   "settings.venue": "Tempat routing",
-  "settings.venueNote":
-    "Robinhood Chain belum menerbitkan daftar deployment yang bisa jadi acuan, jadi Snyper membawa deployment Uniswap v3 yang dibacanya langsung dari chain 4663 dan tetap menanyakan ke launchpad Pons, tiap kali dibuka, Uniswap mana yang dipakainya membuka pool. Jawaban langsung menang; yang dibawa Snyper menjaga harga dan transaksi tetap jalan saat pencarian itu tidak menjawab. Isi punyamu sendiri di bawah untuk menimpa keduanya.",
   "settings.venueSource": "Sumbernya",
   "settings.venueEnv": "Konfigurasi build",
   "settings.venueManual": "Diisi di sini",
@@ -722,16 +676,12 @@ const id: Record<TKey, string> = {
   "settings.venueStableDecimals": "Desimal dolar",
   "settings.venueRetry": "Cari lagi",
   "settings.venueEdit": "Isi alamatnya sendiri",
-  "settings.venueRouterHint":
-    "Cukup isi router-nya saja — factory dan wrapped native dibaca dari router itu dan diisikan sendiri.",
   "settings.venueSave": "Pakai ini",
   "settings.venueClear": "Kosongkan",
   "settings.venueWarning":
     "Alamat router yang salah mengirim dana ke kontrak yang tidak pernah dimaksudkan menerimanya. Cek tiap alamat di explorer sebelum disimpan.",
   "settings.ponsV1": "Factory Pons V1",
   "settings.ponsV2": "Factory Pons V2",
-  "settings.rpcNote":
-    "Endpoint disetel saat build lewat NEXT_PUBLIC_RPC_4663. Endpoint publik cepat kena batas jika interval mesin terlalu pendek.",
   "settings.localData": "Data lokal",
   "settings.localDataNote":
     "Snype, sinyal, catatan aktivitas, dan tick harga hanya tersimpan di browser ini. Menghapusnya tidak bisa dibatalkan dan tidak memengaruhi apa pun di chain.",
@@ -857,8 +807,6 @@ const id: Record<TKey, string> = {
   "snype.exit.cl": "Cut loss",
   "snype.exit.manual": "Dijual manual",
   "snype.emptyTitle": "Belum ada snype",
-  "snype.emptyHint":
-    "Snype membeli di harga yang kamu tentukan, lalu menjaga posisinya dengan take profit dan cut loss.",
   "snype.emptyAction": "Pasang snype",
   "snype.summary": "{total} snype · {live} jalan",
 
@@ -868,8 +816,6 @@ const id: Record<TKey, string> = {
   "positions.title": "Posisi",
   "positions.count": "{count} terbuka",
   "positions.emptyTitle": "Belum ada posisi",
-  "positions.emptyHint":
-    "Tiap swap yang dikirim dari browser ini ikut menyusun harga masuknya, jadi satu bag yang dibeli bertahap tetap terbaca sebagai satu baris.",
   "positions.booked": "Sudah jadi ({symbol})",
   "positions.openResult": "Berjalan {value}",
   "positions.closed": "Sudah tutup",
@@ -880,8 +826,10 @@ const id: Record<TKey, string> = {
 
   "settings.priorityFee": "Priority fee (gwei)",
   "settings.maxImpact": "Penjaga dampak (bps)",
-  "settings.guardNote":
-    "Priority fee ditambahkan di atas base fee; 0 berarti tipnya diserahkan ke dompet. Penjaga dampak menolak swap yang biayanya melebihi angka ini — begitulah pool yang sudah dikuras terlihat dari luar.",
+  "settings.priorityFeeHint":
+    "Ditambahkan di atas base fee; 0 berarti tipnya diserahkan ke dompet.",
+  "settings.impactHint":
+    "Menolak swap yang biayanya melebihi angka ini — begitulah pool yang sudah dikuras terlihat dari luar.",
 
   "error.impactGuard":
     "Swap ini akan memakan {impact}, di atas penjaga {limit}. Naikkan penjaganya di pengaturan kalau memang itu maksudmu.",

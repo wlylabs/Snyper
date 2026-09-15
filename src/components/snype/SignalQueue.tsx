@@ -40,7 +40,6 @@ export function SignalQueue() {
       {open.length === 0 && recent.length === 0 ? (
         <Empty
           title={t("signal.emptyTitle")}
-          hint={t("signal.emptyHint")}
         />
       ) : (
         <div>

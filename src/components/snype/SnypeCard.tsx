@@ -147,7 +147,6 @@ export function SnypeCard({ snype }: { snype: Snype }) {
                 tone={pnl !== undefined && pnl < 0 ? "short" : "long"}
               />
               <Targets takeProfit={takeProfit} cutLoss={cutLoss} />
-              <p className="text-[11px] leading-relaxed text-faint">{t("snype.recalcNote")}</p>
             </>
           )}
 
@@ -230,7 +229,10 @@ export function SnypeCard({ snype }: { snype: Snype }) {
 function Targets({ takeProfit, cutLoss }: { takeProfit: number; cutLoss: number }) {
   const { t } = useI18n();
   return (
-    <div className="grid grid-cols-2 gap-2">
+    /* Both are measured from the fill, not from the price the reader typed —
+       a surprise worth answering on hover rather than in a line of prose under
+       every card that ever ran. */
+    <div className="grid grid-cols-2 gap-2" title={t("snype.recalcNote")}>
       <div className="border border-line bg-base px-2 py-1.5">
         <span className="lbl block">{t("snype.exit.tp")}</span>
         <span className="num text-[12.5px] long">{formatPrice(takeProfit)}</span>

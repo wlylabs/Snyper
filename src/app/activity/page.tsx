@@ -114,7 +114,6 @@ export default function ActivityPage() {
           <h1 className="text-[15px] font-bold tracking-[0.12em] uppercase">
             {t("activity.title")}
           </h1>
-          <p className="mt-0.5 text-[11px] text-faint">{t("activity.subtitle")}</p>
         </div>
         <Segmented
           options={FILTERS.map((f) => ({ value: f.value, label: t(f.label) }))}
@@ -127,7 +126,6 @@ export default function ActivityPage() {
         {!mounted || entries.length === 0 ? (
           <Empty
             title={t("activity.emptyTitle")}
-            hint={t("activity.emptyHint")}
           />
         ) : (
           entries.map((entry) => {
