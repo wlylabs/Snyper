@@ -1,7 +1,7 @@
 "use client";
 
 import { Icon } from "@/components/ui/Icon";
-import { TokenBadge } from "@/components/terminal/TokenPicker";
+import { TokenBadge } from "@/components/ui/TokenBadge";
 import type { Token } from "@/lib/tokens";
 
 export function PairButton({
@@ -21,7 +21,11 @@ export function PairButton({
       className="row-link panel flex items-center gap-2.5 p-2.5"
       onClick={onClick}
     >
-      {token ? <TokenBadge token={token} size={26} /> : <span className="h-[26px] w-[26px] border border-line" />}
+      {token ? (
+        <TokenBadge token={token} size={26} />
+      ) : (
+        <span className="badge badge-empty" style={{ width: 26, height: 26 }} />
+      )}
       <span className="min-w-0 flex-1 text-left">
         <span className="lbl block">{caption}</span>
         <span className="block truncate text-[13px] font-semibold">

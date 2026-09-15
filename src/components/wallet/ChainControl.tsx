@@ -23,7 +23,7 @@ export function ChainControl() {
   const meta = chainMeta(CHAIN_ID);
   const wrongNetwork = isConnected && currentId !== CHAIN_ID;
 
-  if (!mounted) return <div className="skel h-[34px] w-[92px]" />;
+  if (!mounted) return <div className="skel h-[30px] w-[92px]" />;
 
   if (wrongNetwork) {
     return (

@@ -10,6 +10,8 @@ import { PRIVY_APP_ID, PRIVY_CLIENT_ID, PRIVY_CONFIGURED, privyConfig } from "@/
 import { ToastProvider } from "@/components/ui/Toast";
 import { SnypeRunner } from "@/components/snype/SnypeRunner";
 import { VenueSync } from "@/hooks/useVenue";
+import { TokenLogoSync } from "@/hooks/useTokenLogos";
+import { ConnectPromptProvider } from "@/hooks/useConnectPrompt";
 import { useAppStore } from "@/store/useAppStore";
 import { setNumberLocale } from "@/lib/format";
 import { INTL_LOCALE, detectLocale } from "@/lib/i18n";
@@ -78,6 +80,7 @@ function ServiceWorker() {
  */
 function WalletProviders({ children }: { children: ReactNode }) {
   const theme = useAppStore((state) => state.settings.theme);
+  const locale = useAppStore((state) => state.settings.locale);
 
   if (!PRIVY_CONFIGURED) {
     return <BareWagmiProvider config={config}>{children}</BareWagmiProvider>;
@@ -87,9 +90,13 @@ function WalletProviders({ children }: { children: ReactNode }) {
     <PrivyProvider
       appId={PRIVY_APP_ID}
       {...(PRIVY_CLIENT_ID ? { clientId: PRIVY_CLIENT_ID } : {})}
-      config={privyConfig(theme)}
+      // Theme and language are read here rather than inside the modal, so a
+      // reader who switches either one finds Privy already switched with them.
+      config={privyConfig(theme, locale)}
     >
-      <WagmiProvider config={config}>{children}</WagmiProvider>
+      <WagmiProvider config={config}>
+        <ConnectPromptProvider>{children}</ConnectPromptProvider>
+      </WagmiProvider>
     </PrivyProvider>
   );
 }
@@ -116,6 +123,7 @@ export function Providers({ children }: { children: ReactNode }) {
           <LocaleSync />
           <ServiceWorker />
           <VenueSync />
+          <TokenLogoSync />
           <SnypeRunner />
           {children}
         </ToastProvider>

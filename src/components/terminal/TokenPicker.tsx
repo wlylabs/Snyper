@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { isAddress } from "viem";
 import { usePublicClient } from "wagmi";
 import { Icon } from "@/components/ui/Icon";
+import { TokenBadge } from "@/components/ui/TokenBadge";
 import { Sheet } from "@/components/ui/Sheet";
 import { truncateAddress } from "@/lib/format";
 import { memeSignal } from "@/lib/memecoin";
@@ -144,22 +145,6 @@ export function TokenPicker({
         )}
       </div>
     </Sheet>
-  );
-}
-
-export function TokenBadge({ token, size = 28 }: { token: Token; size?: number }) {
-  return (
-    <span
-      className="flex shrink-0 items-center justify-center overflow-hidden border border-line bg-base font-bold leading-none"
-      style={{ width: size, height: size, fontSize: Math.max(7, Math.round(size * 0.3)) }}
-    >
-      {token.logoURI ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={token.logoURI} alt="" className="h-full w-full object-cover" loading="lazy" />
-      ) : (
-        token.symbol.slice(0, 3).toUpperCase()
-      )}
-    </span>
   );
 }
 

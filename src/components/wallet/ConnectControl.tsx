@@ -1,11 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import { usePrivy, useExportWallet, useWallets, type User } from "@privy-io/react-auth";
+import {
+  useExportWallet,
+  useLogin,
+  useModalStatus,
+  usePrivy,
+  useWallets,
+  type ConnectedWallet,
+  type User,
+} from "@privy-io/react-auth";
 import { useSetActiveWallet } from "@privy-io/wagmi";
 import { useAccount, useBalance } from "wagmi";
 import { Icon } from "@/components/ui/Icon";
 import { Sheet } from "@/components/ui/Sheet";
+import { WalletAvatar } from "@/components/ui/TokenBadge";
+import { useToast } from "@/components/ui/Toast";
 import { chainMeta, explorerAddress } from "@/lib/chains";
 import { formatAmount, truncateAddress } from "@/lib/format";
 import { PRIVY_CONFIGURED } from "@/lib/privy";
@@ -15,7 +25,7 @@ import { useI18n } from "@/hooks/useI18n";
 export function ConnectControl() {
   const mounted = useMounted();
 
-  if (!mounted) return <div className="skel h-[34px] w-[116px]" />;
+  if (!mounted) return <div className="skel h-[30px] w-[116px] rounded-full" />;
   if (!PRIVY_CONFIGURED) return <Unconfigured />;
   return <PrivyControl />;
 }
@@ -44,32 +54,94 @@ function Unconfigured() {
   );
 }
 
+/** The wallet a given address belongs to, out of everything Privy has linked. */
+function walletFor(wallets: ConnectedWallet[], address?: string) {
+  if (!address) return undefined;
+  return wallets.find((wallet) => wallet.address.toLowerCase() === address.toLowerCase());
+}
+
+/** What to call a wallet in a row: its own name, or what it is to Privy. */
+function walletName(wallet: ConnectedWallet | undefined, embeddedLabel: string, fallback: string) {
+  if (!wallet) return fallback;
+  if (wallet.walletClientType === "privy") return embeddedLabel;
+  return wallet.meta.name ?? wallet.walletClientType ?? fallback;
+}
+
 function PrivyControl() {
   const { t } = useI18n();
-  const { ready, authenticated, user, login } = usePrivy();
+  const toast = useToast();
+  const { ready, authenticated, user } = usePrivy();
+  const { wallets } = useWallets();
   const { address } = useAccount();
   const [accountOpen, setAccountOpen] = useState(false);
 
-  if (!ready) return <div className="skel h-[34px] w-[116px]" />;
+  /*
+   * Privy's modal is a surface of this app, not a departure from it, so the
+   * control that opened it stays lit for as long as it is up — the same way a
+   * menu button stays pressed while its menu is open. Without that the header
+   * looks idle while the reader is mid-connect.
+   */
+  const { isOpen } = useModalStatus();
 
-  if (!authenticated || !address) {
+  const { login } = useLogin({
+    onComplete: ({ wasAlreadyAuthenticated }) => {
+      if (wasAlreadyAuthenticated) return;
+      toast.push({ tone: "ok", message: t("wallet.connected") });
+    },
+    onError: (error) => {
+      // A reader closing the modal is reported here too; it is not a failure.
+      if (error === "exited_auth_flow") return;
+      toast.push({ tone: "error", message: t("wallet.connectFailed"), detail: String(error) });
+    },
+  });
+
+  if (!ready) return <div className="skel h-[30px] w-[116px] rounded-full" />;
+
+  if (!authenticated) {
     return (
-      <button type="button" className="btn btn-accent btn-sm" onClick={() => login()}>
+      <button
+        type="button"
+        className="btn btn-accent btn-sm"
+        data-open={isOpen ? "true" : undefined}
+        onClick={() => login()}
+      >
+        <Icon name="wallet" size={13} />
         {t("wallet.connect")}
       </button>
     );
   }
 
+  /*
+   * Authenticated, but wagmi has no account yet: Privy is still creating or
+   * attaching the embedded wallet. The pill holds its place at its final size
+   * so the header does not jump when the address lands.
+   */
+  if (!address) {
+    return (
+      <span className="pill cursor-default" aria-live="polite">
+        <span className="badge badge-empty" style={{ width: 22, height: 22 }} />
+        <span className="text-[11px] text-dim">{t("wallet.connecting")}</span>
+      </span>
+    );
+  }
+
+  const active = walletFor(wallets, address);
+
   return (
     <>
       <button
         type="button"
-        className="btn btn-sm"
+        className="pill"
+        data-open={isOpen || accountOpen ? "true" : undefined}
         onClick={() => setAccountOpen(true)}
         aria-label={t("wallet.account")}
       >
-        <span className="dot dot-live" />
-        <span className="num normal-case tracking-normal">{truncateAddress(address, 4, 4)}</span>
+        <WalletAvatar
+          address={address}
+          size={22}
+          embedded={active?.walletClientType === "privy"}
+        />
+        <span className="num tracking-normal">{truncateAddress(address, 4, 4)}</span>
       </button>
       <AccountSheet
         open={accountOpen}
@@ -94,6 +166,14 @@ function identityLabel(user: User | null): string | undefined {
   );
 }
 
+/**
+ * The account surface, built to the same plan as the screen Privy shows once a
+ * wallet is linked: the avatar and the address at the top, what the account
+ * holds under them, and everything you can do about it as filled rows below. A
+ * reader who connects through Privy's modal and then opens this should not feel
+ * they have crossed a border — the modal and this sheet run on the same tokens,
+ * the same corners and the same avatar.
+ */
 function AccountSheet({
   open,
   onClose,
@@ -106,7 +186,8 @@ function AccountSheet({
   user: User | null;
 }) {
   const { t } = useI18n();
-  const { logout } = usePrivy();
+  const toast = useToast();
+  const { logout, connectWallet } = usePrivy();
   const { exportWallet } = useExportWallet();
   const { wallets } = useWallets();
   const { setActiveWallet } = useSetActiveWallet();
@@ -115,9 +196,7 @@ function AccountSheet({
   const meta = chainMeta(chainId);
   const { data: balance } = useBalance({ address, query: { enabled: open } });
 
-  const active = wallets.find(
-    (wallet) => wallet.address.toLowerCase() === address.toLowerCase(),
-  );
+  const active = walletFor(wallets, address);
   const embedded = active?.walletClientType === "privy";
   const others = wallets.filter(
     (wallet) => wallet.address.toLowerCase() !== address.toLowerCase(),
@@ -136,94 +215,137 @@ function AccountSheet({
 
   return (
     <Sheet open={open} title={t("wallet.account")} onClose={onClose}>
-      <div className="p-3">
-        <div className="panel ticked p-4">
-          <p className="lbl mb-2">
-            {embedded
-              ? t("wallet.embedded")
-              : (active?.meta.name ?? active?.walletClientType ?? t("wallet.wallet"))}
+      <div className="identity">
+        <WalletAvatar address={address} size={52} embedded={embedded} />
+
+        <div>
+          <p className="num text-[15px] leading-tight">{truncateAddress(address, 10, 6)}</p>
+          <p className="mt-1.5 flex items-center justify-center gap-1.5 text-[11px] text-faint">
+            <Icon name="wallet" size={12} />
+            {walletName(active, t("wallet.embedded"), t("wallet.wallet"))}
           </p>
-          <p className="num text-[15px] break-all">{address}</p>
-          {identity && <p className="mt-1 text-[11px] text-faint break-all">{identity}</p>}
-          <div className="mt-4 flex items-baseline justify-between">
-            <span className="lbl">{meta ? meta.label : t("wallet.unsupportedNetwork")}</span>
-            <span className="num text-[15px]">
-              {balance
-                ? `${formatAmount(Number(balance.formatted), 5)} ${balance.symbol}`
-                : "—"}
-            </span>
-          </div>
+          {identity && <p className="mt-1 wrap-any text-[11px] text-faint">{identity}</p>}
         </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <button type="button" className="btn btn-sm" onClick={copy}>
-            <Icon name={copied ? "check" : "copy"} size={13} />
+        <div className="mt-1">
+          <p className="num text-[26px] leading-none">
+            {balance ? formatAmount(Number(balance.formatted), 5) : "—"}
+            {balance && <span className="ml-1.5 text-[13px] text-dim">{balance.symbol}</span>}
+          </p>
+          <p className="lbl mt-2">{meta ? meta.label : t("wallet.unsupportedNetwork")}</p>
+        </div>
+      </div>
+
+      <div className="px-3 pb-4">
+        <div className="grid grid-cols-2 gap-2">
+          <button type="button" className="tile justify-center" onClick={copy}>
+            <Icon name={copied ? "check" : "copy"} size={14} className="text-dim" />
             {copied ? t("common.copied") : t("common.copy")}
           </button>
           <a
             href={chainId ? explorerAddress(chainId, address) : undefined}
             target="_blank"
             rel="noreferrer"
-            className="btn btn-sm"
+            className="tile justify-center"
           >
-            <Icon name="external" size={13} />
+            <Icon name="external" size={14} className="text-dim" />
             {t("common.explorer")}
           </a>
         </div>
 
-        {others.length > 0 && (
-          <div className="mt-3">
-            <p className="lbl mb-2">{t("wallet.otherWallets")}</p>
-            <div className="flex flex-col gap-1.5">
-              {others.map((wallet) => (
-                <button
-                  key={wallet.address}
-                  type="button"
-                  className="row-link panel flex items-center gap-3 p-2.5"
-                  onClick={() => void setActiveWallet(wallet)}
-                >
-                  <Icon name="wallet" size={15} className="text-dim" />
-                  <span className="min-w-0 flex-1 text-left">
-                    <span className="block text-[12px] font-semibold">
-                      {wallet.walletClientType === "privy"
-                        ? t("wallet.embedded")
-                        : (wallet.meta.name ?? wallet.walletClientType)}
-                    </span>
-                    <span className="num block truncate text-[11px] text-faint">
-                      {truncateAddress(wallet.address, 6, 4)}
-                    </span>
-                  </span>
-                  <span className="lbl">{t("wallet.use")}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        <p className="lbl mt-5 mb-2">{t("wallet.wallets")}</p>
+        <div className="flex flex-col gap-1.5">
+          <span className="tile cursor-default" data-active="true">
+            <WalletAvatar address={address} size={26} embedded={embedded} />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate">
+                {walletName(active, t("wallet.embedded"), t("wallet.wallet"))}
+              </span>
+              <span className="num block truncate text-[11px] font-normal text-faint">
+                {truncateAddress(address, 6, 4)}
+              </span>
+            </span>
+            <span className="lbl text-accent-text">{t("wallet.active")}</span>
+          </span>
+
+          {others.map((wallet) => (
+            <button
+              key={wallet.address}
+              type="button"
+              className="tile"
+              onClick={() => void setActiveWallet(wallet)}
+            >
+              <WalletAvatar
+                address={wallet.address}
+                size={26}
+                embedded={wallet.walletClientType === "privy"}
+              />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate">
+                  {walletName(wallet, t("wallet.embedded"), t("wallet.wallet"))}
+                </span>
+                <span className="num block truncate text-[11px] font-normal text-faint">
+                  {truncateAddress(wallet.address, 6, 4)}
+                </span>
+              </span>
+              <span className="lbl">{t("wallet.use")}</span>
+            </button>
+          ))}
+
+          {/*
+           * Straight back into Privy's own connect screen. Adding a wallet is
+           * its job, and handing it over is cheaper for the reader than a
+           * second picker of ours that would do the same thing worse.
+           */}
+          <button type="button" className="tile" onClick={() => connectWallet()}>
+            <span
+              className="badge badge-empty flex items-center justify-center"
+              style={{ width: 26, height: 26 }}
+            >
+              <Icon name="plus" size={13} className="text-dim" />
+            </span>
+            <span className="flex-1">{t("wallet.addWallet")}</span>
+            <Icon name="chevron" size={13} className="-rotate-90 text-faint" />
+          </button>
+        </div>
 
         {embedded && (
           <button
             type="button"
-            className="btn btn-sm mt-2 w-full"
+            className="tile mt-4"
             onClick={() => void exportWallet({ address })}
           >
-            <Icon name="download" size={13} />
-            {t("wallet.exportKey")}
+            <Icon name="download" size={14} className="text-dim" />
+            <span className="flex-1">{t("wallet.exportKey")}</span>
+            <Icon name="chevron" size={13} className="-rotate-90 text-faint" />
           </button>
         )}
 
         <button
           type="button"
-          className="btn btn-sm btn-short mt-2 w-full"
+          className="tile tile-danger mt-2 justify-center"
           onClick={() => {
             void logout();
             onClose();
+            toast.push({ tone: "info", message: t("wallet.disconnected") });
           }}
         >
-          <Icon name="power" size={13} />
+          <Icon name="power" size={14} />
           {t("wallet.disconnect")}
         </button>
 
-        <p className="mt-3 text-[10px] leading-relaxed text-faint">{t("wallet.privyNote")}</p>
+        <p className="mt-4 text-[10px] leading-relaxed text-faint">{t("wallet.privyNote")}</p>
+
+        {/* The same line Privy prints under its own modal, in the same words. */}
+        <a
+          href="https://privy.io"
+          target="_blank"
+          rel="noreferrer"
+          className="mt-3 flex items-center justify-center gap-1.5 text-[10px] tracking-[0.1em] text-faint uppercase transition-colors hover:text-dim"
+        >
+          {t("wallet.securedBy")}
+          <Icon name="external" size={11} />
+        </a>
       </div>
     </Sheet>
   );

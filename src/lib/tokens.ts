@@ -2,6 +2,7 @@ import type { PublicClient } from "viem";
 import { getAddress, isAddress } from "viem";
 import { erc20Abi } from "./abi";
 import { CHAIN_META, NATIVE, dexMeta } from "./chains";
+import { resolveTokenLogo } from "./tokenFeed";
 
 export type Token = {
   chainId: number;
@@ -90,16 +91,23 @@ export function mergeTokens(chainId: number, ...groups: Token[][]): Token[] {
   return [...seen.values()];
 }
 
-/** Reads name/symbol/decimals straight from the contract for unlisted tokens. */
+/**
+ * Reads name/symbol/decimals straight from the contract for unlisted tokens,
+ * and looks up its artwork while it is there — the contract first, the indexer
+ * only if the contract had nothing to say. The logo is
+ * optional in a way the other three are not, so it never fails the import: a
+ * token that will not say what it looks like still imports and still trades.
+ */
 export async function readToken(
   client: PublicClient,
   chainId: number,
   address: `0x${string}`,
 ): Promise<Token> {
-  const [symbol, name, decimals] = await Promise.all([
+  const [symbol, name, decimals, logoURI] = await Promise.all([
     client.readContract({ address, abi: erc20Abi, functionName: "symbol" }),
     client.readContract({ address, abi: erc20Abi, functionName: "name" }),
     client.readContract({ address, abi: erc20Abi, functionName: "decimals" }),
+    resolveTokenLogo(client, address).catch(() => undefined),
   ]);
   return {
     chainId,
@@ -107,6 +115,7 @@ export async function readToken(
     symbol,
     name,
     decimals: Number(decimals),
+    ...(logoURI ? { logoURI } : {}),
   };
 }
 

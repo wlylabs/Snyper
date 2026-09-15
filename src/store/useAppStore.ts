@@ -69,6 +69,12 @@ type AppState = {
   customTokens: Token[];
   /** Tokens found by scanning the wallet's own transfer history. */
   discoveredTokens: Token[];
+  /**
+   * Artwork each token named for itself, keyed `chainId:address`. An empty
+   * string is a token that was asked and had no answer, kept so the same dead
+   * lookup does not run again on every visit.
+   */
+  tokenLogos: Record<string, string>;
   /** Venue addresses the operator entered by hand. */
   venueManual?: VenueConfig;
   /** Venue addresses read off the Pons launchpad's own DEX config. */
@@ -97,6 +103,7 @@ type AppState = {
   setVenueDiscovered: (config: VenueConfig | undefined) => void;
   addCustomToken: (token: Token) => void;
   addDiscoveredTokens: (tokens: Token[]) => void;
+  setTokenLogos: (logos: Record<string, string>) => void;
   setHydrated: () => void;
 };
 
@@ -197,6 +204,7 @@ export const useAppStore = create<AppState>()(
       settings: DEFAULT_SETTINGS,
       customTokens: [],
       discoveredTokens: [],
+      tokenLogos: {},
       venueManual: undefined,
       venueDiscovered: undefined,
       venueKey: syncVenue(),
@@ -315,6 +323,14 @@ export const useAppStore = create<AppState>()(
           };
         }),
 
+      /**
+       * Records what a batch of tokens answered when asked for their artwork.
+       * Merged rather than replaced: a later pass covers tokens the earlier one
+       * did not reach, and must not forget what the earlier one learned.
+       */
+      setTokenLogos: (logos) =>
+        set((state) => ({ tokenLogos: { ...state.tokenLogos, ...logos } })),
+
       setVenueManual: (config) =>
         set((state) => ({
           venueManual: config,
@@ -342,6 +358,7 @@ export const useAppStore = create<AppState>()(
         settings: state.settings,
         customTokens: state.customTokens,
         discoveredTokens: state.discoveredTokens,
+        tokenLogos: state.tokenLogos,
         venueManual: state.venueManual,
         venueDiscovered: state.venueDiscovered,
       }),
