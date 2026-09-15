@@ -50,6 +50,13 @@ export type SnypeRuntime = {
   fillPrice?: number;
   /** Base units of the asset actually received, held as a string. */
   positionBase?: string;
+  /**
+   * Quote units the entry actually paid, held as a string. This is the figure
+   * the performance fee is measured against, so it is recorded raw rather than
+   * rebuilt from `fillPrice` — a float round trip on a position's cost basis is
+   * how a reader ends up charged on a profit they did not make.
+   */
+  costQuote?: string;
   exitReason?: Exclude<SnypeLeg, "entry">;
 };
 
@@ -110,7 +117,10 @@ export type Trade = {
   tokenIn?: Token;
   tokenOut?: Token;
   amountIn?: string;
+  /** What the wallet actually received, already net of anything Snyper took. */
   amountOut?: string;
+  /** Snyper's share of the output, in bps. Absent on trades that predate fees. */
+  feeBps?: number;
   snypeName?: string;
 };
 

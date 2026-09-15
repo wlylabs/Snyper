@@ -12,6 +12,7 @@ import { usePairPrice } from "@/hooks/usePairPrice";
 import { useTokenList } from "@/hooks/useTokenList";
 import { chainMeta } from "@/lib/chains";
 import { formatMoney } from "@/lib/currency";
+import { feePolicy, MAX_FEE_BPS } from "@/lib/fees";
 import { formatAmount, formatPrice } from "@/lib/format";
 import { SNYPE_DEFAULTS, SNYPE_TTL_MS } from "@/lib/snype";
 import { nativeToken, stableToken, type Token } from "@/lib/tokens";
@@ -119,6 +120,23 @@ export function SnypeComposer({ open, onClose }: { open: boolean; onClose: () =>
       loss: (amountQuote * cutLossPct) / 100,
     };
   }, [amountQuote, cutLossPct, entryPrice, takeProfitPct]);
+
+  /*
+   * What the take profit would cost, shown before anything is armed.
+   *
+   * The real charge is worked out in whole units against the fill this snype
+   * actually gets, so this is an illustration of the deal rather than a figure
+   * to hold anyone to — but it is the deal: a share of the profit, never of the
+   * stake, and never more than the router's own ceiling on the sale.
+   */
+  const profitFeeAtTakeProfit = useMemo(() => {
+    const policy = feePolicy();
+    const profit = projection?.profit ?? 0;
+    if (!policy.recipient || policy.profitShareBps <= 0 || !(profit > 0)) return 0;
+    const share = (profit * policy.profitShareBps) / 10_000;
+    const ceiling = ((amountQuote + profit) * MAX_FEE_BPS) / 10_000;
+    return Math.min(share, ceiling);
+  }, [amountQuote, projection]);
 
   const validate = (): string | undefined => {
     if (!base || !quote) return t("snype.errPair");
@@ -340,6 +358,16 @@ export function SnypeComposer({ open, onClose }: { open: boolean; onClose: () =>
             />
           </div>
 
+          {profitFeeAtTakeProfit > 0 && (
+            <p className="text-[11px] leading-relaxed text-faint">
+              {t("snype.profitFeeNote", {
+                share: `${feePolicy().profitShareBps / 100}%`,
+                cap: `${MAX_FEE_BPS / 100}%`,
+              })}{" "}
+              {t("snype.profitFee")}: {formatAmount(profitFeeAtTakeProfit)}{" "}
+              {quote?.symbol ?? ""}
+            </p>
+          )}
           <p className="text-[11px] leading-relaxed text-faint">
             {t("snype.terms", {
               slippage: `${SNYPE_DEFAULTS.slippageBps / 100}%`,

@@ -158,6 +158,37 @@ export const swapRouter02Abi = [
     inputs: [],
     outputs: [],
   },
+  /*
+   * The router's own fee split, from Uniswap's PeripheryPaymentsWithFee. Both
+   * settle the output the swap parked in the router: the fee to one address,
+   * the rest to the reader, in the same transaction. `feeBips` is rejected
+   * outside 1…100, which is what caps anything Snyper charges this way.
+   */
+  {
+    type: "function",
+    name: "sweepTokenWithFee",
+    stateMutability: "payable",
+    inputs: [
+      { name: "token", type: "address" },
+      { name: "amountMinimum", type: "uint256" },
+      { name: "recipient", type: "address" },
+      { name: "feeBips", type: "uint256" },
+      { name: "feeRecipient", type: "address" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "unwrapWETH9WithFee",
+    stateMutability: "payable",
+    inputs: [
+      { name: "amountMinimum", type: "uint256" },
+      { name: "recipient", type: "address" },
+      { name: "feeBips", type: "uint256" },
+      { name: "feeRecipient", type: "address" },
+    ],
+    outputs: [],
+  },
 ] as const;
 
 export const v3FactoryAbi = [

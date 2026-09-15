@@ -8,6 +8,7 @@ import { Segmented } from "@/components/ui/Segmented";
 import { useMounted } from "@/hooks/useMounted";
 import { CHAIN_ID, CHAIN_META } from "@/lib/chains";
 import { CURRENCIES, formatRate } from "@/lib/currency";
+import { feePolicy, MAX_FEE_BPS, swapFeeBps } from "@/lib/fees";
 import { LOCALES, type TKey } from "@/lib/i18n";
 import { useI18n } from "@/hooks/useI18n";
 import { useFxRate } from "@/hooks/useFxRate";
@@ -111,6 +112,8 @@ export default function SettingsPage() {
 
       </Panel>
 
+      <FeesPanel />
+
       <Panel label={t("settings.execDefaults")} bodyClassName="p-3">
         <div className="grid gap-3 sm:grid-cols-3">
           <NumberField
@@ -198,6 +201,40 @@ export default function SettingsPage() {
         </button>
       </Panel>
     </div>
+  );
+}
+
+/**
+ * What this build charges, written down where a reader can check it against
+ * what their wallet shows. A terminal that takes a cut and does not say so
+ * anywhere is indistinguishable from one that is skimming, so the policy is
+ * printed whether or not it is switched on.
+ */
+function FeesPanel() {
+  const { t } = useI18n();
+  const policy = feePolicy();
+  const swapBps = swapFeeBps();
+  const charging = Boolean(policy.recipient);
+
+  return (
+    <Panel label={t("settings.fees")} bodyClassName="p-3">
+      <Row
+        k={t("settings.feeSwap")}
+        v={swapBps > 0 ? `${swapBps / 100}%` : t("settings.feeNone")}
+      />
+      <Row
+        k={t("settings.feeSnype")}
+        v={
+          charging && policy.profitShareBps > 0
+            ? t("settings.feeProfitShare", { share: `${policy.profitShareBps / 100}%` })
+            : t("settings.feeNone")
+        }
+      />
+      {charging && <Row k={t("settings.feeCap")} v={`${MAX_FEE_BPS / 100}%`} />}
+      <p className="mt-3 text-[11px] leading-relaxed text-dim">
+        {charging ? t("settings.feeNote") : t("settings.feeOff")}
+      </p>
+    </Panel>
   );
 }
 

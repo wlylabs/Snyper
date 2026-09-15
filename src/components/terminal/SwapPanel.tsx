@@ -12,6 +12,7 @@ import { useTokenBalance } from "@/hooks/useTokenBalance";
 import { useVenue, useVenueDiscovery, useVenueFromToken } from "@/hooks/useVenue";
 import { useConnectPrompt } from "@/hooks/useConnectPrompt";
 import { chainMeta, isSupportedChain } from "@/lib/chains";
+import { feeChargeable, netOfFee, swapFeeBps } from "@/lib/fees";
 import {
   feeLabel,
   formatPercent,
@@ -102,9 +103,27 @@ export function SwapPanel({
   const insufficient = Boolean(amountIn && balanceIn !== undefined && amountIn > balanceIn);
   const busy = phase !== "idle";
 
+  /*
+   * Snyper's cut, and every figure on this panel taken net of it.
+   *
+   * A reader is quoted what lands in their wallet, not what the pool pays the
+   * router, because the difference is the whole of what they are being charged
+   * and a panel that prints the gross would be hiding it behind a rounding
+   * error. The fee has its own row besides.
+   */
+  const feeBps = quote && feeChargeable(quote.venue) ? swapFeeBps() : 0;
+  const feeTaken = quote ? quote.amountOut - netOfFee(quote.amountOut, feeBps) : 0n;
+  const receiving =
+    quote && tokenOut
+      ? formatUnitsFixed(netOfFee(quote.amountOut, feeBps), tokenOut.decimals)
+      : "0.0";
+
   const minReceived =
     quote && tokenOut
-      ? formatUnitsFixed(applySlippage(quote.amountOut, settings.slippageBps), tokenOut.decimals)
+      ? formatUnitsFixed(
+          netOfFee(applySlippage(quote.amountOut, settings.slippageBps), feeBps),
+          tokenOut.decimals,
+        )
       : "—";
 
   useEffect(() => {
@@ -257,7 +276,7 @@ export function SwapPanel({
         </div>
         <div className="mt-2 flex items-center gap-3">
           <span className="num min-w-0 flex-1 truncate text-[22px] leading-[52px]">
-            {quote && tokenOut ? formatUnitsFixed(quote.amountOut, tokenOut.decimals) : "0.0"}
+            {receiving}
           </span>
           <TokenButton
             token={tokenOut}
@@ -307,6 +326,19 @@ export function SwapPanel({
           k={t("swap.minReceived")}
           v={tokenOut ? `${minReceived} ${tokenOut.symbol}` : "—"}
         />
+        {feeBps > 0 && (
+          <Row
+            k={t("swap.snyperFee")}
+            v={
+              tokenOut
+                ? `${formatPercent(feeBps / 10_000)} · ${formatUnitsFixed(
+                    feeTaken,
+                    tokenOut.decimals,
+                  )} ${tokenOut.symbol}`
+                : formatPercent(feeBps / 10_000)
+            }
+          />
+        )}
         <Row
           k={t("swap.route")}
           v={quote && tokenIn && tokenOut ? `${tokenIn.symbol} → ${tokenOut.symbol} · v3 ${feeLabel(quote.fee)}` : "—"}

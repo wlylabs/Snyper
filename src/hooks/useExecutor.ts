@@ -17,6 +17,7 @@ import {
 } from "wagmi/actions";
 import { erc20Abi } from "@/lib/abi";
 import { chainMeta, explorerTx } from "@/lib/chains";
+import { feeChargeable, netOfFee, swapFeeBps } from "@/lib/fees";
 import type { Quote } from "@/lib/quote";
 import { formatPercent } from "@/lib/format";
 import { applySlippage, buildSwap, swapRequest } from "@/lib/swap";
@@ -35,6 +36,13 @@ export type ExecuteArgs = {
   deadlineMinutes: number;
   source: "terminal" | "snype";
   snypeName?: string;
+  /**
+   * Snyper's share of the output, in bps, for the callers that price one — a
+   * snype exit works its own out of what the position made. Left unset, a
+   * manual trade falls back to the build's flat swap fee and an automated one
+   * to nothing, because a snype is charged on its exit rather than its entry.
+   */
+  feeBps?: number;
 };
 
 export type ExecutePhase = "idle" | "approving" | "signing" | "pending";
@@ -124,6 +132,12 @@ export function useExecutor() {
       const amountOutMinimum = applySlippage(quote.amountOut, slippageBps);
       const fees = await feeOverrides(config, tokenIn.chainId, priorityFeeGwei);
 
+      // Only a pool route can carry a fee leg at all; a curve is encoded the
+      // same way it always was, and the ledger below records the zero.
+      const feeBps = feeChargeable(quote.venue)
+        ? (args.feeBps ?? (args.source === "terminal" ? swapFeeBps() : 0))
+        : 0;
+
       // Built before the approval so the spender is the contract that will
       // actually pull the tokens: SwapRouter02 on a pool route, the bonding
       // curve itself on a launchpad one.
@@ -135,6 +149,7 @@ export function useExecutor() {
         quote,
         recipient: address,
         deadlineMinutes,
+        feeBps,
       });
 
       // ERC-20 inputs need an allowance before the trade can settle.
@@ -265,7 +280,11 @@ export function useExecutor() {
         tokenIn,
         tokenOut,
         amountIn: amountIn.toString(),
-        amountOut: quote.amountOut.toString(),
+        // What the wallet is due once the fee leg has taken its part, so the
+        // ledger reads as the receipt it is rather than as the quote it came
+        // from. The rate it was charged at is kept beside it.
+        amountOut: netOfFee(quote.amountOut, plan.feeBps).toString(),
+        feeBps: plan.feeBps,
         snypeName: args.snypeName,
       });
       toast.push({

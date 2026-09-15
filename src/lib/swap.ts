@@ -1,6 +1,7 @@
 import { encodeFunctionData, type Abi, type Address } from "viem";
 import { ponsCurveAbi, swapRouter02Abi } from "./abi";
 import { dexMeta } from "./chains";
+import { feePolicy, MAX_FEE_BPS } from "./fees";
 import type { Quote } from "./quote";
 import { routingAddress, type Token } from "./tokens";
 
@@ -23,7 +24,27 @@ export type SwapPlan = {
   amountIn: bigint;
   amountOutMinimum: bigint;
   fee: number;
+  /**
+   * Snyper's cut, in bps of the output, as the router was actually told to take
+   * it. Zero on every route that cannot carry one, so what the interface quotes
+   * and what the transaction does can never drift apart.
+   */
+  feeBps: number;
 };
+
+/**
+ * The fee leg a plan is allowed to carry, or nothing. A build with no recipient
+ * configured, a share outside what the router accepts, or a venue with no fee
+ * call at all each come back the same way: no leg, and a trade encoded exactly
+ * as it was before any of this existed.
+ */
+function feeLeg(feeBps: number | undefined): { bps: bigint; recipient: Address } | undefined {
+  const recipient = feePolicy().recipient;
+  if (!recipient) return undefined;
+  const bps = Math.floor(feeBps ?? 0);
+  if (!(bps >= 1 && bps <= MAX_FEE_BPS)) return undefined;
+  return { bps: BigInt(bps), recipient };
+}
 
 export function applySlippage(amountOut: bigint, slippageBps: number): bigint {
   const bps = BigInt(Math.max(0, Math.min(5_000, Math.round(slippageBps))));
@@ -42,6 +63,8 @@ export function buildSwap(params: {
   quote: Quote;
   recipient: Address;
   deadlineMinutes: number;
+  /** Snyper's share of the output, in bps. Ignored by venues that cannot take one. */
+  feeBps?: number;
 }): SwapPlan {
   return params.quote.venue === "curve" ? buildCurveTrade(params) : buildV3Swap(params);
 }
@@ -58,6 +81,7 @@ function buildV3Swap(params: {
   quote: Quote;
   recipient: Address;
   deadlineMinutes: number;
+  feeBps?: number;
 }): SwapPlan {
   const { tokenIn, tokenOut, amountIn, amountOutMinimum, quote, recipient } = params;
   const dex = dexMeta(tokenIn.chainId);
@@ -65,6 +89,7 @@ function buildV3Swap(params: {
 
   const nativeIn = Boolean(tokenIn.native);
   const nativeOut = Boolean(tokenOut.native);
+  const fee = feeLeg(params.feeBps);
 
   const swapData = encodeFunctionData({
     abi: swapRouter02Abi,
@@ -74,8 +99,10 @@ function buildV3Swap(params: {
         tokenIn: routingAddress(tokenIn),
         tokenOut: routingAddress(tokenOut),
         fee: quote.fee,
-        // Native output settles inside the router, then unwraps to the user.
-        recipient: nativeOut ? ADDRESS_THIS : recipient,
+        // Native output settles inside the router, then unwraps to the user. A
+        // fee leg needs the output parked there too, whatever it is made of,
+        // because the split happens on the router's own balance.
+        recipient: nativeOut || fee ? ADDRESS_THIS : recipient,
         amountIn,
         amountOutMinimum,
         sqrtPriceLimitX96: 0n,
@@ -85,12 +112,40 @@ function buildV3Swap(params: {
 
   const calls: `0x${string}`[] = [swapData];
 
+  /*
+   * Settling what the swap left in the router. The bound handed to each call is
+   * the same gross minimum `exactInputSingle` already enforced: the fee is a
+   * share of whatever arrived, so a bound net of it would be a second, looser
+   * check on a number the swap had already refused to go below.
+   */
   if (nativeOut) {
+    calls.push(
+      encodeFunctionData(
+        fee
+          ? {
+              abi: swapRouter02Abi,
+              functionName: "unwrapWETH9WithFee",
+              args: [amountOutMinimum, recipient, fee.bps, fee.recipient],
+            }
+          : {
+              abi: swapRouter02Abi,
+              functionName: "unwrapWETH9",
+              args: [amountOutMinimum, recipient],
+            },
+      ),
+    );
+  } else if (fee) {
     calls.push(
       encodeFunctionData({
         abi: swapRouter02Abi,
-        functionName: "unwrapWETH9",
-        args: [amountOutMinimum, recipient],
+        functionName: "sweepTokenWithFee",
+        args: [
+          routingAddress(tokenOut),
+          amountOutMinimum,
+          recipient,
+          fee.bps,
+          fee.recipient,
+        ],
       }),
     );
   }
@@ -108,6 +163,7 @@ function buildV3Swap(params: {
     amountIn,
     amountOutMinimum,
     fee: quote.fee,
+    feeBps: fee ? Number(fee.bps) : 0,
   };
 }
 
@@ -140,6 +196,10 @@ function buildCurveTrade(params: {
     amountIn,
     amountOutMinimum,
     fee: quote.fee,
+    // A curve settles the trade itself and takes no instruction about a third
+    // party, so a launchpad route is free until something of Snyper's own
+    // stands in front of it.
+    feeBps: 0,
   };
 }
 
