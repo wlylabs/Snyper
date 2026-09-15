@@ -92,7 +92,6 @@
   --dur-tap: 140ms;
   --dur-enter: 200ms;
   --dur-travel: 260ms;
-  --dur-wash: 420ms;
   --dur-flash: 640ms;
   --ease-out: cubic-bezier(0, 0, 0.3, 1);
   --ease-emphasis: cubic-bezier(0.2, 0, 0, 1);
@@ -107,11 +106,23 @@
    * quick under the thumb without anything snapping back.
    */
   --dur-release: 300ms;
+
+  /*
+   * How far a key travels, and the tone of the plinth it travels onto. The
+   * strike curve accelerates all the way into the stop, which is what gives the
+   * press its bottom — an eased landing would read as a control sinking into
+   * something soft.
+   */
+  --press-drop: 2px;
+  --color-plinth: #04060a;
+  --ease-strike: cubic-bezier(0.4, 0, 1, 1);
 }
 
 [data-theme="light"] {
   color-scheme: light;
   --scrim: rgb(20 27 38 / 0.38);
+  /* On white the plinth is the shade the key casts, not a black line. */
+  --color-plinth: #c0c9d8;
   /* The grid line colour is far weaker against white, so it needs more of it. */
   --grid-opacity: 0.5;
 }
@@ -325,122 +336,111 @@
   /* ---------- press ---------- */
 
   /*
-   * One press language, worn differently by every control.
+   * Every control in Snyper is a key.
    *
-   * Two things happen when a pressable is pressed. It moves — by an amount its
-   * own rule sets, because a 30px chip and a full-width slab cannot travel the
-   * same distance and read as the same weight of press. And a wash of light
-   * runs out from the point the finger actually landed on, which is the part
-   * generic feedback always misses: a button that dims uniformly answers the
-   * click, while a button that lights up *where it was touched* answers the
-   * reader. Material's ripple is built on the same observation.
+   * Not a rectangle that dims, not a rectangle that lights up under the finger
+   * — a key, sitting a couple of pixels proud of the surface on a plinth of its
+   * own, that travels the whole of that distance when it is pressed and stops
+   * dead at the bottom. The travel is the feedback and the stop is the feel:
+   * the control does not fade into a pressed state, it arrives at one, and the
+   * whole of it goes down rather than some patch of it lighting up. Let go and
+   * it comes back on the settle curve, unhurried, the way a key returns under
+   * its own spring.
    *
-   * It is deliberately colourless. A wash in the brand lime would read as a
-   * glow, and the accent has one job on this surface — to carry a reading, as
-   * fill or as type — never to light a control up from underneath. So the wash
-   * is the ink of the surface it lands on, which is what a state layer is
-   * supposed to be, and it clears in under half a second.
-   *
-   * `PressWash` writes the coordinates and the radius as custom properties on
-   * whatever was pressed and stamps `data-press`, so no control has to be
-   * wired up for this: anything carrying one of these classes gets it, keyboard
-   * presses included, where the wash starts from the middle instead.
+   * This costs nothing in colour, which is the point. The plinth is a hard
+   * shadow — no blur, no spread, no glow — in a tone darker than the ground it
+   * sits on, so it reads as the side of a physical thing rather than as light.
+   * Both themes get one; on white it is a grey, on black it is very nearly
+   * black. And it needs no JavaScript at all: `:active` is the whole mechanism,
+   * so a control added next week is a key the moment it takes the class.
+   */
+  /*
+   * A key has to have a body. Left transparent with a hairline round it, a
+   * control has nothing to travel *with* — the plinth appears under an outline
+   * and reads as a second line rather than as the side of a thing. So every key
+   * stands on the raised surface, one step above the panel it sits on and two
+   * above the plinth beneath it. That also settles the older complaint for
+   * good: a key is a solid block, so it no longer needs a box drawn round it to
+   * be a button, and on dark the border all but disappears into it.
    */
   .btn,
   .icon-btn,
-  button.chip,
-  .tile,
+  .flip,
   .pill,
-  .row-link,
-  .seg-item {
-    position: relative;
-    isolation: isolate;
-    overflow: hidden;
+  button.chip {
+    --plinth: var(--color-plinth);
+    box-shadow: 0 var(--press-drop) 0 0 var(--plinth);
   }
 
-  .btn::after,
-  .icon-btn::after,
-  button.chip::after,
-  .tile::after,
-  .pill::after,
-  .row-link::after,
-  .seg-item::after {
-    content: "";
-    position: absolute;
-    z-index: -1;
-    top: var(--press-y, 50%);
-    left: var(--press-x, 50%);
-    width: calc(var(--press-r, 60px) * 2);
-    height: calc(var(--press-r, 60px) * 2);
-    border-radius: var(--radius-pill);
-    pointer-events: none;
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(0.12);
-    background: radial-gradient(
-      circle,
-      color-mix(in srgb, var(--color-ink) 22%, transparent),
-      color-mix(in srgb, var(--color-ink) 8%, transparent) 62%,
-      transparent 72%
-    );
+  /* Approaching a key lights its face; it is the press that moves it. */
+  .btn:hover:not(:disabled),
+  .icon-btn:hover:not(:disabled),
+  .flip:hover,
+  .pill:hover,
+  button.chip:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--color-raise) 92%, var(--color-ink));
+    border-color: var(--color-edge);
   }
 
   /*
-   * The animation is named twice and alternated by the parity the handler
-   * writes. A CSS animation does not replay because an attribute changed, only
-   * because the animation itself changed — so two names that do the same thing
-   * are what let a reader tap the same button four times and see four washes.
+   * Down is a strike: it accelerates into the stop rather than easing out of
+   * it, which is the difference between a key bottoming out and a panel
+   * sliding. Everything else about the control still moves on the app's own
+   * curves — only the travel is struck.
    */
-  [data-press="0"]::after {
-    animation: wash-a var(--dur-wash) var(--ease-out);
+  .btn:active:not(:disabled),
+  .icon-btn:active:not(:disabled),
+  .flip:active,
+  .pill:active,
+  button.chip:active:not(:disabled) {
+    transform: translateY(var(--press-drop));
+    box-shadow: 0 0 0 0 var(--plinth);
+    transition-timing-function: var(--ease-strike);
+    transition-duration: var(--dur-press);
   }
 
-  [data-press="1"]::after {
-    animation: wash-b var(--dur-wash) var(--ease-out);
+  /* Nothing to press: a disabled control sits flat on the surface. */
+  .btn:disabled,
+  .icon-btn:disabled,
+  button.chip:disabled {
+    box-shadow: none;
   }
 
-  @keyframes wash-a {
-    from {
-      opacity: 0.85;
-      transform: translate(-50%, -50%) scale(0.12);
-    }
-    to {
-      opacity: 0;
-      transform: translate(-50%, -50%) scale(1);
-    }
+  /*
+   * A row is not a key — a list of wallets on little plinths would read as a
+   * stack of buttons rather than a list. It presses into the panel instead:
+   * down a pixel, and the ground goes to the darker of the two surfaces, which
+   * is a recess in either theme.
+   */
+  .tile:active,
+  .row-link:active,
+  .seg-item:active:not(:disabled):not([data-active="true"]) {
+    transform: translateY(1px);
+    transition-timing-function: var(--ease-strike);
+    transition-duration: var(--dur-press);
   }
 
-  @keyframes wash-b {
-    from {
-      opacity: 0.85;
-      transform: translate(-50%, -50%) scale(0.12);
-    }
-    to {
-      opacity: 0;
-      transform: translate(-50%, -50%) scale(1);
-    }
-  }
-
-  /* On a filled primary the ink of the surface is the dark, not the light. */
-  .btn-accent::after {
-    background: radial-gradient(
-      circle,
-      color-mix(in srgb, var(--color-accent-ink) 30%, transparent),
-      transparent 70%
-    );
+  .tile:active,
+  .row-link:active {
+    background: var(--color-base);
   }
 
   /* ---------- controls ---------- */
 
   .btn {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
     height: 40px;
     padding: 0 16px;
-    border: 1px solid var(--color-edge);
+    border: 1px solid var(--color-line);
     border-radius: var(--radius-xs);
-    background: transparent;
+    /* The face of the key — see the press section for why it has one. */
+    background: var(--color-raise);
     color: var(--color-ink);
     font-size: 11px;
     font-weight: 600;
@@ -457,37 +457,23 @@
   }
 
   /*
-   * Hover raises the ground; it does not trace the button in lime. An accent
-   * outline is the app's loudest mark and it was being spent on the cheapest
-   * event there is — a cursor passing over a control it may not even be aimed
-   * at. Spent everywhere it marks nothing.
+   * The slab across the foot of the panel is the biggest key on it, so it sits
+   * higher and falls further. Anything else would have it travel the same two
+   * pixels as a 30-pixel chip and read as the lighter of the two.
    */
-  .btn:hover:not(:disabled) {
-    background: var(--color-raise);
-    border-color: var(--color-edge);
+  .btn-block {
+    --press-drop: 3px;
   }
 
   /*
-   * Press feedback: the control gives a little under the finger and settles
-   * back when it is released. 2.5% is enough to feel and small enough that a
-   * row of buttons does not appear to wobble; the pixel of travel is what
-   * turns a resize into a press. Down is instant, up takes the release curve —
-   * one `transition-duration` covers the whole list, which is right, because a
-   * colour that lags the finger reads as latency.
+   * A key that has been pressed and is now waiting on a wallet or a block stays
+   * down. It is the truest thing the control can say while it has no answer
+   * yet: the order is out, this is held, nothing here is pressable until it
+   * comes back.
    */
-  .btn:active:not(:disabled) {
-    transform: scale(0.975) translateY(1px);
-    transition-duration: var(--dur-press);
-  }
-
-  /*
-   * A wide slab cannot shrink: scaled by the same factor its corners travel far
-   * enough to read as a wobble. It sinks instead — down a notch, with the
-   * ground darkening under it, the way a key on a deck goes down rather than in.
-   */
-  .btn-block:active:not(:disabled) {
-    transform: translateY(2px) scale(0.995);
-    box-shadow: inset 0 2px 8px -4px rgb(0 0 0 / 0.55);
+  .btn[data-run="true"] {
+    transform: translateY(var(--press-drop));
+    box-shadow: none;
   }
 
   /*
@@ -507,9 +493,16 @@
   }
 
   .btn-accent {
+    /* A lime key stands on a darker lime, not on the near-black of the deck. */
+    --plinth: color-mix(in srgb, var(--color-accent) 42%, #000);
     background: var(--color-accent);
     border-color: var(--color-accent);
     color: var(--color-accent-ink);
+  }
+
+  .btn-accent:hover:not(:disabled) {
+    background: var(--color-accent-hover);
+    border-color: var(--color-accent-hover);
   }
 
   .btn-accent:hover:not(:disabled) {
@@ -675,26 +668,19 @@
     height: 34px;
     border: 1px solid var(--color-line);
     border-radius: var(--radius-xs);
-    background: transparent;
+    background: var(--color-raise);
     color: var(--color-dim);
     cursor: pointer;
     transition:
       color var(--dur-tap) var(--ease-out),
       border-color var(--dur-tap) var(--ease-out),
       background-color var(--dur-tap) var(--ease-out),
+      box-shadow var(--dur-tap) var(--ease-out),
       transform var(--dur-release) var(--ease-settle);
   }
 
   .icon-btn:hover:not(:disabled) {
     color: var(--color-ink);
-    border-color: var(--color-edge);
-    background: var(--color-raise);
-    transform: translateY(-1px);
-  }
-
-  .icon-btn:active:not(:disabled) {
-    transform: scale(0.88);
-    transition-duration: var(--dur-press);
   }
 
   .icon-btn:disabled {
@@ -779,27 +765,21 @@
     justify-content: center;
     width: 38px;
     height: 38px;
-    border: 1px solid var(--color-edge);
+    border: 1px solid var(--color-line);
     border-radius: var(--radius-xs);
-    background: var(--color-panel);
+    background: var(--color-raise);
     color: var(--color-dim);
     cursor: pointer;
     transition:
       color var(--dur-tap) var(--ease-out),
       border-color var(--dur-tap) var(--ease-out),
       background-color var(--dur-tap) var(--ease-out),
+      box-shadow var(--dur-tap) var(--ease-out),
       transform var(--dur-release) var(--ease-settle);
   }
 
   .flip:hover {
     color: var(--color-ink);
-    border-color: var(--color-edge);
-    background: var(--color-raise);
-  }
-
-  .flip:active {
-    transform: scale(0.9);
-    transition-duration: var(--dur-press);
   }
 
   .flip svg {
@@ -1011,11 +991,17 @@
     transition:
       background-color var(--dur-tap) var(--ease-out),
       border-color var(--dur-tap) var(--ease-out),
+      box-shadow var(--dur-tap) var(--ease-out),
       transform var(--dur-release) var(--ease-settle);
+    /* The smallest key on the surface, so it travels a single pixel. */
+    --press-drop: 1px;
+    box-shadow: 0 var(--press-drop) 0 0 var(--color-plinth);
   }
 
   .check:active {
-    transform: scale(0.88);
+    transform: translateY(var(--press-drop));
+    box-shadow: none;
+    transition-timing-function: var(--ease-strike);
     transition-duration: var(--dur-press);
   }
 
@@ -1105,12 +1091,10 @@
   /*
    * The marker is already travelling to meet the press, so the item itself only
    * has to acknowledge it — and an option that is already selected answers
-   * nothing at all, because pressing it changes nothing.
+   * nothing at all, because pressing it changes nothing. The press itself is in
+   * the press section, with the rows: an item inside a track is set into that
+   * track, not standing on it.
    */
-  .seg-item:active:not(:disabled):not([data-active="true"]) {
-    transform: scale(0.94);
-    transition-duration: var(--dur-press);
-  }
 
   .seg-item[data-active="true"] {
     background: var(--color-accent);
@@ -1138,25 +1122,21 @@
 
   /* Presets and offsets are chips that can be pressed, so they answer back. */
   button.chip {
+    background: var(--color-raise);
     cursor: pointer;
     transition:
       color var(--dur-tap) var(--ease-out),
       border-color var(--dur-tap) var(--ease-out),
       background-color var(--dur-tap) var(--ease-out),
+      box-shadow var(--dur-tap) var(--ease-out),
       transform var(--dur-release) var(--ease-settle);
   }
 
   button.chip:hover:not(:disabled) {
     color: var(--color-ink);
-    border-color: var(--color-edge);
   }
 
-  /* The lightest control in the app, so it takes the deepest press: there is
-     no travel and no shadow to carry the feedback, only the shape itself. */
-  button.chip:active:not(:disabled) {
-    transform: scale(0.93);
-    transition-duration: var(--dur-press);
-  }
+  /* A chip is a key like the rest, and travels like one. */
 
   .chip-live {
     color: var(--color-accent-text);
@@ -1272,11 +1252,6 @@
 
   .row-link:hover::before {
     transform: scaleY(1);
-  }
-
-  .row-link:active {
-    transform: scale(0.995);
-    transition-duration: var(--dur-press);
   }
 
   /* Pressed, the edge is already fully drawn — there is no hover on a thumb. */
@@ -1545,7 +1520,7 @@
     padding: 0 10px 0 3px;
     border: 1px solid var(--color-line);
     border-radius: var(--radius-pill);
-    background: var(--color-panel);
+    background: var(--color-raise);
     color: var(--color-ink);
     font-size: 11px;
     font-weight: 600;
@@ -1554,17 +1529,8 @@
     transition:
       background-color var(--dur-tap) var(--ease-out),
       border-color var(--dur-tap) var(--ease-out),
+      box-shadow var(--dur-tap) var(--ease-out),
       transform var(--dur-release) var(--ease-settle);
-  }
-
-  .pill:hover {
-    background: var(--color-raise);
-    border-color: var(--color-edge);
-  }
-
-  .pill:active {
-    transform: scale(0.97);
-    transition-duration: var(--dur-press);
   }
 
   /* While Privy's modal is open the control it was opened from stays lit. */
@@ -1609,17 +1575,6 @@
   .tile:hover {
     background: var(--color-panel);
     border-color: var(--color-edge);
-  }
-
-  /*
-   * Pressing a tile nudges it along rather than shrinking it, so a column of
-   * wallets reads as a list being worked down rather than a stack of cards
-   * being squeezed. Nothing is drawn around it: the wash and the nudge are the
-   * answer, and the row keeps the one quiet border it already had.
-   */
-  .tile:active {
-    transform: translateX(2px) scale(0.995);
-    transition-duration: var(--dur-press);
   }
 
   /* A tile that has just done its one job — copied an address, say. */
