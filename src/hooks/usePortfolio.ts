@@ -52,10 +52,10 @@ function holdingOf(token: Token, balance: bigint): Holding {
 /**
  * The indexer's rows as tokens this app understands.
  *
- * What the app already knows about a token wins over what the indexer says:
- * a reader who imported a contract named it in the picker, artwork has been
- * read off the contract itself, and neither should be overwritten by a third
- * party's copy. The indexer only fills what nothing else answered.
+ * What the app already knows about a token wins over what the indexer says: a
+ * reader who imported a contract named it in the picker, and a third party's
+ * copy should not overwrite that. The indexer only covers what nothing else
+ * answered.
  */
 function fromIndexed(
   indexed: IndexedPortfolio,
@@ -64,16 +64,13 @@ function fromIndexed(
 ): Holding[] {
   return indexed.tokens.map((row) => {
     const existing = known.get(row.address.toLowerCase());
-    const token: Token = existing
-      ? { ...existing, ...(existing.logoURI ? {} : row.logoURI ? { logoURI: row.logoURI } : {}) }
-      : {
-          chainId,
-          address: row.address,
-          symbol: row.symbol,
-          name: row.name,
-          decimals: row.decimals,
-          ...(row.logoURI ? { logoURI: row.logoURI } : {}),
-        };
+    const token: Token = existing ?? {
+      chainId,
+      address: row.address,
+      symbol: row.symbol,
+      name: row.name,
+      decimals: row.decimals,
+    };
     return holdingOf(token, row.balance);
   });
 }

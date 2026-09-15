@@ -14,7 +14,7 @@ import { useSetActiveWallet } from "@privy-io/wagmi";
 import { useAccount, useBalance } from "wagmi";
 import { Icon } from "@/components/ui/Icon";
 import { Sheet } from "@/components/ui/Sheet";
-import { WalletAvatar } from "@/components/ui/TokenBadge";
+import { WalletAvatar } from "@/components/ui/WalletAvatar";
 import { useToast } from "@/components/ui/Toast";
 import { CHAIN_ID, chainMeta, explorerAddress } from "@/lib/chains";
 import { formatAmount, truncateAddress } from "@/lib/format";
@@ -119,7 +119,7 @@ function PrivyControl() {
   if (!address) {
     return (
       <span className="pill cursor-default" aria-live="polite">
-        <span className="badge badge-empty" style={{ width: 22, height: 22 }} />
+        <span className="avatar avatar-empty" style={{ width: 22, height: 22 }} />
         <span className="text-[11px] text-dim">{t("wallet.connecting")}</span>
       </span>
     );
@@ -315,7 +315,7 @@ function AccountSheet({
            */}
           <button type="button" className="tile" onClick={() => connectWallet()}>
             <span
-              className="badge badge-empty flex items-center justify-center"
+              className="avatar avatar-empty flex items-center justify-center"
               style={{ width: 26, height: 26 }}
             >
               <Icon name="plus" size={13} className="text-dim" />

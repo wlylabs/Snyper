@@ -2,7 +2,6 @@ import type { PublicClient } from "viem";
 import { getAddress, isAddress } from "viem";
 import { erc20Abi } from "./abi";
 import { CHAIN_META, NATIVE, dexMeta } from "./chains";
-import { resolveTokenLogo } from "./tokenFeed";
 
 export type Token = {
   chainId: number;
@@ -10,7 +9,6 @@ export type Token = {
   symbol: string;
   name: string;
   decimals: number;
-  logoURI?: string;
   /** Marks the chain's native currency, which needs wrapping before routing. */
   native?: boolean;
 };
@@ -81,34 +79,28 @@ export function mergeTokens(chainId: number, ...groups: Token[][]): Token[] {
       if (token.chainId !== chainId) continue;
       const key = token.address.toLowerCase();
       const existing = seen.get(key);
-      if (!existing) {
-        seen.set(key, token);
-      } else if (!existing.logoURI && token.logoURI) {
-        // Earlier groups win on identity; later ones still contribute artwork.
-        seen.set(key, { ...existing, logoURI: token.logoURI });
-      }
+      /* Earlier groups win on identity: a reader's own import outranks a list. */
+      if (!existing) seen.set(key, token);
     }
   }
   return [...seen.values()];
 }
 
 /**
- * Reads name/symbol/decimals straight from the contract for unlisted tokens,
- * and looks up its artwork while it is there — the contract first, the indexer
- * only if the contract had nothing to say. The logo is
- * optional in a way the other three are not, so it never fails the import: a
- * token that will not say what it looks like still imports and still trades.
+ * Reads name/symbol/decimals straight from the contract for unlisted tokens.
+ * That is the whole of a token's identity here: the app draws no artwork, so a
+ * contract pasted in thirty seconds ago arrives as complete as one that has
+ * traded for a year.
  */
 export async function readToken(
   client: PublicClient,
   chainId: number,
   address: `0x${string}`,
 ): Promise<Token> {
-  const [symbol, name, decimals, logoURI] = await Promise.all([
+  const [symbol, name, decimals] = await Promise.all([
     client.readContract({ address, abi: erc20Abi, functionName: "symbol" }),
     client.readContract({ address, abi: erc20Abi, functionName: "name" }),
     client.readContract({ address, abi: erc20Abi, functionName: "decimals" }),
-    resolveTokenLogo(client, address).catch(() => undefined),
   ]);
   return {
     chainId,
@@ -116,7 +108,6 @@ export async function readToken(
     symbol,
     name,
     decimals: Number(decimals),
-    ...(logoURI ? { logoURI } : {}),
   };
 }
 

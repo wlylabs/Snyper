@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import { isAddress } from "viem";
 import { usePublicClient } from "wagmi";
 import { Icon } from "@/components/ui/Icon";
-import { TokenBadge } from "@/components/ui/TokenBadge";
 import { Sheet } from "@/components/ui/Sheet";
 import { truncateAddress } from "@/lib/format";
 import { memeSignal } from "@/lib/memecoin";
@@ -103,13 +102,12 @@ export function TokenPicker({
               setQuery("");
             }}
           >
-            <TokenBadge token={token} />
-            <span className="min-w-0 flex-1 text-left">
-              <span className="flex items-center gap-1.5">
-                <span className="truncate text-[13px] font-semibold">{token.symbol}</span>
-                <TokenTags token={token} listed={listed} />
-              </span>
-              <span className="block truncate text-[11px] text-faint">{token.name}</span>
+            <span className="ticker" data-native={token.native ? "true" : undefined}>
+              {token.symbol}
+            </span>
+            <span className="flex min-w-0 flex-1 items-center gap-1.5 text-left">
+              <span className="truncate text-[12px] text-dim">{token.name}</span>
+              <TokenTags token={token} listed={listed} />
             </span>
             <span className="num text-[10px] text-faint">
               {token.native ? t("token.native") : truncateAddress(token.address, 6, 4)}

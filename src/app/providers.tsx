@@ -10,7 +10,6 @@ import { PRIVY_APP_ID, PRIVY_CLIENT_ID, PRIVY_CONFIGURED, privyConfig } from "@/
 import { ToastProvider } from "@/components/ui/Toast";
 import { SnypeRunner } from "@/components/snype/SnypeRunner";
 import { VenueSync } from "@/hooks/useVenue";
-import { TokenLogoSync } from "@/hooks/useTokenLogos";
 import { ConnectPromptProvider } from "@/hooks/useConnectPrompt";
 import { ActiveWalletSync } from "@/components/wallet/ActiveWalletSync";
 import { useAppStore } from "@/store/useAppStore";
@@ -125,7 +124,6 @@ export function Providers({ children }: { children: ReactNode }) {
           <LocaleSync />
           <ServiceWorker />
           <VenueSync />
-          <TokenLogoSync />
           <SnypeRunner />
           {children}
         </ToastProvider>
