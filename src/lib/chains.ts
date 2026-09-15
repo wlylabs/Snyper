@@ -16,7 +16,7 @@ export const SUPPORTED_CHAINS = [robinhood] as const;
 
 /**
  * The routing venue for the chain. Robinhood Chain publishes no deployment list
- * the app can bundle, so this is resolved at runtime — see `venue.ts`.
+ * to ship against, so this is resolved per session — see `venue.ts`.
  */
 export type DexMeta = Venue;
 
