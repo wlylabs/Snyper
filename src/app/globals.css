@@ -987,34 +987,43 @@
   }
 
   /*
-   * The leg being spent lights its edge while the amount is being typed into
-   * it. The big field carries no border of its own — it is a figure on the
-   * panel, not a box — so the panel is what has to show that this is the half
-   * of the trade the reader is working in.
+   * The leg being spent, while the amount is being typed into it.
+   *
+   * Not by lighting the box it sits in: a rectangle traced in accent — with or
+   * without a glow behind it — is the loudest possible way to say "the caret is
+   * here", and it turns a readout into a sign. The figure itself is what is
+   * being worked on, so the figure is what is marked: its label goes accent and
+   * a hairline draws itself under the number, left to right, the way a reading
+   * is underlined on paper.
    */
-  .leg-pay:focus-within {
-    border-color: var(--color-accent-line);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent-line) 18%, transparent);
+  .leg-pay:focus-within .lbl {
+    color: var(--color-accent-text);
   }
 
   .field-lg {
     height: 52px;
     font-size: 22px;
     border: none;
-    background: transparent;
+    background-color: transparent;
     padding: 0;
+    /* The rule is a background rather than a border, so it can be drawn on. */
+    background-image: linear-gradient(var(--color-accent-line), var(--color-accent-line));
+    background-repeat: no-repeat;
+    background-position: 0 100%;
+    background-size: 0% 1px;
+    transition: background-size var(--dur-enter) var(--ease-out);
   }
 
   /*
-   * The big figure takes no ring of its own: the leg around it is already
-   * carrying the focus, and a box inside a lit box is two answers to one
-   * question. The treatment is the same one `.field:focus` uses, moved out to
-   * the edge of the panel where the whole half of the trade lights up.
+   * Hence no ring here either, neither the app's own focus outline nor the
+   * browser's. The underline is drawn as an inset shadow so the figure never
+   * shifts by the pixel a border would cost it.
    */
   .field-lg:focus {
     border: none;
-    box-shadow: none;
     outline: none;
+    box-shadow: none;
+    background-size: 100% 1px;
   }
 
   /*
