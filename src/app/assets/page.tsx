@@ -59,7 +59,15 @@ export default function AssetsPage() {
     return mergeTokens(chainId, baseTokens(chainId), customTokens, discoveredTokens, touched);
   }, [chainId, snypes, trades, customTokens, discoveredTokens, venueKey]);
 
-  const { data: holdings, isFetching, refetch } = usePortfolio(chainId, scope);
+  const { data: portfolio, isFetching, refetch } = usePortfolio(chainId, scope);
+  const holdings = portfolio?.holdings;
+  /*
+   * The indexer answers with everything the address holds; the chain can only
+   * answer for tokens the app already knew to name. When the second one is what
+   * happened, the list is a subset and says so rather than passing itself off
+   * as the wallet.
+   */
+  const scopeOnly = Boolean(portfolio && portfolio.source === "chain");
 
   const total = useMemo(
     () => (holdings ?? []).reduce((sum, holding) => sum + (holding.value ?? 0), 0),
@@ -87,7 +95,16 @@ export default function AssetsPage() {
         <Panel
           label={t("assets.holdings")}
           ticked
-          meta={<span className="chip">{meta?.label ?? t("common.network")}</span>}
+          meta={
+            <>
+              {scopeOnly && (
+                <span className="chip" title={t("assets.scopeOnlyHint")}>
+                  {t("assets.scopeOnly")}
+                </span>
+              )}
+              <span className="chip">{meta?.label ?? t("common.network")}</span>
+            </>
+          }
           action={
             <button
               type="button"
@@ -137,7 +154,7 @@ export default function AssetsPage() {
           ) : (holdings?.length ?? 0) === 0 ? (
             <Empty
               title={isFetching ? t("assets.scanning") : t("assets.emptyTitle")}
-              hint={t("assets.emptyHint")}
+              hint={scopeOnly ? t("assets.scopeOnlyHint") : t("assets.emptyHint")}
             />
           ) : (
             <div>

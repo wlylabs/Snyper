@@ -183,6 +183,9 @@ const en = {
   "assets.emptyHint":
     "Scope covers the chain's own money, tokens you imported and anything you have traded here. Run the wallet scan below to pick up whatever else this address holds.",
   "assets.unpriced": "unpriced",
+  "assets.scopeOnly": "Scope only",
+  "assets.scopeOnlyHint":
+    "The chain's indexer did not answer, so this lists only the tokens the app already knew about. Run the wallet scan below to find the rest.",
   "assets.unpricedNote":
     "{count} holding(s) have no route to the chain's USD unit, so they count as zero in this figure.",
   "assets.address": "Address",
@@ -608,6 +611,9 @@ const id: Record<TKey, string> = {
   "assets.emptyHint":
     "Cakupan meliputi aset bawaan chain ini, token yang kamu impor, dan apa pun yang pernah kamu tukar di sini. Jalankan pemindaian dompet di bawah untuk menarik sisa token yang dipegang alamat ini.",
   "assets.unpriced": "tanpa harga",
+  "assets.scopeOnly": "Hanya cakupan",
+  "assets.scopeOnlyHint":
+    "Indexer chain tidak menjawab, jadi daftar ini hanya memuat token yang sudah dikenal aplikasi. Jalankan pemindaian dompet di bawah untuk menemukan sisanya.",
   "assets.unpricedNote":
     "{count} aset belum punya rute ke unit USD chain ini, jadi dihitung nol pada angka di atas.",
   "assets.address": "Alamat",
