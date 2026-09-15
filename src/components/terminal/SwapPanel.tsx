@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { formatUnits } from "viem";
 import { useAccount, useChainId, useSwitchChain } from "wagmi";
 import { Icon } from "@/components/ui/Icon";
@@ -24,9 +24,12 @@ import { applySlippage } from "@/lib/swap";
 import type { Token } from "@/lib/tokens";
 import { useAppStore } from "@/store/useAppStore";
 import { useI18n } from "@/hooks/useI18n";
+import { haptic } from "@/lib/haptics";
+import { FlipButton } from "./FlipButton";
 import { TokenPicker } from "./TokenPicker";
 
 const SLIPPAGE_PRESETS = [10, 50, 100];
+const FRACTIONS = [0.25, 0.5, 1];
 
 /** Digits plus at most one decimal separator. */
 function sanitiseAmount(input: string): string {
@@ -73,6 +76,16 @@ export function SwapPanel({
   const [amount, setAmount] = useState("");
   const [picker, setPicker] = useState<"in" | "out" | null>(null);
   const [error, setError] = useState<string>();
+  /*
+   * Two counters the panel keeps purely so it can show its own state back.
+   * `flips` drives every part of the inversion — the glyph, the ring, the rule
+   * and the two legs passing each other — from one number, and `applied` is
+   * which of the quarter/half/max buttons put the figure that is currently in
+   * the field there, so that button can stay filled until it is no longer true.
+   */
+  const [flips, setFlips] = useState(0);
+  const [applied, setApplied] = useState<number>();
+  const [settled, setSettled] = useState(false);
 
   const amountIn = useMemo(
     () => (tokenIn ? safeParseUnits(amount, tokenIn.decimals) : undefined),
@@ -130,12 +143,35 @@ export function SwapPanel({
     setError(undefined);
   }, [amount, tokenIn, tokenOut]);
 
+  // A balance that moved, or a different asset, invalidates the reading on the
+  // fraction buttons: the figure in the field is no longer that fraction.
+  useEffect(() => {
+    setApplied(undefined);
+  }, [tokenIn, balanceIn]);
+
   const setFraction = (fraction: number) => {
     if (balanceIn === undefined || !tokenIn) return;
     // Native inputs keep a gas buffer so the swap can still be mined.
     const usable = tokenIn.native ? (balanceIn * 97n) / 100n : balanceIn;
     const value = (usable * BigInt(Math.round(fraction * 1000))) / 1000n;
     setAmount(formatUnits(value, tokenIn.decimals));
+    setApplied(fraction);
+    // Spending the lot is the one of the three worth feeling in the hand.
+    if (fraction === 1) haptic("tap");
+  };
+
+  /*
+   * Turning the pair around. The count going up is what the whole animation
+   * reads from, and it is deliberately not a boolean: a reader who inverts four
+   * times should watch the glyph turn four times in the same direction, not
+   * flick between two poses.
+   */
+  const invert = () => {
+    onSwitch();
+    setAmount("");
+    setApplied(undefined);
+    setFlips((count) => count + 1);
+    haptic("turn");
   };
 
   const submit = async () => {
@@ -152,6 +188,11 @@ export function SwapPanel({
         source: "terminal",
       });
       setAmount("");
+      setApplied(undefined);
+      // The slab acknowledges the fill once, then goes back to being a button.
+      setSettled(true);
+      window.setTimeout(() => setSettled(false), 800);
+      haptic("commit");
       void refetchIn();
       void refetchOut();
       void quoteQuery.refetch();
@@ -211,78 +252,82 @@ export function SwapPanel({
       }
       bodyClassName="p-3"
     >
-      <div className="panel bg-base p-3">
-        <div className="flex items-center justify-between">
-          <span className="lbl">{t("swap.pay")}</span>
-          <span className="num text-[11px] text-faint">
-            {tokenIn && balanceIn !== undefined
-              ? `${formatUnitsFixed(balanceIn, tokenIn.decimals)} ${tokenIn.symbol}`
-              : "—"}
-          </span>
+      {/*
+       * The two legs and the control between them are one group, because the
+       * inversion is one movement: the parity written here is what restarts the
+       * ring, the rule and both legs together on every press.
+       */}
+      <div data-parity={flips === 0 ? undefined : flips % 2}>
+        <div className="panel leg-pay bg-base p-3">
+          <div className="flex items-center justify-between">
+            <span className="lbl">{t("swap.pay")}</span>
+            <span className="num text-[11px] text-faint">
+              {tokenIn && balanceIn !== undefined
+                ? `${formatUnitsFixed(balanceIn, tokenIn.decimals)} ${tokenIn.symbol}`
+                : "—"}
+            </span>
+          </div>
+          <div className="mt-2 flex items-center gap-3">
+            <input
+              className="field-lg num min-w-0 flex-1"
+              inputMode="decimal"
+              placeholder="0.0"
+              value={amount}
+              onChange={(event) => {
+                setAmount(sanitiseAmount(event.target.value));
+                // Typed over, so no preset is in force any more.
+                setApplied(undefined);
+              }}
+              aria-label={t("swap.amountLabel")}
+            />
+            <TokenButton
+              token={tokenIn}
+              onClick={() => setPicker("in")}
+              label={t("token.selectShort")}
+            />
+          </div>
+          <div className="mt-2 flex gap-1.5">
+            {FRACTIONS.map((fraction) => (
+              <button
+                key={fraction}
+                type="button"
+                className="btn btn-fill btn-sm flex-1"
+                style={{ "--fill": fraction } as CSSProperties}
+                data-filled={applied === fraction ? "true" : undefined}
+                onClick={() => setFraction(fraction)}
+                disabled={balanceIn === undefined || balanceIn === 0n}
+              >
+                {fraction === 1 ? t("swap.max") : `${fraction * 100}%`}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="mt-2 flex items-center gap-3">
-          <input
-            className="field-lg num min-w-0 flex-1"
-            inputMode="decimal"
-            placeholder="0.0"
-            value={amount}
-            onChange={(event) => setAmount(sanitiseAmount(event.target.value))}
-            aria-label={t("swap.amountLabel")}
-          />
-          <TokenButton
-            token={tokenIn}
-            onClick={() => setPicker("in")}
-            label={t("token.selectShort")}
-          />
-        </div>
-        <div className="mt-2 flex gap-1.5">
-          {[0.25, 0.5, 1].map((fraction) => (
-            <button
-              key={fraction}
-              type="button"
-              className="btn btn-sm flex-1"
-              onClick={() => setFraction(fraction)}
-              disabled={balanceIn === undefined || balanceIn === 0n}
-            >
-              {fraction === 1 ? t("swap.max") : `${fraction * 100}%`}
-            </button>
-          ))}
-        </div>
-      </div>
 
-      <div className="relative my-2 flex justify-center">
-        <div className="absolute inset-x-0 top-1/2 hair" />
-        <button
-          type="button"
-          className="icon-btn relative bg-panel"
-          onClick={() => {
-            onSwitch();
-            setAmount("");
-          }}
-          aria-label={t("swap.invert")}
-        >
-          <Icon name="swap" size={15} />
-        </button>
-      </div>
-
-      <div className="panel bg-base p-3">
-        <div className="flex items-center justify-between">
-          <span className="lbl">{t("swap.receive")}</span>
-          <span className="num text-[11px] text-faint">
-            {tokenOut && balanceOut !== undefined
-              ? `${formatUnitsFixed(balanceOut, tokenOut.decimals)} ${tokenOut.symbol}`
-              : "—"}
-          </span>
+        <div className="relative my-2 flex justify-center">
+          <div className="absolute inset-x-0 top-1/2 hair" />
+          <span className="rule-charge" aria-hidden />
+          <FlipButton turns={flips} onFlip={invert} label={t("swap.invert")} />
         </div>
-        <div className="mt-2 flex items-center gap-3">
-          <span className="num min-w-0 flex-1 truncate text-[22px] leading-[52px]">
-            {receiving}
-          </span>
-          <TokenButton
-            token={tokenOut}
-            onClick={() => setPicker("out")}
-            label={t("token.selectShort")}
-          />
+
+        <div className="panel leg-get bg-base p-3">
+          <div className="flex items-center justify-between">
+            <span className="lbl">{t("swap.receive")}</span>
+            <span className="num text-[11px] text-faint">
+              {tokenOut && balanceOut !== undefined
+                ? `${formatUnitsFixed(balanceOut, tokenOut.decimals)} ${tokenOut.symbol}`
+                : "—"}
+            </span>
+          </div>
+          <div className="mt-2 flex items-center gap-3">
+            <span className="num min-w-0 flex-1 truncate text-[22px] leading-[52px]">
+              {receiving}
+            </span>
+            <TokenButton
+              token={tokenOut}
+              onClick={() => setPicker("out")}
+              label={t("token.selectShort")}
+            />
+          </div>
         </div>
       </div>
 
@@ -296,11 +341,6 @@ export function SwapPanel({
                 type="button"
                 className="btn btn-sm"
                 data-active={settings.slippageBps === bps}
-                style={
-                  settings.slippageBps === bps
-                    ? { borderColor: "var(--color-accent-line)", color: "var(--color-accent-text)" }
-                    : undefined
-                }
                 onClick={() => setSettings({ slippageBps: bps })}
               >
                 {(bps / 100).toFixed(bps % 100 === 0 ? 0 : 1)}%
@@ -358,6 +398,7 @@ export function SwapPanel({
           <button
             type="button"
             className="btn btn-sm mt-2 w-full"
+            data-busy={venueResolving ? "true" : undefined}
             disabled={venueResolving}
             onClick={retryVenue}
           >
@@ -376,9 +417,18 @@ export function SwapPanel({
 
       {error && <p className="wrap-any mt-3 text-[11px] leading-relaxed short">{error}</p>}
 
+      {/*
+       * The slab carries three states, not two. Idle it is pressable; between
+       * the signature and the block it stays accent and runs a rail, because a
+       * grey disabled slab is exactly what a button that was never pressable
+       * looks like; and for three quarters of a second after the fill lands it
+       * puts out a ring to say so.
+       */}
       <button
         type="button"
         className="btn btn-accent btn-block mt-3"
+        data-run={busy ? "true" : undefined}
+        data-done={settled ? "true" : undefined}
         disabled={cta.disabled || busy}
         onClick={cta.action}
       >

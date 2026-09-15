@@ -19,7 +19,12 @@ type ToastItem = {
   message: string;
   detail?: string;
   href?: string;
+  /** Set for the length of the exit animation, then the toast is dropped. */
+  leaving?: boolean;
 };
+
+/** Matches `--dur-tap`, which is what the leaving animation runs for. */
+const EXIT_MS = 140;
 
 type ToastApi = {
   push: (toast: Omit<ToastItem, "id">) => void;
@@ -31,13 +36,29 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const { t } = useI18n();
   const [items, setItems] = useState<ToastItem[]>([]);
 
-  const push = useCallback((toast: Omit<ToastItem, "id">) => {
-    const id = `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
-    setItems((current) => [...current.slice(-3), { ...toast, id }]);
+  /*
+   * A toast that is taken off the screen in one frame reads as a glitch — the
+   * eye registers that something was there rather than that it left. So
+   * dismissing, by hand or by the clock, marks it first and drops it once the
+   * exit has run.
+   */
+  const dismiss = useCallback((id: string) => {
+    setItems((current) =>
+      current.map((item) => (item.id === id ? { ...item, leaving: true } : item)),
+    );
     window.setTimeout(() => {
       setItems((current) => current.filter((item) => item.id !== id));
-    }, 7000);
+    }, EXIT_MS);
   }, []);
+
+  const push = useCallback(
+    (toast: Omit<ToastItem, "id">) => {
+      const id = `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+      setItems((current) => [...current.slice(-3), { ...toast, id }]);
+      window.setTimeout(() => dismiss(id), 7000);
+    },
+    [dismiss],
+  );
 
   const api = useMemo(() => ({ push }), [push]);
 
@@ -49,6 +70,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <div
             key={item.id}
             className="panel toast pointer-events-auto flex items-start gap-3 p-3"
+            data-leaving={item.leaving ? "true" : undefined}
             role="status"
           >
             <span
@@ -73,10 +95,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 </a>
               )}
             </div>
+            {/* The cross leans away as it is approached, as it does everywhere. */}
             <button
               type="button"
-              className="text-faint transition-colors hover:text-ink"
-              onClick={() => setItems((current) => current.filter((i) => i.id !== item.id))}
+              className="text-faint transition-[color,transform] duration-150 hover:rotate-90 hover:text-ink active:scale-90"
+              onClick={() => dismiss(item.id)}
               aria-label={t("toast.dismiss")}
             >
               <Icon name="close" size={14} />

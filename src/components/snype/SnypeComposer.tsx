@@ -8,6 +8,7 @@ import { Icon } from "@/components/ui/Icon";
 import { Sheet } from "@/components/ui/Sheet";
 import { useFxRate } from "@/hooks/useFxRate";
 import { useI18n } from "@/hooks/useI18n";
+import { haptic } from "@/lib/haptics";
 import { usePairPrice } from "@/hooks/usePairPrice";
 import { useTokenList } from "@/hooks/useTokenList";
 import { chainMeta } from "@/lib/chains";
@@ -192,6 +193,8 @@ export function SnypeComposer({ open, onClose }: { open: boolean; onClose: () =>
     };
 
     addSnype(snype);
+    // Armed: the one press in this sheet that leaves something running.
+    haptic("commit");
     onClose();
   };
 

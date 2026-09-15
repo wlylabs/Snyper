@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { formatUnits } from "viem";
 import { useAccount } from "wagmi";
 import { Icon } from "@/components/ui/Icon";
+import { IconButton } from "@/components/ui/IconButton";
 import { Empty, Panel, Skeleton } from "@/components/ui/Panel";
 import { useConnectPrompt } from "@/hooks/useConnectPrompt";
 import { useMounted } from "@/hooks/useMounted";
@@ -182,14 +183,13 @@ export default function AssetsPage() {
             </>
           }
           action={
-            <button
-              type="button"
-              className="icon-btn"
+            <IconButton
+              icon="refresh"
+              act="spin"
+              busy={isFetching}
               onClick={() => void refetch()}
               aria-label={t("assets.refresh")}
-            >
-              <Icon name="refresh" size={14} />
-            </button>
+            />
           }
           bodyClassName="p-0"
         >

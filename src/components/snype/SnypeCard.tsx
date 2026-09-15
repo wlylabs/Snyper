@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { Flash } from "@/components/ui/Flash";
+import { HoldButton } from "@/components/ui/HoldButton";
 import { Icon } from "@/components/ui/Icon";
 import { useI18n } from "@/hooks/useI18n";
 import { chainMeta } from "@/lib/chains";
@@ -33,7 +33,6 @@ export function SnypeCard({ snype }: { snype: Snype }) {
   const removeSnype = useAppStore((state) => state.removeSnype);
   const pushSignal = useAppStore((state) => state.pushSignal);
   const patchRuntime = useAppStore((state) => state.patchRuntime);
-  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const plan = snype.plan;
   const runtime = snype.runtime;
@@ -193,33 +192,21 @@ export function SnypeCard({ snype }: { snype: Snype }) {
               {t("snype.cancel")}
             </button>
           )}
-          {finished &&
-            (confirmDelete ? (
-              <>
-                <button
-                  type="button"
-                  className="btn btn-sm flex-1"
-                  onClick={() => setConfirmDelete(false)}
-                >
-                  {t("common.cancel")}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-sm flex-1 short"
-                  onClick={() => removeSnype(snype.id)}
-                >
-                  {t("snype.delete")}
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                className="btn btn-sm flex-1"
-                onClick={() => setConfirmDelete(true)}
-              >
-                {t("snype.delete")}
-              </button>
-            ))}
+          {/*
+           * Deleting a finished strategy used to take two taps on two buttons
+           * that read alike, in the same place, a tenth of a second apart —
+           * which is not a confirmation, it is a double-tap. Holding is the
+           * confirmation: the fill is the reader watching their own decision
+           * being made, and letting go is how they change their mind.
+           */}
+          {finished && (
+            <HoldButton
+              className="btn-sm flex-1"
+              label={t("snype.delete")}
+              holdLabel={t("common.holdToConfirm")}
+              onConfirm={() => removeSnype(snype.id)}
+            />
+          )}
         </div>
       </div>
     </article>

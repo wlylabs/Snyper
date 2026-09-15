@@ -49,6 +49,7 @@ export default function StrategiesPage() {
           <button
             type="button"
             className="btn btn-accent btn-sm"
+            data-act="add"
             onClick={() => setComposerOpen(true)}
           >
             <Icon name="plus" size={13} />
