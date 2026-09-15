@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { usePublicClient } from "wagmi";
 import { Icon } from "@/components/ui/Icon";
 import { Panel, Row } from "@/components/ui/Panel";
 import { Segmented } from "@/components/ui/Segmented";
@@ -17,7 +18,7 @@ import { RPC_OVERRIDE, WALLETCONNECT_PROJECT_ID } from "@/lib/wagmi";
 import { PONS_V1_FACTORY, PONS_V2_FACTORY } from "@/lib/pons";
 import { useVenue, useVenueDiscovery } from "@/hooks/useVenue";
 import { truncateAddress } from "@/lib/format";
-import type { VenueConfig } from "@/lib/venue";
+import { completeVenueConfig, type VenueConfig } from "@/lib/venue";
 import { DEFAULT_SETTINGS, useAppStore } from "@/store/useAppStore";
 
 export default function SettingsPage() {
@@ -341,11 +342,34 @@ function VenuePanel() {
   const { t } = useI18n();
   const mounted = useMounted();
   const { venue } = useVenue();
-  const { isResolving } = useVenueDiscovery();
+  const { isResolving, retry: retryVenue } = useVenueDiscovery();
   const manual = useAppStore((state) => state.venueManual);
   const setVenueManual = useAppStore((state) => state.setVenueManual);
+  const client = usePublicClient({ chainId: CHAIN_ID });
   const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [draft, setDraft] = useState<VenueConfig>(manual ?? {});
+
+  /**
+   * Stores what was typed, after asking the chain for whatever it leaves out.
+   * The router knows its own factory and wrapped native, so the entry that gets
+   * stored is the complete one rather than the partial one that would be
+   * refused. What the reader typed always wins over what was read.
+   */
+  const saveManual = async () => {
+    if (!client) {
+      setVenueManual(draft);
+      return;
+    }
+    setSaving(true);
+    try {
+      const completed = await completeVenueConfig(client, draft);
+      setDraft(completed);
+      setVenueManual(completed);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const sourceLabel = !venue
     ? isResolving
@@ -399,14 +423,21 @@ function VenuePanel() {
         <Row k={t("settings.ponsV2")} v={truncateAddress(PONS_V2_FACTORY, 8, 6)} />
       </div>
 
-      <button
-        type="button"
-        className="btn btn-sm mt-3 w-full"
-        onClick={() => setOpen((value) => !value)}
-      >
-        <Icon name={open ? "chevron" : "sliders"} size={13} />
-        {open ? t("common.close") : t("settings.venueEdit")}
-      </button>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          className="btn btn-sm"
+          disabled={isResolving}
+          onClick={retryVenue}
+        >
+          <Icon name="refresh" size={13} />
+          {isResolving ? t("settings.venueResolving") : t("settings.venueRetry")}
+        </button>
+        <button type="button" className="btn btn-sm" onClick={() => setOpen((value) => !value)}>
+          <Icon name={open ? "chevron" : "sliders"} size={13} />
+          {open ? t("common.close") : t("settings.venueEdit")}
+        </button>
+      </div>
 
       {open && (
         <div className="mt-3 grid gap-2">
@@ -448,15 +479,19 @@ function VenuePanel() {
             />
           </div>
 
+          <p className="text-[10px] leading-relaxed text-dim">
+            {t("settings.venueRouterHint")}
+          </p>
           <p className="text-[10px] leading-relaxed warn">{t("settings.venueWarning")}</p>
 
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
               className="btn btn-accent btn-sm"
-              onClick={() => setVenueManual(draft)}
+              disabled={saving}
+              onClick={() => void saveManual()}
             >
-              {t("settings.venueSave")}
+              {saving ? t("settings.venueResolving") : t("settings.venueSave")}
             </button>
             <button
               type="button"

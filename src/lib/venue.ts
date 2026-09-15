@@ -1,6 +1,6 @@
 import type { PublicClient } from "viem";
-import { getAddress, isAddress } from "viem";
-import { ponsV1FactoryAbi } from "./abi";
+import { getAddress, isAddress, zeroAddress } from "viem";
+import { erc20Abi, ponsV1FactoryAbi, swapRouter02Abi } from "./abi";
 import { PONS_V1_FACTORY } from "./pons";
 
 /**
@@ -54,11 +54,17 @@ export type VenueConfig = {
 };
 
 const STANDARD_FEE_TIERS = [100, 500, 3000, 10000] as const;
-const ZERO = "0x0000000000000000000000000000000000000000";
 
+/**
+ * An address, or nothing. The zero address is not one: it is what an unset slot
+ * in a launchpad record reads as, and routing against it would fail every trade
+ * rather than fall through to a venue that works.
+ */
 function address(value: string | undefined): `0x${string}` | undefined {
   const trimmed = value?.trim();
-  return trimmed && isAddress(trimmed) ? getAddress(trimmed) : undefined;
+  if (!trimmed || !isAddress(trimmed)) return undefined;
+  const parsed = getAddress(trimmed);
+  return parsed === zeroAddress ? undefined : parsed;
 }
 
 function feeTiers(poolFee: string | number | undefined): readonly number[] {
@@ -158,70 +164,227 @@ export function setActiveVenue(venue: Venue | undefined): void {
  * which is Robinhood Chain's wrapped native. That makes the launchpad a first
  * party source for the one thing the app cannot bundle, with no indexer and no
  * address anyone had to trust a third party for.
+ *
+ * Nothing here is batched through multicall3, and every read is allowed to fail
+ * on its own. Both are deliberate: an aggregator that is missing or a single
+ * view that reverts used to sink the whole lookup, and a venue that fails to
+ * resolve costs the app every price and every trade at once. The transport
+ * batches these into one request anyway.
  */
 export async function discoverVenue(
   client: PublicClient,
 ): Promise<VenueConfig | undefined> {
-  const [dexCount, launchCount] = await client.multicall({
-    allowFailure: false,
-    contracts: [
-      {
-        address: PONS_V1_FACTORY,
-        abi: ponsV1FactoryAbi,
-        functionName: "dexConfigCount" as const,
-      },
-      {
-        address: PONS_V1_FACTORY,
-        abi: ponsV1FactoryAbi,
-        functionName: "launchConfigCount" as const,
-      },
-    ],
-  });
-
-  const dexIds = indices(dexCount);
-  const launchIds = indices(launchCount);
-  if (dexIds.length === 0 || launchIds.length === 0) return undefined;
+  const [dexCount, launchCount] = await configCounts(client);
 
   const [dexConfigs, launchConfigs] = await Promise.all([
-    client.multicall({
-      allowFailure: true,
-      contracts: dexIds.map((id) => ({
-        address: PONS_V1_FACTORY,
-        abi: ponsV1FactoryAbi,
-        functionName: "getDexConfig" as const,
-        args: [id] as const,
-      })),
-    }),
-    client.multicall({
-      allowFailure: true,
-      contracts: launchIds.map((id) => ({
-        address: PONS_V1_FACTORY,
-        abi: ponsV1FactoryAbi,
-        functionName: "getLaunchConfig" as const,
-        args: [id] as const,
-      })),
-    }),
+    Promise.all(
+      configIds(dexCount).map((id) =>
+        tryRead(
+          client.readContract({
+            address: PONS_V1_FACTORY,
+            abi: ponsV1FactoryAbi,
+            functionName: "getDexConfig",
+            args: [id],
+          }),
+        ),
+      ),
+    ),
+    Promise.all(
+      configIds(launchCount).map((id) =>
+        tryRead(
+          client.readContract({
+            address: PONS_V1_FACTORY,
+            abi: ponsV1FactoryAbi,
+            functionName: "getLaunchConfig",
+            args: [id],
+          }),
+        ),
+      ),
+    ),
   ]);
 
-  // The newest enabled entry wins: configs are appended, so the last one is the
-  // venue the launchpad is currently opening pools in.
-  const dex = [...dexConfigs]
-    .reverse()
-    .map((entry) => (entry.status === "success" ? entry.result : undefined))
-    .find((config) => config?.enabled);
-  const launch = [...launchConfigs]
-    .reverse()
-    .map((entry) => (entry.status === "success" ? entry.result : undefined))
-    .find((config) => config?.enabled && config.pairToken !== ZERO);
+  // Newest first: configs are appended and never renumbered, so the last entry
+  // is the venue the launchpad opens pools in today. An enabled config wins,
+  // but a retired one is still taken over nothing — `enabled` says whether the
+  // launchpad still launches into that DEX, not whether its pools still trade.
+  // Only the router has to be there: a record that left its factory unset is
+  // still routable, because the router names the factory it swaps against.
+  const dexes = newestFirst(dexConfigs).filter((config) => address(config.swapRouter));
+  const dex = dexes.find((config) => config.enabled) ?? dexes[0];
+  if (!dex) return undefined;
 
-  if (!dex || !launch) return undefined;
+  // The pair token every V1 launch trades against is the chain's wrapped
+  // native. It is a hint rather than a requirement: the router knows its own.
+  const launches = newestFirst(launchConfigs).filter((config) =>
+    address(config.pairToken),
+  );
+  const launch = launches.find((config) => config.enabled) ?? launches[0];
 
-  return {
+  return completeVenue(client, {
     factory: dex.factory,
     router: dex.swapRouter,
-    wrapped: launch.pairToken,
+    wrapped: launch?.pairToken,
     poolFee: dex.poolFee,
+  });
+}
+
+/**
+ * The venue one token actually trades in, read off its own launch record. A V1
+ * launch names the DEX it was minted into and the tier its pool sits in, so a
+ * pasted contract address resolves routing by itself — which is what keeps a
+ * launchpad-wide lookup that came back empty from costing the reader the trade
+ * they were looking at.
+ */
+export async function venueFromLaunch(
+  client: PublicClient,
+  token: `0x${string}`,
+): Promise<VenueConfig | undefined> {
+  const launch = await tryRead(
+    client.readContract({
+      address: PONS_V1_FACTORY,
+      abi: ponsV1FactoryAbi,
+      functionName: "getLaunchedToken",
+      args: [token],
+    }),
+  );
+  if (!launch?.exists) return undefined;
+
+  const dex = await tryRead(
+    client.readContract({
+      address: PONS_V1_FACTORY,
+      abi: ponsV1FactoryAbi,
+      functionName: "getDexConfig",
+      args: [launch.dexId],
+    }),
+  );
+  if (!dex) return undefined;
+
+  return completeVenue(client, {
+    factory: dex.factory,
+    router: dex.swapRouter,
+    wrapped: launch.pairedToken,
+    // This token's own tier, which is the one worth probing before the ladder.
+    poolFee: Number(launch.poolFee) || Number(dex.poolFee),
+  });
+}
+
+/**
+ * Fills in what a launchpad record does not carry. SwapRouter02 publishes both
+ * the wrapped native it settles through and the factory it routes against, so
+ * one read off the router completes a venue on its own. The wrapped symbol is
+ * read from the token rather than assumed, because a chain that calls its coin
+ * something else should not be labelled WETH in the interface.
+ */
+async function completeVenue(
+  client: PublicClient,
+  partial: {
+    factory?: string;
+    router?: string;
+    wrapped?: string;
+    poolFee?: number | bigint;
+  },
+): Promise<VenueConfig | undefined> {
+  const router = address(partial.router);
+  if (!router) return undefined;
+
+  const [routerWrapped, routerFactory] = await Promise.all([
+    tryRead(
+      client.readContract({ address: router, abi: swapRouter02Abi, functionName: "WETH9" }),
+    ),
+    tryRead(
+      client.readContract({ address: router, abi: swapRouter02Abi, functionName: "factory" }),
+    ),
+  ]);
+
+  const wrapped = address(partial.wrapped) ?? address(routerWrapped);
+  const factory = address(partial.factory) ?? address(routerFactory);
+  if (!wrapped || !factory) return undefined;
+
+  const symbol = await tryRead(
+    client.readContract({ address: wrapped, abi: erc20Abi, functionName: "symbol" }),
+  );
+
+  return {
+    factory,
+    router,
+    wrapped,
+    wrappedSymbol: symbol,
+    poolFee: partial.poolFee === undefined ? undefined : Number(partial.poolFee),
   };
+}
+
+/**
+ * Completes a hand-entered venue from the chain. An operator who found the
+ * router in a block explorer should not have to hunt down the factory and the
+ * wrapped native as well: the router publishes both, so one address is enough
+ * to pin the app to a venue. Returns the entry untouched when the chain had
+ * nothing to add, so a half-filled config still fails closed rather than being
+ * patched with guesses.
+ */
+export async function completeVenueConfig(
+  client: PublicClient,
+  config: VenueConfig,
+): Promise<VenueConfig> {
+  if (address(config.factory) && address(config.wrapped)) return config;
+
+  const completed = await completeVenue(client, {
+    factory: config.factory,
+    router: config.router,
+    wrapped: config.wrapped,
+    poolFee:
+      config.poolFee === undefined || config.poolFee === ""
+        ? undefined
+        : Number(config.poolFee),
+  });
+  return completed ? { ...config, ...completed } : config;
+}
+
+/** A read that answers with nothing rather than throwing. */
+function tryRead<T>(read: Promise<T>): Promise<T | undefined> {
+  return read.then(
+    (value) => value,
+    () => undefined,
+  );
+}
+
+/** The answers that came back, newest first. A failed read is simply absent. */
+function newestFirst<T>(results: readonly (T | undefined)[]): T[] {
+  return [...results].reverse().filter((entry): entry is T => entry !== undefined);
+}
+
+/**
+ * How many configs each list holds. A count view that reverts — a launchpad
+ * generation that never had it, an address that turned out to be something
+ * else — reads as zero rather than throwing, and the blind window below covers
+ * the case where the configs are there but the count is not.
+ */
+async function configCounts(client: PublicClient): Promise<[bigint, bigint]> {
+  const [dex, launch] = await Promise.all([
+    tryRead(
+      client.readContract({
+        address: PONS_V1_FACTORY,
+        abi: ponsV1FactoryAbi,
+        functionName: "dexConfigCount",
+      }),
+    ),
+    tryRead(
+      client.readContract({
+        address: PONS_V1_FACTORY,
+        abi: ponsV1FactoryAbi,
+        functionName: "launchConfigCount",
+      }),
+    ),
+  ]);
+
+  return [dex ?? 0n, launch ?? 0n];
+}
+
+/** Ids to read: what the count names, or a blind window when it named nothing. */
+function configIds(count: bigint): bigint[] {
+  const known = indices(count);
+  return known.length > 0
+    ? known
+    : Array.from({ length: 8 }, (_, index) => BigInt(index));
 }
 
 /**

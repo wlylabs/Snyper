@@ -9,7 +9,8 @@ import { useToast } from "@/components/ui/Toast";
 import { readableError, useExecutor } from "@/hooks/useExecutor";
 import { useQuote } from "@/hooks/useQuote";
 import { useTokenBalance } from "@/hooks/useTokenBalance";
-import { chainMeta, hasRouting } from "@/lib/chains";
+import { useVenue, useVenueDiscovery, useVenueFromToken } from "@/hooks/useVenue";
+import { chainMeta, isSupportedChain } from "@/lib/chains";
 import {
   feeLabel,
   formatPercent,
@@ -57,6 +58,13 @@ export function SwapPanel({
   const { t } = useI18n();
   const settings = useAppStore((state) => state.settings);
   const setSettings = useAppStore((state) => state.setSettings);
+  // Reading the venue through the hook is what re-renders this panel the moment
+  // one resolves; the module mirror alone would leave the no-venue notice up.
+  const { hasRouting: venueResolved } = useVenue();
+  const { isResolving: venueResolving, retry: retryVenue } = useVenueDiscovery();
+  // An imported contract can resolve the venue itself, same as the paste desk.
+  // Either leg may be the pasted one, so the first non-native side is probed.
+  useVenueFromToken([tokenOut, tokenIn].find((token) => token && !token.native)?.address);
 
   const [amount, setAmount] = useState("");
   const [picker, setPicker] = useState<"in" | "out" | null>(null);
@@ -84,7 +92,8 @@ export function SwapPanel({
    * Without a resolved Uniswap venue nothing prices or executes — except a Pons
    * bonding curve, which settles trades itself with no router in front of it.
    */
-  const routable = hasRouting(pairChainId) || quote?.venue === "curve";
+  const routable =
+    (venueResolved && isSupportedChain(pairChainId)) || quote?.venue === "curve";
   const pairChainLabel = chainMeta(pairChainId)?.label ?? t("common.network");
   const wrongNetwork = isConnected && tokenIn && chainId !== tokenIn.chainId;
   const insufficient = Boolean(amountIn && balanceIn !== undefined && amountIn > balanceIn);
@@ -302,10 +311,21 @@ export function SwapPanel({
       </div>
 
       {!routable && (
-        <p className="mt-3 flex items-start gap-2 text-[11px] leading-relaxed warn">
-          <Icon name="alert" size={14} className="mt-0.5 shrink-0" />
-          {t("swap.noVenueNote", { chain: pairChainLabel })}
-        </p>
+        <div className="mt-3">
+          <p className="flex items-start gap-2 text-[11px] leading-relaxed warn">
+            <Icon name="alert" size={14} className="mt-0.5 shrink-0" />
+            {t("swap.noVenueNote", { chain: pairChainLabel })}
+          </p>
+          <button
+            type="button"
+            className="btn btn-sm mt-2 w-full"
+            disabled={venueResolving}
+            onClick={retryVenue}
+          >
+            <Icon name="refresh" size={13} />
+            {venueResolving ? t("settings.venueResolving") : t("swap.noVenueRetry")}
+          </button>
+        </div>
       )}
 
       {quote && quote.priceImpact > 0.05 && (

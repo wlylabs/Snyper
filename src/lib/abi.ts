@@ -93,6 +93,23 @@ export const quoterV2Abi = [
 ] as const;
 
 export const swapRouter02Abi = [
+  // SwapRouter02 publishes the two addresses that pin it to a deployment. They
+  // are what lets a venue complete itself from the router alone, so a launchpad
+  // record that names only the router still resolves to something routable.
+  {
+    type: "function",
+    name: "WETH9",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "address" }],
+  },
+  {
+    type: "function",
+    name: "factory",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "address" }],
+  },
   {
     type: "function",
     name: "exactInputSingle",

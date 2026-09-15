@@ -17,7 +17,7 @@ import { usePairPrice } from "@/hooks/usePairPrice";
 import { useQuote } from "@/hooks/useQuote";
 import { useTokenBalance } from "@/hooks/useTokenBalance";
 import { useTokenList } from "@/hooks/useTokenList";
-import { useVenue } from "@/hooks/useVenue";
+import { useVenue, useVenueDiscovery, useVenueFromToken } from "@/hooks/useVenue";
 import { chainMeta, dexMeta, explorerAddress, isNative } from "@/lib/chains";
 import {
   feeLabel,
@@ -78,6 +78,7 @@ export function ContractDesk() {
   const client = usePublicClient({ chainId });
   const { execute, phase } = useExecutor();
   const { hasRouting: routable } = useVenue();
+  const { isResolving: venueResolving, retry: retryVenue } = useVenueDiscovery();
   const toast = useToast();
 
   const settings = useAppStore((state) => state.settings);
@@ -96,6 +97,13 @@ export function ContractDesk() {
 
   const trimmed = query.trim();
   const valid = isAddress(trimmed);
+
+  /**
+   * A pasted launch names the DEX it was minted into, so it can resolve the
+   * routing venue by itself when the launchpad-wide lookup came back empty.
+   * Runs only while no venue is resolved, and only for a valid address.
+   */
+  useVenueFromToken(valid ? (trimmed as `0x${string}`) : undefined);
 
   /**
    * One read per pasted address: what the contract says it is, and what the
@@ -562,6 +570,24 @@ export function ContractDesk() {
             <Icon name="alert" size={13} className="mt-0.5 shrink-0" />
             {mode === "snipe" ? t("desk.snipeNote") : t("desk.buyNote")}
           </p>
+
+          {!tradeable && (
+            <div className="mt-2">
+              <p className="flex items-start gap-2 text-[11px] leading-relaxed warn">
+                <Icon name="alert" size={13} className="mt-0.5 shrink-0" />
+                {t("swap.noVenueNote", { chain: meta?.label ?? t("common.network") })}
+              </p>
+              <button
+                type="button"
+                className="btn btn-sm mt-2 w-full"
+                disabled={venueResolving}
+                onClick={retryVenue}
+              >
+                <Icon name="refresh" size={13} />
+                {venueResolving ? t("settings.venueResolving") : t("swap.noVenueRetry")}
+              </button>
+            </div>
+          )}
 
           {error && <p className="wrap-any mt-2 text-[11px] leading-relaxed short">{error}</p>}
           {armed && <p className="mt-2 text-[11px] leading-relaxed long">{armed}</p>}
