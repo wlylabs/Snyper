@@ -468,6 +468,116 @@ const en = {
 
   "notFound.title": "That route is not part of the terminal.",
   "notFound.action": "Back to terminal",
+  "bots.tabSnipe": "Snipe",
+  "bots.snipesSummary": "{total} snipes · {live} watching",
+
+  "desk.title": "Contract desk",
+  "desk.paste": "Paste a contract address",
+  "desk.placeholder": "0x… contract address",
+  "desk.reading": "Reading the contract…",
+  "desk.notToken": "That address does not read as an ERC-20 token.",
+  "desk.hint":
+    "Paste a token's contract address to read it straight off the chain, price it against its pool, and either buy it now or leave a snipe armed for the moment a pool opens.",
+  "desk.fund": "Pay with",
+  "desk.amount": "Size ({symbol})",
+  "desk.pool": "Pool",
+  "desk.noPool": "No pool yet",
+  "desk.depth": "Depth ({symbol})",
+  "desk.price": "Pool mid",
+  "desk.receive": "You receive",
+  "desk.modeBuy": "Buy now",
+  "desk.modeSnipe": "Arm a snipe",
+  "desk.takeProfit": "Take profit (%, 0 = off)",
+  "desk.cutLoss": "Cut loss (%, 0 = off)",
+  "desk.minLiquidity": "Minimum depth ({symbol}, 0 = ignore)",
+  "desk.maxImpact": "Maximum impact (%)",
+  "desk.slippage": "Max slippage (bps)",
+  "desk.buyNote":
+    "The buy goes out at the pool price on screen, bounded by the slippage set in settings.",
+  "desk.snipeNote":
+    "A snipe checks the pair every tick and buys the moment a pool clears both guards. It raises a signal your wallet signs — nothing is ever pre-signed.",
+  "desk.ctaPaste": "Paste a contract address",
+  "desk.ctaSameAsFunding": "That is the funding asset",
+  "desk.ctaNoPoolYet": "No pool to price against",
+  "desk.ctaArm": "Arm the snipe",
+  "desk.ctaBuy": "Buy {symbol}",
+  "desk.errAmount": "Set how much to commit.",
+  "desk.armedNote": "Snipe armed on {symbol}. It buys the moment a pool clears the guards.",
+
+  "snipe.stage.waiting": "Watching for a pool",
+  "snipe.stage.entering": "Buying",
+  "snipe.stage.expired": "Gave up",
+  "snipe.commit": "Commits",
+  "snipe.guards": "Guards",
+  "snipe.guardLine": "depth {depth} · impact ≤ {impact}",
+  "snipe.givesUp": "Gives up in",
+  "snipe.expiredNote": "No pool cleared the guards before the watch ran out.",
+  "snipe.handedOver": "Bought with no targets set. The position is the wallet's to manage.",
+  "snipe.cancel": "Cancel the snipe",
+  "snipe.targetOff": "off",
+
+  "protect.held": "Held",
+  "protect.reference": "Reference",
+  "protect.onArm": "on arming",
+  "protect.change": "From reference",
+
+  "positions.title": "Positions",
+  "positions.count": "{count} open",
+  "positions.emptyTitle": "No positions yet",
+  "positions.emptyHint":
+    "Every confirmed swap sent from this browser builds an entry price, so a bag bought in legs reads as one line.",
+  "positions.booked": "Booked ({symbol})",
+  "positions.openResult": "Open {value}",
+  "positions.closed": "Closed",
+  "positions.closedLine": "{fills} fills · fully unwound",
+  "positions.entryLine": "Entry {entry} · {size} {symbol}",
+  "positions.realised": "Realised",
+  "positions.unpriced": "No route",
+
+  "composer.shareToSell": "Share of the {symbol} balance to sell (%)",
+  "composer.shareHint":
+    "The watch reads the wallet balance each tick, so it guards whatever is there when a target hits.",
+  "composer.takeProfit": "Take profit (%, 0 = off)",
+  "composer.cutLoss": "Cut loss (%, 0 = off)",
+  "composer.reference": "Reference price ({symbol}, 0 = price on arming)",
+  "composer.referenceHint": "Mid now {price}",
+  "composer.errShare": "Set a share above zero.",
+  "composer.errNoTarget": "Set a take profit, a cut loss, or both.",
+
+  "settings.priorityFee": "Priority fee (gwei)",
+  "settings.maxImpact": "Impact guard (bps)",
+  "settings.guardNote":
+    "The priority fee rides on top of the base fee; 0 leaves the tip to the wallet. The impact guard refuses any swap that would cost more than this in depth — which is what a drained pool looks like from the outside.",
+  "settings.presets": "Preset sizes",
+  "settings.presetsNote": "One-tap buy sizes on the contract desk, separated by commas.",
+  "settings.presetsNative": "Native coin",
+  "settings.presetsStable": "USD stable",
+
+  "strategy.snipe": "Snipe",
+  "strategy.snipeShort": "Snipe",
+  "strategy.snipeSummary":
+    "Watches a pair and buys the moment a pool clears the depth and impact guards.",
+  "strategy.snipeDesc": "{amount} {quote} on the first pool · TP +{tp}% · CL −{cl}%",
+  "strategy.snipeDescBare": "{amount} {quote} on the first pool that clears the guards",
+  "strategy.protect": "Position guard",
+  "strategy.protectShort": "Guard",
+  "strategy.protectSummary":
+    "Sells a share of what the wallet already holds once price reaches a target on either side.",
+  "strategy.protectDesc": "Sell {percent}% of {base} · TP +{tp}% · CL −{cl}%",
+
+  "reason.snipeEntry": "Pool live at {price}",
+  "reason.snipeNoPool": "No pool with liquidity yet",
+  "reason.snipeDepthUnknown": "Pool depth could not be read",
+  "reason.snipeThin": "Depth {depth} {symbol}, under the {min} {symbol} floor",
+  "reason.snipeNoRoute": "Pool exists but prices nothing yet",
+  "reason.snipeImpact": "The entry would cost {impact} in depth, over the {limit} ceiling",
+  "reason.protectTakeProfit": "Take profit +{percent}% at {price}",
+  "reason.protectCutLoss": "Cut loss −{percent}% at {price}",
+  "reason.protectEmpty": "Nothing held to guard",
+
+  "error.impactGuard":
+    "This swap would cost {impact} in depth, over the {limit} guard. Raise the guard in settings if that is what you meant.",
+
 } as const;
 
 export type TKey = keyof typeof en;
@@ -931,6 +1041,116 @@ const id: Record<TKey, string> = {
 
   "notFound.title": "Rute itu bukan bagian dari terminal ini.",
   "notFound.action": "Kembali ke terminal",
+
+  "bots.tabSnipe": "Snipe",
+  "bots.snipesSummary": "{total} snipe · {live} memantau",
+
+  "desk.title": "Meja kontrak",
+  "desk.paste": "Tempel alamat kontrak",
+  "desk.placeholder": "0x… alamat kontrak",
+  "desk.reading": "Membaca kontrak…",
+  "desk.notToken": "Alamat itu tidak terbaca sebagai token ERC-20.",
+  "desk.hint":
+    "Tempel alamat kontrak token untuk membacanya langsung dari chain, melihat harganya di pool, lalu beli sekarang atau pasang snipe yang menunggu poolnya dibuka.",
+  "desk.fund": "Bayar pakai",
+  "desk.amount": "Jumlah ({symbol})",
+  "desk.pool": "Pool",
+  "desk.noPool": "Belum ada pool",
+  "desk.depth": "Kedalaman ({symbol})",
+  "desk.price": "Harga pool",
+  "desk.receive": "Kamu dapat",
+  "desk.modeBuy": "Beli sekarang",
+  "desk.modeSnipe": "Pasang snipe",
+  "desk.takeProfit": "Take profit (%, 0 = mati)",
+  "desk.cutLoss": "Cut loss (%, 0 = mati)",
+  "desk.minLiquidity": "Kedalaman minimal ({symbol}, 0 = abaikan)",
+  "desk.maxImpact": "Dampak harga maksimal (%)",
+  "desk.slippage": "Slippage maksimal (bps)",
+  "desk.buyNote":
+    "Pembelian dikirim di harga pool yang tampil sekarang, dibatasi slippage yang kamu atur di pengaturan.",
+  "desk.snipeNote":
+    "Snipe memeriksa pasangan ini tiap tick dan membeli begitu ada pool yang lolos kedua penjaga. Transaksinya tetap kamu tanda tangani sendiri di dompet — tidak ada yang ditandatangani di muka.",
+  "desk.ctaPaste": "Tempel alamat kontrak",
+  "desk.ctaSameAsFunding": "Itu aset pembayarnya sendiri",
+  "desk.ctaNoPoolYet": "Belum ada pool untuk dihargai",
+  "desk.ctaArm": "Aktifkan snipe",
+  "desk.ctaBuy": "Beli {symbol}",
+  "desk.errAmount": "Isi mau pakai berapa.",
+  "desk.armedNote": "Snipe {symbol} aktif. Dia beli begitu ada pool yang lolos penjaga.",
+
+  "snipe.stage.waiting": "Menunggu pool",
+  "snipe.stage.entering": "Sedang beli",
+  "snipe.stage.expired": "Berhenti menunggu",
+  "snipe.commit": "Siap pakai",
+  "snipe.guards": "Penjaga",
+  "snipe.guardLine": "kedalaman {depth} · dampak ≤ {impact}",
+  "snipe.givesUp": "Berhenti dalam",
+  "snipe.expiredNote": "Sampai waktunya habis, tidak ada pool yang lolos penjaga.",
+  "snipe.handedOver": "Sudah dibeli tanpa target. Posisinya jadi urusan dompetmu.",
+  "snipe.cancel": "Batalkan snipe",
+  "snipe.targetOff": "mati",
+
+  "protect.held": "Dipegang",
+  "protect.reference": "Acuan",
+  "protect.onArm": "saat diaktifkan",
+  "protect.change": "Dari acuan",
+
+  "positions.title": "Posisi",
+  "positions.count": "{count} terbuka",
+  "positions.emptyTitle": "Belum ada posisi",
+  "positions.emptyHint":
+    "Tiap swap yang dikirim dari browser ini ikut menyusun harga masuknya, jadi satu bag yang dibeli bertahap tetap terbaca sebagai satu baris.",
+  "positions.booked": "Sudah jadi ({symbol})",
+  "positions.openResult": "Berjalan {value}",
+  "positions.closed": "Sudah tutup",
+  "positions.closedLine": "{fills} eksekusi · habis dijual",
+  "positions.entryLine": "Masuk {entry} · {size} {symbol}",
+  "positions.realised": "Terkunci",
+  "positions.unpriced": "Tidak ada rute",
+
+  "composer.shareToSell": "Bagian saldo {symbol} yang dijual (%)",
+  "composer.shareHint":
+    "Penjaga membaca saldo dompet tiap tick, jadi yang dijaga adalah apa pun yang ada saat target kena.",
+  "composer.takeProfit": "Take profit (%, 0 = mati)",
+  "composer.cutLoss": "Cut loss (%, 0 = mati)",
+  "composer.reference": "Harga acuan ({symbol}, 0 = harga saat diaktifkan)",
+  "composer.referenceHint": "Harga sekarang {price}",
+  "composer.errShare": "Isi bagian yang lebih dari nol.",
+  "composer.errNoTarget": "Isi take profit, cut loss, atau keduanya.",
+
+  "settings.priorityFee": "Priority fee (gwei)",
+  "settings.maxImpact": "Penjaga dampak (bps)",
+  "settings.guardNote":
+    "Priority fee ditambahkan di atas base fee; 0 berarti tipnya diserahkan ke dompet. Penjaga dampak menolak swap yang biayanya melebihi angka ini — begitulah pool yang sudah dikuras terlihat dari luar.",
+  "settings.presets": "Nominal cepat",
+  "settings.presetsNote": "Nominal beli sekali ketuk di meja kontrak, dipisah koma.",
+  "settings.presetsNative": "Koin asli",
+  "settings.presetsStable": "Stabil USD",
+
+  "strategy.snipe": "Snipe",
+  "strategy.snipeShort": "Snipe",
+  "strategy.snipeSummary":
+    "Memantau satu pasangan dan membeli begitu ada pool yang lolos penjaga kedalaman dan dampak harga.",
+  "strategy.snipeDesc": "{amount} {quote} di pool pertama · TP +{tp}% · CL −{cl}%",
+  "strategy.snipeDescBare": "{amount} {quote} di pool pertama yang lolos penjaga",
+  "strategy.protect": "Penjaga posisi",
+  "strategy.protectShort": "Jaga",
+  "strategy.protectSummary":
+    "Menjual sebagian dari yang sudah dipegang dompet begitu harga menyentuh target di salah satu sisi.",
+  "strategy.protectDesc": "Jual {percent}% {base} · TP +{tp}% · CL −{cl}%",
+
+  "reason.snipeEntry": "Pool hidup di {price}",
+  "reason.snipeNoPool": "Belum ada pool berisi likuiditas",
+  "reason.snipeDepthUnknown": "Kedalaman pool tidak terbaca",
+  "reason.snipeThin": "Kedalaman {depth} {symbol}, di bawah batas {min} {symbol}",
+  "reason.snipeNoRoute": "Pool ada tapi belum bisa memberi harga",
+  "reason.snipeImpact": "Pembelian ini akan memakan {impact}, di atas batas {limit}",
+  "reason.protectTakeProfit": "Take profit +{percent}% di {price}",
+  "reason.protectCutLoss": "Cut loss −{percent}% di {price}",
+  "reason.protectEmpty": "Tidak ada yang bisa dijaga",
+
+  "error.impactGuard":
+    "Swap ini akan memakan {impact}, di atas penjaga {limit}. Naikkan penjaganya di pengaturan kalau memang itu maksudmu.",
 };
 
 const DICTIONARIES: Record<Locale, Record<TKey, string>> = { en, id };

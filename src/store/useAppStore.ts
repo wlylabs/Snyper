@@ -27,6 +27,10 @@ export const DEFAULT_SETTINGS: Settings = {
   tickSeconds: 30,
   theme: "dark",
   autoDispatch: false,
+  presetsNative: [0.05, 0.1, 0.25, 0.5],
+  presetsStable: [25, 50, 100, 250],
+  priorityFeeGwei: 0,
+  maxImpactBps: 1_500,
 };
 
 export function seriesKey(chainId: number, base: Token, quote: Token): string {

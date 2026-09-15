@@ -5,6 +5,7 @@ import { useAccount, useConfig } from "wagmi";
 import { getPublicClient, readContract } from "wagmi/actions";
 import { erc20Abi } from "@/lib/abi";
 import { quoteExactIn } from "@/lib/quote";
+import { hasExitTargets, isStaged } from "@/lib/strategies";
 import type { Token } from "@/lib/tokens";
 import type { Signal } from "@/lib/types";
 import { todayKey, useAppStore } from "@/store/useAppStore";
@@ -54,14 +55,14 @@ export function useDispatchSignal() {
       const client = getPublicClient(config, { chainId: signal.chainId });
       if (!client) return;
 
-      const isOrder = bot.strategy.kind === "order";
-      const closingOrder = isOrder && signal.side === "sell";
+      const staged = isStaged(bot.strategy);
+      const closingPosition = staged && signal.side === "sell";
       let amountIn = BigInt(signal.amountIn);
 
       // A full exit sells what the wallet is holding right now, not what the
       // entry once received: anything sold elsewhere in between would otherwise
       // make the swap revert on a balance that is no longer there.
-      if (closingOrder) {
+      if (closingPosition) {
         const held = await heldBalance(config, signal.tokenIn, address);
         if (held !== undefined && held < amountIn) {
           if (held <= 0n) {
@@ -82,8 +83,8 @@ export function useDispatchSignal() {
       }
 
       store.updateSignal(signal.id, { status: "executing", error: undefined });
-      if (isOrder) {
-        store.patchRuntime(bot.id, { stage: closingOrder ? "exiting" : "entering" });
+      if (staged) {
+        store.patchRuntime(bot.id, { stage: closingPosition ? "exiting" : "entering" });
       }
 
       try {
@@ -93,7 +94,7 @@ export function useDispatchSignal() {
         // Read before the swap so the delta afterwards is the real fill, taxes
         // and price impact included.
         const balanceBefore =
-          isOrder && !closingOrder
+          staged && !closingPosition
             ? await heldBalance(config, signal.tokenOut, address)
             : undefined;
 
@@ -120,7 +121,12 @@ export function useDispatchSignal() {
           else filled.delete(signal.level);
         }
 
-        const oneShot = current.strategy.kind === "limit" || current.strategy.kind === "trail";
+        const oneShot =
+          current.strategy.kind === "limit" ||
+          current.strategy.kind === "trail" ||
+          // A protect watch guards a bag once. What it leaves behind is the
+          // wallet's to manage, or to put under a fresh watch.
+          current.strategy.kind === "protect";
 
         useAppStore.getState().patchRuntime(bot.id, {
           lastFireAt: Date.now(),
@@ -136,7 +142,7 @@ export function useDispatchSignal() {
           error: undefined,
         });
 
-        if (isOrder && !closingOrder) {
+        if (staged && !closingPosition && isStaged(current.strategy)) {
           const balanceAfter = await heldBalance(config, signal.tokenOut, address);
           const received =
             balanceBefore !== undefined &&
@@ -145,17 +151,22 @@ export function useDispatchSignal() {
               ? balanceAfter - balanceBefore
               : quote.amountOut;
           const receivedSize = Number(received) / 10 ** signal.tokenOut.decimals;
+          // A snipe may carry no targets at all, in which case the fill is
+          // simply handed to the wallet rather than watched from here.
+          const guarded = hasExitTargets(current.strategy);
 
           // Take profit and cut loss hang off what was actually paid, so a leg
           // that slipped moves both targets with it.
           useAppStore.getState().patchRuntime(bot.id, {
-            stage: "holding",
+            stage: guarded ? "holding" : "done",
             fillPrice: receivedSize > 0 ? sizeIn / receivedSize : signal.price,
             positionBase: received.toString(),
+            completed: guarded ? current.runtime.completed : true,
           });
+          if (!guarded) useAppStore.getState().setBotStatus(bot.id, "idle");
         }
 
-        if (closingOrder) {
+        if (closingPosition) {
           useAppStore.getState().patchRuntime(bot.id, {
             stage: "done",
             exitReason: signal.leg === "tp" || signal.leg === "cl" ? signal.leg : "manual",
@@ -172,9 +183,11 @@ export function useDispatchSignal() {
         useAppStore.getState().updateSignal(signal.id, { status: "failed", error: message });
         useAppStore.getState().patchRuntime(bot.id, {
           error: message,
-          // Hand the order back to the stage it came from so the next tick can
+          // Hand the entry back to the stage it came from so the next tick can
           // try again — a failed exit especially must not leave it stranded.
-          ...(isOrder ? { stage: closingOrder ? ("holding" as const) : ("waiting" as const) } : {}),
+          ...(staged
+            ? { stage: closingPosition ? ("holding" as const) : ("waiting" as const) }
+            : {}),
         });
       }
     },

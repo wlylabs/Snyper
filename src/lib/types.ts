@@ -2,11 +2,19 @@ import type { DisplayCurrency } from "./currency";
 import type { Locale, TKey, TVars } from "./i18n";
 import type { Token } from "./tokens";
 
-export type StrategyKind = "dca" | "grid" | "limit" | "trail" | "order";
+export type StrategyKind =
+  | "dca"
+  | "grid"
+  | "limit"
+  | "trail"
+  | "order"
+  | "snipe"
+  | "protect";
 
 /**
- * Lifecycle of a one-shot order. The entry stage is the only one that can time
- * out — once the position exists, its protection runs until it is closed.
+ * Lifecycle of a staged strategy — a one-shot order or a snipe. The entry stage
+ * is the only one that can time out: once the position exists, its protection
+ * runs until it is closed.
  */
 export type OrderStage =
   | "waiting"
@@ -67,6 +75,34 @@ export type Strategy =
       expiresAt: number;
     }
   | {
+      kind: "snipe";
+      /** Quote currency committed the moment the pool becomes tradable. */
+      amountQuote: number;
+      /** Pool depth, in quote units, the entry refuses to trade under. */
+      minLiquidityQuote: number;
+      /** Ceiling on the entry's own price impact, in basis points. */
+      maxImpactBps: number;
+      /** Refuse to buy above this price. 0 disables. */
+      maxEntryPrice: number;
+      /** Take profit above the fill price. 0 leaves the fill unmanaged. */
+      takeProfitPct: number;
+      /** Cut loss below the fill price. 0 leaves the fill unmanaged. */
+      cutLossPct: number;
+      /** The watch gives up here. Exits are never time limited. */
+      expiresAt: number;
+    }
+  | {
+      kind: "protect";
+      /** Share of the wallet's holding sold when a target hits. 1 = all of it. */
+      sellFraction: number;
+      /** Sell this far above the reference price. 0 disables. */
+      takeProfitPct: number;
+      /** Sell this far below the reference price. 0 disables. */
+      cutLossPct: number;
+      /** Price both targets hang off. 0 reads the first price the watch sees. */
+      referencePrice: number;
+    }
+  | {
       kind: "trail";
       /** Distance below the running peak that closes the position. */
       trailPercent: number;
@@ -96,6 +132,15 @@ export type BotRuntime = {
   /** Base units of the asset actually received, held as a string. */
   positionBase?: string;
   exitReason?: Exclude<OrderLeg, "entry">;
+  /** Base units the wallet holds, re-read each tick for a protect watch. */
+  heldBase?: string;
+  /** Price a protect watch measures its targets against, fixed on arming. */
+  refPrice?: number;
+  /**
+   * What the watch is waiting on, as opposed to something that went wrong. A
+   * snipe with no pool yet is working exactly as intended.
+   */
+  note?: string;
 };
 
 export type Bot = {
@@ -177,4 +222,12 @@ export type Settings = {
   theme: "dark" | "light";
   /** Auto execution still needs a wallet signature; this gates dispatch. */
   autoDispatch: boolean;
+  /** One-tap buy sizes offered when the funding asset is the native coin. */
+  presetsNative: number[];
+  /** One-tap buy sizes offered when the funding asset is the chain's stable. */
+  presetsStable: number[];
+  /** Tip added on top of the base fee, in gwei. 0 leaves it to the wallet. */
+  priorityFeeGwei: number;
+  /** Swaps above this much price impact are refused outright. 0 disables. */
+  maxImpactBps: number;
 };

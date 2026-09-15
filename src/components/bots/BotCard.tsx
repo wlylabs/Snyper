@@ -3,8 +3,14 @@
 import { useState } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { chainMeta } from "@/lib/chains";
-import { formatDuration, formatPrice, formatSigned, timeAgo } from "@/lib/format";
-import { describeStrategy, gridLevels } from "@/lib/strategies";
+import { formatAmount, formatDuration, formatPrice, formatSigned, timeAgo } from "@/lib/format";
+import {
+  describeStrategy,
+  gridLevels,
+  heldPosition,
+  protectReference,
+  protectTargets,
+} from "@/lib/strategies";
 import type { Bot } from "@/lib/types";
 import { useAppStore } from "@/store/useAppStore";
 import { useI18n } from "@/hooks/useI18n";
@@ -60,6 +66,8 @@ export function BotCard({ bot }: { bot: Bot }) {
           <GridLadder bot={bot} price={price} />
         )}
 
+        {bot.strategy.kind === "protect" && <ProtectDetail bot={bot} price={price} />}
+
         <dl className="mt-3 grid grid-cols-3 gap-x-3 gap-y-2">
           <Metric label={t("bots.fills")} value={String(runtime.fills)} />
           <Metric
@@ -101,6 +109,10 @@ export function BotCard({ bot }: { bot: Bot }) {
             <Icon name="alert" size={12} className="mt-0.5 shrink-0" />
             {runtime.error}
           </p>
+        )}
+
+        {!runtime.error && runtime.note && (
+          <p className="wrap-any mt-3 text-[11px] leading-relaxed text-faint">{runtime.note}</p>
         )}
 
         {runtime.completed && (
@@ -160,6 +172,54 @@ function Metric({
     <div>
       <dt className="lbl mb-1">{label}</dt>
       <dd className={`num text-[12px] ${tone ?? ""}`}>{value}</dd>
+    </div>
+  );
+}
+
+/**
+ * What a protect watch is guarding: the balance it read last tick, the price its
+ * targets hang off, and where those targets sit.
+ */
+function ProtectDetail({ bot, price }: { bot: Bot; price?: number }) {
+  const { t } = useI18n();
+  if (bot.strategy.kind !== "protect") return null;
+
+  const reference = protectReference(bot);
+  const { takeProfit, cutLoss } = protectTargets(bot.strategy, reference);
+  const held = Number(heldPosition(bot)) / 10 ** bot.base.decimals;
+  const change = reference && price ? price / reference - 1 : undefined;
+
+  return (
+    <div className="mt-3">
+      <dl className="grid grid-cols-3 gap-x-3 gap-y-2">
+        <Metric
+          label={t("protect.held")}
+          value={bot.runtime.heldBase ? `${formatAmount(held, 4)}` : "—"}
+        />
+        <Metric
+          label={t("protect.reference")}
+          value={reference ? formatPrice(reference) : t("protect.onArm")}
+        />
+        <Metric
+          label={t("protect.change")}
+          value={change !== undefined ? formatSigned(change) : "—"}
+          tone={change !== undefined && change < 0 ? "short" : "long"}
+        />
+      </dl>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <div className="border border-line bg-base px-2 py-1.5">
+          <span className="lbl block">{t("order.exit.tp")}</span>
+          <span className={`num text-[12.5px] ${takeProfit !== undefined ? "long" : "text-faint"}`}>
+            {takeProfit !== undefined ? formatPrice(takeProfit) : t("snipe.targetOff")}
+          </span>
+        </div>
+        <div className="border border-line bg-base px-2 py-1.5">
+          <span className="lbl block">{t("order.exit.cl")}</span>
+          <span className={`num text-[12.5px] ${cutLoss !== undefined ? "short" : "text-faint"}`}>
+            {cutLoss !== undefined ? formatPrice(cutLoss) : t("snipe.targetOff")}
+          </span>
+        </div>
+      </div>
     </div>
   );
 }

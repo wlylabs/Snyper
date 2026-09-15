@@ -17,7 +17,7 @@ import { baseTokens, nativeToken, type Token } from "@/lib/tokens";
 import type { Bot, Strategy, StrategyKind } from "@/lib/types";
 import { emptyRuntime, useAppStore } from "@/store/useAppStore";
 
-const KIND_ORDER: StrategyKind[] = ["dca", "grid", "limit", "trail"];
+const KIND_ORDER: StrategyKind[] = ["dca", "grid", "limit", "trail", "protect"];
 
 type Draft = {
   name: string;
@@ -35,6 +35,10 @@ type Draft = {
   trailPercent: string;
   amountBase: string;
   activation: string;
+  sellPercent: string;
+  takeProfitPct: string;
+  cutLossPct: string;
+  referencePrice: string;
   slippageBps: string;
   cooldownSec: string;
   dailyCapQuote: string;
@@ -57,6 +61,10 @@ const EMPTY_DRAFT: Draft = {
   trailPercent: "5",
   amountBase: "",
   activation: "0",
+  sellPercent: "100",
+  takeProfitPct: "50",
+  cutLossPct: "20",
+  referencePrice: "0",
   slippageBps: "50",
   cooldownSec: "60",
   dailyCapQuote: "0",
@@ -139,10 +147,29 @@ export function BotComposer({ open, onClose }: { open: boolean; onClose: () => v
           amountBase: num(draft.amountBase),
           activation: num(draft.activation),
         };
+      case "protect":
+        return {
+          kind: "protect",
+          sellFraction: Math.min(1, Math.max(0, num(draft.sellPercent, 100) / 100)),
+          takeProfitPct: Math.max(0, num(draft.takeProfitPct)),
+          cutLossPct: Math.min(99, Math.max(0, num(draft.cutLossPct))),
+          referencePrice: Math.max(0, num(draft.referencePrice)),
+        };
       default:
         return undefined;
     }
   }, [draft]);
+
+  /** Where the two targets would sit if the watch were armed right now. */
+  const protectPreview = useMemo(() => {
+    if (draft.kind !== "protect") return undefined;
+    const reference = num(draft.referencePrice) > 0 ? num(draft.referencePrice) : price;
+    if (!reference || reference <= 0) return undefined;
+    return {
+      takeProfit: reference * (1 + num(draft.takeProfitPct) / 100),
+      cutLoss: reference * (1 - num(draft.cutLossPct) / 100),
+    };
+  }, [draft.kind, draft.referencePrice, draft.takeProfitPct, draft.cutLossPct, price]);
 
   const validate = (): string | undefined => {
     if (!base || !quote) return t("composer.errPair");
@@ -163,6 +190,12 @@ export function BotComposer({ open, onClose }: { open: boolean; onClose: () => v
       if (strategy.trailPercent <= 0 || strategy.trailPercent >= 100)
         return t("composer.errTrail");
       if (strategy.amountBase <= 0) return t("composer.errUnwind", { symbol: base.symbol });
+    }
+    if (strategy.kind === "protect") {
+      if (strategy.sellFraction <= 0) return t("composer.errShare");
+      if (strategy.takeProfitPct <= 0 && strategy.cutLossPct <= 0) {
+        return t("composer.errNoTarget");
+      }
     }
     return undefined;
   };
@@ -242,12 +275,27 @@ export function BotComposer({ open, onClose }: { open: boolean; onClose: () => v
 
         <section>
           <p className="lbl mb-2">{t("composer.strategy")}</p>
-          <Segmented
-            options={KIND_ORDER.map((kind) => ({ value: kind, label: t(STRATEGY_SHORT[kind]) }))}
-            value={draft.kind}
-            onChange={(value) => patch("kind", value)}
-            className="w-full"
-          />
+          <div className="grid grid-cols-3 gap-1.5">
+            {KIND_ORDER.map((kind) => (
+              <button
+                key={kind}
+                type="button"
+                className="btn btn-sm"
+                data-active={draft.kind === kind}
+                style={
+                  draft.kind === kind
+                    ? {
+                        borderColor: "var(--color-accent-line)",
+                        color: "var(--color-accent-text)",
+                      }
+                    : undefined
+                }
+                onClick={() => patch("kind", kind)}
+              >
+                {t(STRATEGY_SHORT[kind])}
+              </button>
+            ))}
+          </div>
           <p className="mt-2 text-[11px] leading-relaxed text-faint">
             {t(STRATEGY_SUMMARY[draft.kind])}
           </p>
@@ -374,6 +422,49 @@ export function BotComposer({ open, onClose }: { open: boolean; onClose: () => v
                 hint={
                   price !== undefined
                     ? t("composer.midNow", { price: formatPrice(price) })
+                    : undefined
+                }
+              />
+            </>
+          )}
+
+          {draft.kind === "protect" && (
+            <>
+              <Field
+                label={t("composer.shareToSell", { symbol: base?.symbol ?? "" })}
+                value={draft.sellPercent}
+                onChange={(value) => patch("sellPercent", value)}
+                hint={t("composer.shareHint")}
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <Field
+                  label={t("composer.takeProfit")}
+                  value={draft.takeProfitPct}
+                  onChange={(value) => patch("takeProfitPct", value)}
+                  hint={
+                    protectPreview
+                      ? t("order.exitAt", { price: formatPrice(protectPreview.takeProfit) })
+                      : undefined
+                  }
+                />
+                <Field
+                  label={t("composer.cutLoss")}
+                  value={draft.cutLossPct}
+                  onChange={(value) => patch("cutLossPct", value)}
+                  hint={
+                    protectPreview
+                      ? t("order.exitAt", { price: formatPrice(protectPreview.cutLoss) })
+                      : undefined
+                  }
+                />
+              </div>
+              <Field
+                label={t("composer.reference", { symbol: quote?.symbol ?? "" })}
+                value={draft.referencePrice}
+                onChange={(value) => patch("referencePrice", value)}
+                hint={
+                  price !== undefined
+                    ? t("composer.referenceHint", { price: formatPrice(price) })
                     : undefined
                 }
               />
