@@ -42,7 +42,6 @@ export function HoldButton({
   const started = useRef<number>(0);
   const fill = useRef<HTMLButtonElement>(null);
   const [holding, setHolding] = useState(false);
-  const [armed, setArmed] = useState(false);
 
   const setProgress = (value: number) => {
     fill.current?.style.setProperty("--hold", String(value));
@@ -74,8 +73,6 @@ export function HoldButton({
       frame.current = undefined;
       setHolding(false);
       setProgress(0);
-      setArmed(true);
-      window.setTimeout(() => setArmed(false), 700);
       haptic("commit");
       onConfirm();
     };
@@ -88,7 +85,6 @@ export function HoldButton({
       type="button"
       className={`btn btn-hold ${className}`}
       data-holding={holding ? "true" : undefined}
-      data-armed={armed ? "true" : undefined}
       style={{ "--hold": 0 } as CSSProperties}
       onPointerDown={(event) => {
         if (event.button !== 0) return;
