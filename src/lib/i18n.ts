@@ -192,6 +192,9 @@ const en = {
   "assets.dustShown": "{count} holding(s) under $1 or unpriced",
   "assets.dustShow": "Show",
   "assets.dustHide": "Hide",
+  "assets.change24hHint": "Change over the last 24 hours, from the market feed.",
+  "assets.changeUnknownHint":
+    "No market feed reported a 24-hour change for this token. An explorer quote and a pool's mid price are each a single reading, with no yesterday to compare against.",
   "assets.marketCap": "MC",
   "assets.fdv": "FDV",
   "assets.capHint": "Market cap — circulating supply at the market price.",
@@ -639,6 +642,9 @@ const id: Record<TKey, string> = {
   "assets.dustShown": "{count} kepemilikan di bawah $1 atau tanpa harga",
   "assets.dustShow": "Tampilkan",
   "assets.dustHide": "Sembunyikan",
+  "assets.change24hHint": "Perubahan 24 jam terakhir, dari feed pasar.",
+  "assets.changeUnknownHint":
+    "Tidak ada feed pasar yang melaporkan perubahan 24 jam untuk token ini. Kutipan explorer dan harga tengah pool sama-sama hanya satu pembacaan, tanpa data kemarin untuk dibandingkan.",
   "assets.capHint": "Market cap — suplai beredar dikali harga pasar.",
   "assets.fdvHint": "Terdilusi penuh — total suplai dikali harga pasar. Tidak ada feed yang melaporkan suplai beredar.",
   "assets.priceHint": "Harga {price}",

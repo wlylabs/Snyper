@@ -13,7 +13,7 @@ import { useTokenDiscovery } from "@/hooks/useTokenDiscovery";
 import { useI18n } from "@/hooks/useI18n";
 import { useFxRate } from "@/hooks/useFxRate";
 import { CHAIN_ID, chainMeta, explorerAddress } from "@/lib/chains";
-import { formatAmount, truncateAddress } from "@/lib/format";
+import { formatAmount, formatSigned, truncateAddress } from "@/lib/format";
 import {
   formatCompactMoney,
   formatMoney,
@@ -403,6 +403,26 @@ function HoldingRow({
       holding.liquidity < THIN_LIQUIDITY);
 
   /*
+   * What one unit is worth. That is a fact about the token rather than about
+   * the position, so it sits with the quantity on the left and leaves the right
+   * column to say what the holding is worth and where it is going.
+   */
+  const perUnit = leadsWithCap ? (
+    <>
+      <span className="lbl mr-1">
+        {holding.diluted ? t("assets.fdv") : t("assets.marketCap")}
+      </span>
+      {formatCompactMoney(holding.marketCap, money)}
+    </>
+  ) : holding.price !== undefined ? (
+    formatPriceMoney(holding.price, money)
+  ) : holding.token.native ? (
+    t("token.native")
+  ) : (
+    truncateAddress(holding.token.address, 6, 4)
+  );
+
+  /*
    * Everything the figure is standing on, said once where it can be checked. A
    * price with no depth behind it and no pool this app read is exactly the kind
    * that arrives from a ticker collision, and the reader deserves to know that
@@ -451,9 +471,11 @@ function HoldingRow({
           )}
         </p>
         {/* The quantity carries its own unit. A bare number under a dollar
-            figure is two magnitudes in two units with nothing saying so. */}
-        <p className="num truncate text-[11px] text-faint">
-          {formatAmount(holding.amount, 5)} {holding.token.symbol}
+            figure is two magnitudes in two units with nothing saying so. The
+            per-unit figure trails it: both describe the token, while the right
+            column describes the position. */}
+        <p className="num truncate text-[11px] text-faint" title={provenance || undefined}>
+          {formatAmount(holding.amount, 5)} {holding.token.symbol} · {perUnit}
         </p>
       </div>
       <div className="shrink-0 text-right">
@@ -462,21 +484,25 @@ function HoldingRow({
             ? formatMoneyFloor(holding.value, money)
             : t("assets.unpriced")}
         </p>
-        <p className="num text-[11px] text-faint" title={provenance || undefined}>
-          {leadsWithCap ? (
-            <>
-              <span className="lbl mr-1">
-                {holding.diluted ? t("assets.fdv") : t("assets.marketCap")}
-              </span>
-              {formatCompactMoney(holding.marketCap, money)}
-            </>
-          ) : holding.price !== undefined ? (
-            formatPriceMoney(holding.price, money)
-          ) : holding.token.native ? (
-            t("token.native")
-          ) : (
-            truncateAddress(holding.token.address, 6, 4)
-          )}
+        {/* Where the holding is going, under what it is worth. Only a market
+            feed reports this: an explorer's quote and a pool's mid price are
+            each a single reading with no yesterday to compare against, so a row
+            says nothing here rather than guessing at a direction. */}
+        <p
+          className={`num text-[11px] ${
+            holding.change24h === undefined
+              ? "text-faint"
+              : holding.change24h >= 0
+                ? "long"
+                : "short"
+          }`}
+          title={
+            holding.change24h === undefined
+              ? t("assets.changeUnknownHint")
+              : t("assets.change24hHint")
+          }
+        >
+          {holding.change24h === undefined ? "—" : formatSigned(holding.change24h)}
         </p>
       </div>
     </div>
