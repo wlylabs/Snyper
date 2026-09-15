@@ -177,17 +177,12 @@ const en = {
   "assets.count": "{count} assets",
   "assets.refresh": "Refresh balances",
   "assets.noWallet": "Wallet not connected",
-  "assets.noWalletHint": "Balances are read from the chain for the connected address only.",
   "assets.scanning": "Scanning balances…",
   "assets.emptyTitle": "No balances in scope",
-  "assets.emptyHint":
-    "Scope covers the chain's own money, tokens you imported and anything you have traded here. Run the wallet scan below to pick up whatever else this address holds.",
   "assets.unpriced": "unpriced",
   "assets.scopeOnly": "Scope only",
   "assets.scopeOnlyHint":
     "The chain's indexer did not answer, so this lists only the tokens the app already knew about. Run the wallet scan below to find the rest.",
-  "assets.unpricedNote":
-    "{count} holding(s) have no route to the chain's USD unit, so they count as zero in this figure.",
   "assets.dustHidden": "{count} holding(s) under $1 or unpriced hidden",
   "assets.dustShown": "{count} holding(s) under $1 or unpriced",
   "assets.dustShow": "Show",
@@ -216,16 +211,12 @@ const en = {
   "assets.connectHint": "Connect a wallet to read balances.",
   "assets.detect": "Detect wallet tokens",
   "assets.detecting": "Scanning transfers…",
-  "assets.detectNote":
-    "Reads the transfer log for this address and picks up every ERC-20 you hold, memecoins included. No indexer — just your own history.",
   "assets.detectResult": "{count} token(s) found across the last {blocks} blocks.",
   "assets.detectPartial": "The window was cut short by the endpoint; run it again to reach further back.",
   "assets.detected": "Detected tokens",
   "assets.noneDetected": "Nothing detected yet",
-  "assets.noneDetectedHint": "Run a wallet scan to pull in tokens no curated list carries.",
   "assets.imported": "Imported tokens",
   "assets.noneImported": "None imported",
-  "assets.noneImportedHint": "Paste a contract address in any asset picker to add one.",
 
   "activity.title": "Activity",
   "activity.subtitle": "Local ledger of everything this device submitted or signalled.",
@@ -626,17 +617,12 @@ const id: Record<TKey, string> = {
   "assets.count": "{count} aset",
   "assets.refresh": "Muat ulang saldo",
   "assets.noWallet": "Dompet belum terhubung",
-  "assets.noWalletHint": "Saldo dibaca dari chain hanya untuk alamat yang terhubung.",
   "assets.scanning": "Memindai saldo…",
   "assets.emptyTitle": "Tidak ada saldo dalam cakupan",
-  "assets.emptyHint":
-    "Cakupan meliputi aset bawaan chain ini, token yang kamu impor, dan apa pun yang pernah kamu tukar di sini. Jalankan pemindaian dompet di bawah untuk menarik sisa token yang dipegang alamat ini.",
   "assets.unpriced": "tanpa harga",
   "assets.scopeOnly": "Hanya cakupan",
   "assets.scopeOnlyHint":
     "Indexer chain tidak menjawab, jadi daftar ini hanya memuat token yang sudah dikenal aplikasi. Jalankan pemindaian dompet di bawah untuk menemukan sisanya.",
-  "assets.unpricedNote":
-    "{count} aset belum punya rute ke unit USD chain ini, jadi dihitung nol pada angka di atas.",
   "assets.marketCap": "MC",
   "assets.fdv": "FDV",
   "assets.dustHidden": "{count} kepemilikan di bawah $1 atau tanpa harga disembunyikan",
@@ -665,17 +651,12 @@ const id: Record<TKey, string> = {
   "assets.connectHint": "Hubungkan dompet untuk membaca saldo.",
   "assets.detect": "Deteksi token di dompet",
   "assets.detecting": "Memindai transfer…",
-  "assets.detectNote":
-    "Membaca log transfer alamat ini dan mengambil semua ERC-20 yang kamu pegang, termasuk memecoin. Tanpa indexer — murni dari riwayatmu sendiri.",
   "assets.detectResult": "{count} token ditemukan dalam {blocks} blok terakhir.",
   "assets.detectPartial": "Jangkauan dipotong oleh endpoint; jalankan lagi untuk menelusuri lebih jauh.",
   "assets.detected": "Token terdeteksi",
   "assets.noneDetected": "Belum ada yang terdeteksi",
-  "assets.noneDetectedHint": "Jalankan pemindaian dompet untuk menarik token yang tidak ada di daftar kurasi.",
   "assets.imported": "Token terimpor",
   "assets.noneImported": "Belum ada",
-  "assets.noneImportedHint":
-    "Tempel alamat kontrak di pemilih aset mana pun untuk menambahkannya.",
 
   "activity.title": "Aktivitas",
   "activity.subtitle": "Catatan lokal semua yang dikirim atau disinyalkan perangkat ini.",

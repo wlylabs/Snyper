@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import { useAccount } from "wagmi";
-import { TokenTags } from "@/components/terminal/TokenPicker";
 import { Icon } from "@/components/ui/Icon";
 import { Empty, Panel, Skeleton } from "@/components/ui/Panel";
 import { useConnectPrompt } from "@/hooks/useConnectPrompt";
@@ -13,7 +12,7 @@ import { useTokenDiscovery } from "@/hooks/useTokenDiscovery";
 import { useI18n } from "@/hooks/useI18n";
 import { useFxRate } from "@/hooks/useFxRate";
 import { CHAIN_ID, chainMeta, explorerAddress } from "@/lib/chains";
-import { formatAmount, formatSigned, truncateAddress } from "@/lib/format";
+import { formatAmount, formatSigned } from "@/lib/format";
 import {
   formatCompactMoney,
   formatMoney,
@@ -121,17 +120,6 @@ export default function AssetsPage() {
     return { visible, dust };
   }, [holdings, showDust]);
 
-  /*
-   * What the total leaves out. A token with no route to the chain's USD unit
-   * has no price to add, so it counts as nothing here — which is the honest
-   * arithmetic and a poor thing to leave unsaid, because the figure then reads
-   * as the whole wallet to anyone comparing it against one.
-   */
-  const unpriced = useMemo(
-    () => (holdings ?? []).filter((holding) => holding.value === undefined).length,
-    [holdings],
-  );
-
   if (!mounted) {
     return <Skeleton className="h-64 w-full" />;
   }
@@ -170,11 +158,6 @@ export default function AssetsPage() {
               <p className="num text-[30px] leading-none">
                 {address ? formatMoney(total, { currency, fx, locale }) : "—"}
               </p>
-              {address && unpriced > 0 && (
-                <p className="mt-1.5 max-w-[34ch] text-[10px] leading-relaxed text-faint">
-                  {t("assets.unpricedNote", { count: unpriced })}
-                </p>
-              )}
             </div>
             <p className="lbl shrink-0 whitespace-nowrap">
               {isFetching
@@ -186,7 +169,6 @@ export default function AssetsPage() {
           {!address ? (
             <Empty
               title={t("assets.noWallet")}
-              hint={t("assets.noWalletHint")}
               /* Nothing to list until a wallet is connected, so offer that here
                  rather than sending the reader back up to the header. */
               action={
@@ -199,10 +181,7 @@ export default function AssetsPage() {
               }
             />
           ) : (holdings?.length ?? 0) === 0 ? (
-            <Empty
-              title={isFetching ? t("assets.scanning") : t("assets.emptyTitle")}
-              hint={scopeOnly ? t("assets.scopeOnlyHint") : t("assets.emptyHint")}
-            />
+            <Empty title={isFetching ? t("assets.scanning") : t("assets.emptyTitle")} />
           ) : (
             <div>
               {visible.map((holding) => (
@@ -242,9 +221,6 @@ export default function AssetsPage() {
               <Icon name="crosshair" size={13} />
               {discovery.isScanning ? t("assets.detecting") : t("assets.detect")}
             </button>
-            <p className="mt-2 text-[10px] leading-relaxed text-faint">
-              {t("assets.detectNote")}
-            </p>
             {discovery.found && (
               <p className="mt-2 text-[10px] leading-relaxed text-dim">
                 {t("assets.detectResult", {
@@ -264,6 +240,14 @@ export default function AssetsPage() {
         </Panel>
       </div>
 
+      {/*
+       * What used to sit under this: a panel listing detected tokens and
+       * another listing imported ones, each a bordered box whose usual state
+       * was a centred line saying it was empty. Both were already answered by
+       * the list above — a token you hold appears there, and one you do not is
+       * the picker's business — so on most visits they were two screens of
+       * furniture between the reader and the end of the page.
+       */}
       <div className="flex min-w-0 flex-col gap-3 lg:col-span-4">
         <Panel label={t("assets.address")} bodyClassName="p-3">
           {address ? (
@@ -284,56 +268,6 @@ export default function AssetsPage() {
           )}
         </Panel>
 
-        <Panel label={t("assets.detected")} bodyClassName="p-0">
-          {discoveredTokens.filter((token) => token.chainId === chainId).length === 0 ? (
-            <Empty title={t("assets.noneDetected")} hint={t("assets.noneDetectedHint")} />
-          ) : (
-            discoveredTokens
-              .filter((token) => token.chainId === chainId)
-              .map((token) => (
-                <div
-                  key={token.address}
-                  className="flex items-center justify-between gap-3 border-b border-line px-3 py-2.5 last:border-b-0"
-                >
-                  <span className="flex min-w-0 items-center gap-1.5">
-                    <span className="truncate text-[12px] font-semibold">{token.symbol}</span>
-                    <TokenTags token={token} listed={listed} />
-                  </span>
-                  <a
-                    href={explorerAddress(chainId, token.address)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="num shrink-0 text-[10px] text-faint hover:text-accent-text"
-                  >
-                    {truncateAddress(token.address, 6, 4)}
-                  </a>
-                </div>
-              ))
-          )}
-        </Panel>
-
-        <Panel label={t("assets.imported")} bodyClassName="p-0">
-          {customTokens.filter((token) => token.chainId === chainId).length === 0 ? (
-            <Empty
-              title={t("assets.noneImported")}
-              hint={t("assets.noneImportedHint")}
-            />
-          ) : (
-            customTokens
-              .filter((token) => token.chainId === chainId)
-              .map((token) => (
-                <div
-                  key={token.address}
-                  className="flex items-center justify-between gap-3 border-b border-line px-3 py-2.5 last:border-b-0"
-                >
-                  <span className="text-[12px] font-semibold">{token.symbol}</span>
-                  <span className="num text-[10px] text-faint">
-                    {truncateAddress(token.address, 6, 4)}
-                  </span>
-                </div>
-              ))
-          )}
-        </Panel>
       </div>
     </div>
   );
