@@ -188,3 +188,265 @@ export const v3PoolAbi = [
     outputs: [{ type: "address" }],
   },
 ] as const;
+
+/**
+ * Pons launchpad, V1 generation. Only the views the app needs: whether a pasted
+ * address is a launch at all, what it trades against, and the DEX the launchpad
+ * opened its pool in. Signatures follow the verified sources at
+ * github.com/ponsdotdev/ponsfamily.
+ */
+export const ponsV1FactoryAbi = [
+  {
+    type: "function",
+    name: "dexConfigCount",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "getDexConfig",
+    stateMutability: "view",
+    inputs: [{ name: "id", type: "uint256" }],
+    outputs: [
+      {
+        type: "tuple",
+        components: [
+          { name: "name", type: "string" },
+          { name: "factory", type: "address" },
+          { name: "positionManager", type: "address" },
+          { name: "swapRouter", type: "address" },
+          { name: "poolFee", type: "uint24" },
+          { name: "tickSpacing", type: "int24" },
+          { name: "enabled", type: "bool" },
+        ],
+      },
+    ],
+  },
+  {
+    type: "function",
+    name: "launchConfigCount",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "getLaunchConfig",
+    stateMutability: "view",
+    inputs: [{ name: "id", type: "uint256" }],
+    outputs: [
+      {
+        type: "tuple",
+        components: [
+          { name: "pairToken", type: "address" },
+          { name: "graduationThreshold", type: "uint256" },
+          { name: "initialTick", type: "int24" },
+          { name: "supply", type: "uint256" },
+          { name: "maxWalletBps", type: "uint16" },
+          { name: "maxTxBps", type: "uint16" },
+          { name: "restrictionBlocks", type: "uint32" },
+          { name: "reservedFee", type: "uint24" },
+          { name: "enabled", type: "bool" },
+          { name: "routerRequiresDeadline", type: "bool" },
+        ],
+      },
+    ],
+  },
+  {
+    type: "function",
+    name: "getLaunchedToken",
+    stateMutability: "view",
+    inputs: [{ name: "token", type: "address" }],
+    outputs: [
+      {
+        type: "tuple",
+        components: [
+          { name: "token", type: "address" },
+          { name: "deployer", type: "address" },
+          { name: "pairedToken", type: "address" },
+          { name: "positionManager", type: "address" },
+          { name: "positionId", type: "uint256" },
+          { name: "dexId", type: "uint256" },
+          { name: "launchConfigId", type: "uint256" },
+          { name: "restrictionsEndBlock", type: "uint256" },
+          { name: "supply", type: "uint256" },
+          { name: "isToken0", type: "bool" },
+          { name: "poolFee", type: "uint24" },
+          { name: "exists", type: "bool" },
+          { name: "initialBuyAmount", type: "uint256" },
+        ],
+      },
+    ],
+  },
+  {
+    type: "function",
+    name: "graduationStatus",
+    stateMutability: "view",
+    inputs: [{ name: "token", type: "address" }],
+    outputs: [
+      { name: "pairedPrincipal", type: "uint256" },
+      { name: "threshold", type: "uint256" },
+      { name: "graduated", type: "bool" },
+    ],
+  },
+] as const;
+
+/**
+ * Pons launchpad, V2 generation. A V2 launch trades on its own bonding curve
+ * until it graduates into a Uniswap v4 pool, so the record's `curve` and
+ * `phase` are what decide where — and whether — the app can route a trade.
+ */
+export const ponsV2FactoryAbi = [
+  {
+    type: "function",
+    name: "getLaunchedToken",
+    stateMutability: "view",
+    inputs: [{ name: "token", type: "address" }],
+    outputs: [
+      {
+        type: "tuple",
+        components: [
+          { name: "token", type: "address" },
+          { name: "curve", type: "address" },
+          { name: "deployer", type: "address" },
+          { name: "creatorFeeRecipient", type: "address" },
+          { name: "pairToken", type: "address" },
+          { name: "graduationThreshold", type: "uint256" },
+          { name: "poolFee", type: "uint24" },
+          { name: "tickSpacing", type: "int24" },
+          { name: "creatorTaxBps", type: "uint16" },
+          { name: "buybackEnabled", type: "bool" },
+          { name: "phase", type: "uint8" },
+          { name: "sweptQuote", type: "uint256" },
+          { name: "sweptTokens", type: "uint256" },
+          { name: "sweptAt", type: "uint256" },
+          { name: "exists", type: "bool" },
+        ],
+      },
+    ],
+  },
+] as const;
+
+/**
+ * A single V2 launch's constant-product bonding curve. Buys and sells settle
+ * here directly — there is no router and no pool in front of it — and the fee
+ * is always charged on the quote leg.
+ */
+export const ponsCurveAbi = [
+  {
+    type: "function",
+    name: "token",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "address" }],
+  },
+  {
+    type: "function",
+    name: "pairToken",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "address" }],
+  },
+  {
+    type: "function",
+    name: "feeBps",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "creatorTaxBps",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "graduated",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "bool" }],
+  },
+  {
+    type: "function",
+    name: "readyToGraduate",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "bool" }],
+  },
+  {
+    type: "function",
+    name: "getReserves",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [
+      { name: "quoteReserve", type: "uint256" },
+      { name: "tokenReserve", type: "uint256" },
+    ],
+  },
+  {
+    type: "function",
+    name: "realQuoteReserve",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "sellableTokens",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "graduationThreshold",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "buy",
+    stateMutability: "payable",
+    inputs: [
+      { name: "quoteIn", type: "uint256" },
+      { name: "minTokensOut", type: "uint256" },
+      { name: "recipient", type: "address" },
+    ],
+    outputs: [{ name: "tokensOut", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "sell",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "tokensIn", type: "uint256" },
+      { name: "minQuoteOut", type: "uint256" },
+      { name: "recipient", type: "address" },
+    ],
+    outputs: [{ name: "quoteOut", type: "uint256" }],
+  },
+  // Carried so a revert arrives as a named error rather than raw calldata.
+  {
+    type: "error",
+    name: "SlippageExceeded",
+    inputs: [
+      { name: "actual", type: "uint256" },
+      { name: "minimum", type: "uint256" },
+    ],
+  },
+  { type: "error", name: "CurveGraduated", inputs: [] },
+  { type: "error", name: "ZeroAmount", inputs: [] },
+  {
+    type: "error",
+    name: "NativeValueMismatch",
+    inputs: [
+      { name: "supplied", type: "uint256" },
+      { name: "expected", type: "uint256" },
+    ],
+  },
+  { type: "error", name: "UnexpectedNativeValue", inputs: [] },
+] as const;

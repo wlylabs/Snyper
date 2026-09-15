@@ -42,7 +42,8 @@ export function isCashAsset(token: Token): boolean {
   const dex = dexMeta(token.chainId);
   if (!dex) return false;
   const address = token.address.toLowerCase();
-  return address === dex.wrapped.toLowerCase() || address === dex.stable.toLowerCase();
+  if (address === dex.wrapped.toLowerCase()) return true;
+  return Boolean(dex.stable && address === dex.stable.toLowerCase());
 }
 
 function toFloat(amount: string | undefined, decimals: number): number {

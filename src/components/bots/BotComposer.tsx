@@ -9,11 +9,11 @@ import { TokenPicker } from "@/components/terminal/TokenPicker";
 import { Field, PairButton } from "@/components/bots/fields";
 import { usePairPrice } from "@/hooks/usePairPrice";
 import { useTokenList } from "@/hooks/useTokenList";
-import { chainMeta, dexMeta } from "@/lib/chains";
+import { chainMeta } from "@/lib/chains";
 import { formatPrice } from "@/lib/format";
 import { STRATEGY_SHORT, STRATEGY_SUMMARY } from "@/lib/strategies";
 import { useI18n } from "@/hooks/useI18n";
-import { baseTokens, nativeToken, type Token } from "@/lib/tokens";
+import { nativeToken, stableToken, type Token } from "@/lib/tokens";
 import type { Bot, Strategy, StrategyKind } from "@/lib/types";
 import { emptyRuntime, useAppStore } from "@/store/useAppStore";
 
@@ -84,6 +84,8 @@ export function BotComposer({ open, onClose }: { open: boolean; onClose: () => v
   const meta = chainMeta(chainId);
   const { tokens, listed } = useTokenList(chainId);
   const addBot = useAppStore((state) => state.addBot);
+  const customTokens = useAppStore((state) => state.customTokens);
+  const venueKey = useAppStore((state) => state.venueKey);
 
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [base, setBase] = useState<Token>();
@@ -91,17 +93,21 @@ export function BotComposer({ open, onClose }: { open: boolean; onClose: () => v
   const [picker, setPicker] = useState<"base" | "quote" | null>(null);
   const [error, setError] = useState<string>();
 
+  /**
+   * The funding leg is the one that can be defaulted: the chain's USD unit where
+   * the venue carries one, otherwise its coin. The traded leg is left for the
+   * reader to pick, seeded with the last contract they imported — which on this
+   * chain is the memecoin they were just looking at.
+   */
   useEffect(() => {
     if (!chainId || !meta) return;
-    const defaults = baseTokens(chainId);
-    const stable = dexMeta(chainId)?.stable;
-    setBase((current) => (current?.chainId === chainId ? current : nativeToken(chainId)));
-    setQuote((current) =>
-      current?.chainId === chainId
-        ? current
-        : defaults.find((token) => token.address === stable),
-    );
-  }, [chainId, meta]);
+    const funding = stableToken(chainId) ?? nativeToken(chainId);
+    const lastImported = [...customTokens]
+      .reverse()
+      .find((token) => token.chainId === chainId);
+    setQuote((current) => (current?.chainId === chainId ? current : funding));
+    setBase((current) => (current?.chainId === chainId ? current : lastImported));
+  }, [chainId, meta, venueKey, customTokens]);
 
   useEffect(() => {
     if (open) {

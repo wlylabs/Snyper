@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import type { Token } from "@/lib/tokens";
+import { resolveVenue, setActiveVenue, type VenueConfig } from "@/lib/venue";
 import type {
   Bot,
   BotRuntime,
@@ -33,6 +34,26 @@ export const DEFAULT_SETTINGS: Settings = {
   maxImpactBps: 1_500,
 };
 
+/**
+ * Recomputes the active routing venue and mirrors it into `venue.ts`, whose
+ * synchronous readers sit under quoting, routing and position maths. Called
+ * from the store rather than from a component so the mirror is always current
+ * before any render that can see `venueKey` change.
+ */
+function syncVenue(manual?: VenueConfig, discovered?: VenueConfig): string {
+  const venue = resolveVenue(manual, discovered);
+  setActiveVenue(venue);
+  if (!venue) return "none";
+  return [
+    venue.source,
+    venue.factory,
+    venue.router,
+    venue.wrapped,
+    venue.quoter ?? "",
+    venue.stable ?? "",
+  ].join(":");
+}
+
 export function seriesKey(chainId: number, base: Token, quote: Token): string {
   return `${chainId}:${base.address.toLowerCase()}:${quote.address.toLowerCase()}`;
 }
@@ -54,6 +75,12 @@ type AppState = {
   customTokens: Token[];
   /** Tokens found by scanning the wallet's own transfer history. */
   discoveredTokens: Token[];
+  /** Venue addresses the operator entered by hand. */
+  venueManual?: VenueConfig;
+  /** Venue addresses read off the Pons launchpad's own DEX config. */
+  venueDiscovered?: VenueConfig;
+  /** Identity of the venue in force; changes when it resolves or is edited. */
+  venueKey: string;
   hydrated: boolean;
 
   addBot: (bot: Bot) => void;
@@ -74,6 +101,8 @@ type AppState = {
   recordPrice: (key: string, point: PricePoint) => void;
 
   setSettings: (patch: Partial<Settings>) => void;
+  setVenueManual: (config: VenueConfig | undefined) => void;
+  setVenueDiscovered: (config: VenueConfig | undefined) => void;
   addCustomToken: (token: Token) => void;
   addDiscoveredTokens: (tokens: Token[]) => void;
   setHydrated: () => void;
@@ -89,6 +118,9 @@ export const useAppStore = create<AppState>()(
       settings: DEFAULT_SETTINGS,
       customTokens: [],
       discoveredTokens: [],
+      venueManual: undefined,
+      venueDiscovered: undefined,
+      venueKey: syncVenue(),
       hydrated: false,
 
       addBot: (bot) => set((state) => ({ bots: [bot, ...state.bots] })),
@@ -214,6 +246,18 @@ export const useAppStore = create<AppState>()(
           };
         }),
 
+      setVenueManual: (config) =>
+        set((state) => ({
+          venueManual: config,
+          venueKey: syncVenue(config, state.venueDiscovered),
+        })),
+
+      setVenueDiscovered: (config) =>
+        set((state) => ({
+          venueDiscovered: config,
+          venueKey: syncVenue(state.venueManual, config),
+        })),
+
       setHydrated: () => set({ hydrated: true }),
     }),
     {
@@ -228,6 +272,8 @@ export const useAppStore = create<AppState>()(
         settings: state.settings,
         customTokens: state.customTokens,
         discoveredTokens: state.discoveredTokens,
+        venueManual: state.venueManual,
+        venueDiscovered: state.venueDiscovered,
       }),
       /**
        * Persisted state is merged key by key, and `settings` is merged one level
@@ -243,7 +289,13 @@ export const useAppStore = create<AppState>()(
         };
       },
       onRehydrateStorage: () => (state) => {
-        state?.setHydrated();
+        if (!state) return;
+        // The stored venue has to reach the mirror before anything prices
+        // against it, so it is applied here rather than waiting for a render.
+        useAppStore.setState({
+          venueKey: syncVenue(state.venueManual, state.venueDiscovered),
+        });
+        state.setHydrated();
       },
     },
   ),

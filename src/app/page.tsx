@@ -14,14 +14,16 @@ import { useI18n } from "@/hooks/useI18n";
 import { useFxRate } from "@/hooks/useFxRate";
 import { formatMoney } from "@/lib/currency";
 import { useAppStore } from "@/store/useAppStore";
-import { chainMeta, dexMeta, hasRouting } from "@/lib/chains";
+import { chainMeta, hasRouting } from "@/lib/chains";
 import { feeLabel, formatPrice, formatSigned, timeAgo } from "@/lib/format";
-import { baseTokens, nativeToken, sameToken, type Token } from "@/lib/tokens";
+import { nativeToken, sameToken, stableToken, type Token } from "@/lib/tokens";
 
 export default function TerminalPage() {
   const mounted = useMounted();
   const { t, locale } = useI18n();
   const currency = useAppStore((state) => state.settings.currency);
+  const customTokens = useAppStore((state) => state.customTokens);
+  const venueKey = useAppStore((state) => state.venueKey);
   const { fx } = useFxRate();
   const activeChainId = useChainId();
   const { chainId: accountChainId } = useAccount();
@@ -32,20 +34,34 @@ export default function TerminalPage() {
   const [tokenIn, setTokenIn] = useState<Token>();
   const [tokenOut, setTokenOut] = useState<Token>();
 
-  // Default pair follows the active chain: native against its USD unit.
+  /**
+   * Default pair: the chain's coin against its USD unit where the venue carries
+   * one. Robinhood Chain may not, so the fallback is the last token the reader
+   * imported — which on a memecoin terminal is the pair they were just looking
+   * at, and a better opening than an empty second leg.
+   */
   useEffect(() => {
     if (!chainId || !meta) return;
-    const defaults = baseTokens(chainId);
     const native = nativeToken(chainId);
-    const stableAddress = dexMeta(chainId)?.stable;
-    const stable = defaults.find((token) => token.address === stableAddress);
+    const stable = stableToken(chainId);
+    const lastImported = [...customTokens]
+      .reverse()
+      .find((token) => token.chainId === chainId);
     setTokenIn((current) => (current?.chainId === chainId ? current : native));
-    setTokenOut((current) => (current?.chainId === chainId ? current : stable));
-  }, [chainId, meta]);
+    setTokenOut((current) =>
+      current?.chainId === chainId ? current : (stable ?? lastImported),
+    );
+  }, [chainId, meta, venueKey, customTokens]);
 
   const base = tokenIn;
   const quote = tokenOut;
-  const { price, pool, isFetching, error } = usePairPrice(base, quote);
+  const { price, pool, isFetching, error, venue } = usePairPrice(base, quote);
+
+  const venueLabel = (() => {
+    if (venue === "curve") return t("terminal.venueCurve");
+    if (hasRouting(chainId)) return pool ? "Uniswap v3" : t("terminal.venueUniswap");
+    return t("terminal.noVenue");
+  })();
   const series = usePairSeries(base, quote);
 
   const stats = useMemo(() => {
@@ -64,7 +80,7 @@ export default function TerminalPage() {
   }, [series]);
 
   /** The quote side is the chain's USD unit, so a rupiah conversion is meaningful. */
-  const stableAddress = meta?.dex?.stable.toLowerCase();
+  const stableAddress = stableToken(chainId)?.address.toLowerCase();
   const quotedInUsd = Boolean(
     quote && stableAddress && quote.address.toLowerCase() === stableAddress,
   );
@@ -149,7 +165,7 @@ export default function TerminalPage() {
             <>
               <Row
                 k={t("terminal.venue")}
-                v={hasRouting(chainId) ? "Uniswap v3" : t("terminal.noVenue")}
+                v={venueLabel}
                 tone={hasRouting(chainId) ? undefined : "warn"}
               />
               <Row k={t("terminal.deepestTier")} v={pool ? feeLabel(pool.fee) : "—"} />

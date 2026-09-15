@@ -14,12 +14,6 @@ export type Token = {
   native?: boolean;
 };
 
-/**
- * Canonical Uniswap token list. Fetched at runtime from the browser — the app
- * ships no bundled price or token snapshots.
- */
-const TOKEN_LIST_URL = "https://tokens.uniswap.org";
-
 export function nativeToken(chainId: number): Token | undefined {
   const meta = CHAIN_META[chainId];
   if (!meta) return undefined;
@@ -34,68 +28,48 @@ export function nativeToken(chainId: number): Token | undefined {
 }
 
 /**
- * Native currency plus, where the chain has a Uniswap deployment, its wrapped
- * token and USD unit. These are always available offline of the token list.
+ * The chain's own money: native currency plus, where a venue has been resolved,
+ * its wrapped token and USD unit. No curated token list stands behind these —
+ * Robinhood Chain has no canonical one, and everything else in the app is read
+ * off the chain or imported by hand.
  */
 export function baseTokens(chainId: number): Token[] {
   const meta = CHAIN_META[chainId];
   if (!meta) return [];
   const native = nativeToken(chainId);
-  const dex = meta.dex;
-  if (!dex) return native ? [native] : [];
-  return [
-    ...(native ? [native] : []),
-    {
-      chainId,
-      address: dex.wrapped,
-      symbol: dex.wrappedSymbol,
-      name: `Wrapped ${meta.chain.nativeCurrency.name}`,
-      decimals: meta.chain.nativeCurrency.decimals,
-    },
-    {
+  const tokens = native ? [native] : [];
+
+  const dex = dexMeta(chainId);
+  if (!dex) return tokens;
+
+  tokens.push({
+    chainId,
+    address: dex.wrapped,
+    symbol: dex.wrappedSymbol,
+    name: `Wrapped ${meta.chain.nativeCurrency.name}`,
+    decimals: meta.chain.nativeCurrency.decimals,
+  });
+
+  if (dex.stable) {
+    tokens.push({
       chainId,
       address: dex.stable,
-      symbol: dex.stableSymbol,
+      symbol: dex.stableSymbol ?? "USDC",
       name: "USD Coin",
-      decimals: dex.stableDecimals,
-    },
-  ];
-}
-
-type RawListToken = {
-  chainId: number;
-  address: string;
-  symbol: string;
-  name: string;
-  decimals: number;
-  logoURI?: string;
-};
-
-let listPromise: Promise<Token[]> | undefined;
-
-export async function fetchTokenList(): Promise<Token[]> {
-  if (!listPromise) {
-    listPromise = (async () => {
-      const res = await fetch(TOKEN_LIST_URL, { cache: "force-cache" });
-      if (!res.ok) throw new Error(`Token list unavailable (${res.status})`);
-      const body: { tokens?: RawListToken[] } = await res.json();
-      const tokens = body.tokens ?? [];
-      return tokens
-        .filter((t) => t.chainId in CHAIN_META && isAddress(t.address))
-        .map<Token>((t) => ({
-          chainId: t.chainId,
-          address: getAddress(t.address),
-          symbol: t.symbol,
-          name: t.name,
-          decimals: t.decimals,
-          logoURI: t.logoURI,
-        }));
-    })().catch((error) => {
-      listPromise = undefined;
-      throw error;
+      decimals: dex.stableDecimals ?? 6,
     });
   }
-  return listPromise;
+
+  return tokens;
+}
+
+/** The chain's USD unit, when the venue carries one. */
+export function stableToken(chainId: number): Token | undefined {
+  const stable = dexMeta(chainId)?.stable;
+  if (!stable) return undefined;
+  return baseTokens(chainId).find(
+    (token) => token.address.toLowerCase() === stable.toLowerCase(),
+  );
 }
 
 export function mergeTokens(chainId: number, ...groups: Token[][]): Token[] {
@@ -161,4 +135,8 @@ export function searchTokens(tokens: Token[], query: string): Token[] {
       t.name.toLowerCase().includes(q) ||
       t.address.toLowerCase() === q,
   );
+}
+
+export function isTokenAddress(value: string): value is `0x${string}` {
+  return isAddress(value.trim());
 }

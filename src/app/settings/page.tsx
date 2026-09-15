@@ -7,23 +7,18 @@ import { Segmented } from "@/components/ui/Segmented";
 import { InstallSheet } from "@/components/shell/InstallPrompt";
 import { useInstallPrompt } from "@/hooks/useInstallPrompt";
 import { useMounted } from "@/hooks/useMounted";
-import { CHAIN_META, SUPPORTED_CHAINS } from "@/lib/chains";
+import { CHAIN_ID, CHAIN_META } from "@/lib/chains";
 import { CURRENCIES, formatRate } from "@/lib/currency";
 import { LOCALES } from "@/lib/i18n";
 import { useI18n } from "@/hooks/useI18n";
 import { useFxRate } from "@/hooks/useFxRate";
 import { formatClock, timeAgo } from "@/lib/format";
-import { WALLETCONNECT_PROJECT_ID } from "@/lib/wagmi";
+import { RPC_OVERRIDE, WALLETCONNECT_PROJECT_ID } from "@/lib/wagmi";
+import { PONS_V1_FACTORY, PONS_V2_FACTORY } from "@/lib/pons";
+import { useVenue, useVenueDiscovery } from "@/hooks/useVenue";
+import { truncateAddress } from "@/lib/format";
+import type { VenueConfig } from "@/lib/venue";
 import { DEFAULT_SETTINGS, useAppStore } from "@/store/useAppStore";
-
-const RPC_ENV: Record<number, string | undefined> = {
-  1: process.env.NEXT_PUBLIC_RPC_1,
-  10: process.env.NEXT_PUBLIC_RPC_10,
-  137: process.env.NEXT_PUBLIC_RPC_137,
-  8453: process.env.NEXT_PUBLIC_RPC_8453,
-  42161: process.env.NEXT_PUBLIC_RPC_42161,
-  4663: process.env.NEXT_PUBLIC_RPC_4663,
-};
 
 export default function SettingsPage() {
   const mounted = useMounted();
@@ -231,21 +226,20 @@ export default function SettingsPage() {
           }
           tone={mounted && WALLETCONNECT_PROJECT_ID ? "long" : "warn"}
         />
-        {SUPPORTED_CHAINS.map((chain) => (
-          <Row
-            key={chain.id}
-            k={CHAIN_META[chain.id].label}
-            v={
-              RPC_ENV[chain.id]
-                ? t("settings.privateEndpoint")
-                : t("settings.publicEndpoint")
-            }
-          />
-        ))}
+        <Row
+          k={CHAIN_META[CHAIN_ID].label}
+          v={
+            mounted && RPC_OVERRIDE
+              ? t("settings.privateEndpoint")
+              : t("settings.publicEndpoint")
+          }
+        />
         <p className="wrap-any mt-3 text-[10px] leading-relaxed text-faint">
           {t("settings.rpcNote")}
         </p>
       </Panel>
+
+      <VenuePanel />
 
       <Panel label={t("settings.localData")} bodyClassName="p-3">
         <p className="text-[11px] leading-relaxed text-dim">{t("settings.localDataNote")}</p>
@@ -331,6 +325,175 @@ function NumberField({
           if (!Number.isFinite(next)) return;
           onChange(Math.max(min, Math.min(max, Math.round(next))));
         }}
+      />
+    </label>
+  );
+}
+
+/**
+ * Where the routing venue came from, and a way to override it. The app resolves
+ * Uniswap's addresses by asking the Pons launchpad which DEX it opens its pools
+ * in, because Robinhood Chain ships no deployment list worth bundling. What the
+ * launchpad cannot answer — a QuoterV2 for exact pricing, a USD unit to value a
+ * portfolio against — is what these fields are for.
+ */
+function VenuePanel() {
+  const { t } = useI18n();
+  const mounted = useMounted();
+  const { venue } = useVenue();
+  const { isResolving } = useVenueDiscovery();
+  const manual = useAppStore((state) => state.venueManual);
+  const setVenueManual = useAppStore((state) => state.setVenueManual);
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState<VenueConfig>(manual ?? {});
+
+  const sourceLabel = !venue
+    ? isResolving
+      ? t("settings.venueResolving")
+      : t("settings.venueNone")
+    : venue.source === "env"
+      ? t("settings.venueEnv")
+      : venue.source === "manual"
+        ? t("settings.venueManual")
+        : t("settings.venuePons");
+
+  return (
+    <Panel label={t("settings.venue")} bodyClassName="p-3">
+      <p className="text-[11px] leading-relaxed text-dim">{t("settings.venueNote")}</p>
+
+      <div className="mt-3">
+        <Row
+          k={t("settings.venueSource")}
+          v={mounted ? sourceLabel : "…"}
+          tone={mounted && !venue ? "warn" : undefined}
+        />
+        <Row
+          k={t("settings.venueRouter")}
+          v={venue ? truncateAddress(venue.router, 8, 6) : "—"}
+        />
+        <Row
+          k={t("settings.venueFactory")}
+          v={venue ? truncateAddress(venue.factory, 8, 6) : "—"}
+        />
+        <Row
+          k={t("settings.venueWrapped")}
+          v={venue ? `${venue.wrappedSymbol} · ${truncateAddress(venue.wrapped, 6, 4)}` : "—"}
+        />
+        <Row
+          k={t("settings.venueQuoter")}
+          v={venue?.quoter ? truncateAddress(venue.quoter, 8, 6) : t("settings.venueEstimating")}
+          tone={venue && !venue.quoter ? "warn" : undefined}
+        />
+        <Row
+          k={t("settings.venueStable")}
+          v={
+            venue?.stable
+              ? `${venue.stableSymbol} · ${truncateAddress(venue.stable, 6, 4)}`
+              : t("common.none")
+          }
+        />
+      </div>
+
+      <div className="mt-3">
+        <Row k={t("settings.ponsV1")} v={truncateAddress(PONS_V1_FACTORY, 8, 6)} />
+        <Row k={t("settings.ponsV2")} v={truncateAddress(PONS_V2_FACTORY, 8, 6)} />
+      </div>
+
+      <button
+        type="button"
+        className="btn btn-sm mt-3 w-full"
+        onClick={() => setOpen((value) => !value)}
+      >
+        <Icon name={open ? "chevron" : "sliders"} size={13} />
+        {open ? t("common.close") : t("settings.venueEdit")}
+      </button>
+
+      {open && (
+        <div className="mt-3 grid gap-2">
+          <AddressField
+            label={t("settings.venueFactory")}
+            value={draft.factory ?? ""}
+            onChange={(factory) => setDraft((d) => ({ ...d, factory }))}
+          />
+          <AddressField
+            label={t("settings.venueRouter")}
+            value={draft.router ?? ""}
+            onChange={(router) => setDraft((d) => ({ ...d, router }))}
+          />
+          <AddressField
+            label={t("settings.venueWrapped")}
+            value={draft.wrapped ?? ""}
+            onChange={(wrapped) => setDraft((d) => ({ ...d, wrapped }))}
+          />
+          <AddressField
+            label={t("settings.venueQuoter")}
+            value={draft.quoter ?? ""}
+            onChange={(quoter) => setDraft((d) => ({ ...d, quoter }))}
+          />
+          <AddressField
+            label={t("settings.venueStable")}
+            value={draft.stable ?? ""}
+            onChange={(stable) => setDraft((d) => ({ ...d, stable }))}
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <AddressField
+              label={t("settings.venueStableSymbol")}
+              value={draft.stableSymbol ?? ""}
+              onChange={(stableSymbol) => setDraft((d) => ({ ...d, stableSymbol }))}
+            />
+            <AddressField
+              label={t("settings.venueStableDecimals")}
+              value={String(draft.stableDecimals ?? "")}
+              onChange={(stableDecimals) => setDraft((d) => ({ ...d, stableDecimals }))}
+            />
+          </div>
+
+          <p className="text-[10px] leading-relaxed warn">{t("settings.venueWarning")}</p>
+
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              className="btn btn-accent btn-sm"
+              onClick={() => setVenueManual(draft)}
+            >
+              {t("settings.venueSave")}
+            </button>
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => {
+                setDraft({});
+                setVenueManual(undefined);
+              }}
+            >
+              {t("settings.venueClear")}
+            </button>
+          </div>
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+function AddressField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="block">
+      <span className="lbl mb-1 block">{label}</span>
+      <input
+        className="field num"
+        value={value}
+        placeholder="0x…"
+        autoComplete="off"
+        spellCheck={false}
+        onChange={(event) => onChange(event.target.value)}
       />
     </label>
   );

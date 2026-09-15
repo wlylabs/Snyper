@@ -5,7 +5,7 @@ import { parseGwei } from "viem";
 import { useAccount, useConfig, useWriteContract } from "wagmi";
 import { getPublicClient, readContract, waitForTransactionReceipt } from "wagmi/actions";
 import { erc20Abi } from "@/lib/abi";
-import { chainMeta, dexMeta, explorerTx } from "@/lib/chains";
+import { chainMeta, explorerTx } from "@/lib/chains";
 import type { Quote } from "@/lib/quote";
 import { formatPercent } from "@/lib/format";
 import { applySlippage, buildSwap, swapRequest } from "@/lib/swap";
@@ -76,8 +76,6 @@ export function useExecutor() {
       if (!address) throw new Error(t("error.notConnected"));
       const meta = chainMeta(tokenIn.chainId);
       if (!meta) throw new Error(t("error.unsupportedChain"));
-      const dex = dexMeta(tokenIn.chainId);
-      if (!dex) throw new Error(t("error.noVenue", { chain: meta.label }));
       if (chainId !== tokenIn.chainId) {
         throw new Error(t("error.switchFirst", { chain: meta.label }));
       }
@@ -98,14 +96,27 @@ export function useExecutor() {
       const amountOutMinimum = applySlippage(quote.amountOut, slippageBps);
       const fees = await feeOverrides(config, tokenIn.chainId, priorityFeeGwei);
 
-      // ERC-20 inputs need a router allowance before the swap can settle.
+      // Built before the approval so the spender is the contract that will
+      // actually pull the tokens: SwapRouter02 on a pool route, the bonding
+      // curve itself on a launchpad one.
+      const plan = buildSwap({
+        tokenIn,
+        tokenOut,
+        amountIn,
+        amountOutMinimum,
+        quote,
+        recipient: address,
+        deadlineMinutes,
+      });
+
+      // ERC-20 inputs need an allowance before the trade can settle.
       if (!tokenIn.native) {
         setPhase("approving");
         const allowance = (await readContract(config, {
           address: tokenIn.address,
           abi: erc20Abi,
           functionName: "allowance",
-          args: [address, dex.router],
+          args: [address, plan.target],
           chainId: tokenIn.chainId,
         })) as bigint;
 
@@ -114,7 +125,7 @@ export function useExecutor() {
             address: tokenIn.address,
             abi: erc20Abi,
             functionName: "approve",
-            args: [dex.router, amountIn],
+            args: [plan.target, amountIn],
             chainId: tokenIn.chainId,
             ...fees,
           });
@@ -148,16 +159,6 @@ export function useExecutor() {
       }
 
       setPhase("signing");
-      const plan = buildSwap({
-        tokenIn,
-        tokenOut,
-        amountIn,
-        amountOutMinimum,
-        fee: quote.fee,
-        recipient: address,
-        deadlineMinutes,
-      });
-
       const request = swapRequest(plan);
       const hash = await writeContractAsync({
         address: request.address,
@@ -246,6 +247,11 @@ export function readableError(error: unknown, t: Translate): string {
   }
   if (/insufficient funds/i.test(message)) return t("error.insufficientGas");
   if (/STF|TRANSFER_FROM_FAILED/i.test(message)) return t("error.transferFailed");
-  if (/Too little received|slippage/i.test(message)) return t("error.slippage");
+  if (/Too little received|SlippageExceeded|slippage/i.test(message)) {
+    return t("error.slippage");
+  }
+  // A curve closes the moment its sellable supply runs out, which is a race
+  // anyone buying near graduation can lose.
+  if (/CurveGraduated/i.test(message)) return t("error.curveGraduated");
   return message.split("\n")[0].slice(0, 180);
 }

@@ -39,6 +39,7 @@ export function usePairPrice(base?: Token, quote?: Token, intervalMs = 15_000) {
   return {
     price,
     pool: query.data?.pool,
+    venue: query.data?.venue,
     isLoading: query.isLoading,
     isFetching: query.isFetching,
     error: query.error as Error | null,

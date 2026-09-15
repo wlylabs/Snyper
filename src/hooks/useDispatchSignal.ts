@@ -109,7 +109,11 @@ export function useDispatchSignal() {
           botName: bot.name,
         });
 
-        const sizeIn = Number(amountIn) / 10 ** signal.tokenIn.decimals;
+        // A bonding-curve buy that clears the last of the sellable supply is
+        // filled short and refunded the rest, so the spend — and every figure
+        // derived from it — is what the venue actually took, not what was sent.
+        const spent = amountIn - (quote.refund ?? 0n);
+        const sizeIn = Number(spent) / 10 ** signal.tokenIn.decimals;
         const notional = signal.side === "buy" ? sizeIn : sizeIn * signal.price;
         const today = todayKey();
         const current = useAppStore.getState().bots.find((item) => item.id === bot.id) ?? bot;
