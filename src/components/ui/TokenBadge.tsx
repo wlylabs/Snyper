@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import type { Token } from "@/lib/tokens";
+import { tokenKey, type Token } from "@/lib/tokens";
 import { addressArt, tokenArt, type Art } from "@/lib/tokenArt";
+import { useAppStore } from "@/store/useAppStore";
 
 function groundStyle(art: Art, size: number): React.CSSProperties {
   return {
@@ -31,8 +32,15 @@ export function TokenBadge({
   className?: string;
 }) {
   const [broken, setBroken] = useState(false);
+  /*
+   * Artwork the token named for itself, read back from the store where the
+   * on-chain lookup files it. A token that arrived carrying its own `logoURI`
+   * — an import that already knew — keeps precedence over the lookup.
+   */
+  const resolved = useAppStore((state) => state.tokenLogos[tokenKey(token)]);
+  const src = token.logoURI || resolved || undefined;
   const art = tokenArt(token);
-  const showImage = Boolean(token.logoURI) && !broken;
+  const showImage = Boolean(src) && !broken;
 
   return (
     <span
@@ -43,7 +51,7 @@ export function TokenBadge({
       {showImage ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={token.logoURI}
+          src={src}
           alt=""
           className="badge-img"
           loading="lazy"
