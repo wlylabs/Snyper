@@ -454,11 +454,20 @@ function HoldingRow({
 
   return (
     <div className="flex items-center gap-3 border-t border-line px-3 py-2.5">
-      <span className="ticker" data-native={holding.token.native ? "true" : undefined}>
-        {holding.token.symbol}
-      </span>
+      {/* The ticker is not repeated here. It already appears twice on this row
+          — once naming the token and once as the unit on the quantity — and a
+          third copy in its own column was three identifiers for one asset. The
+          one that stays is the one attached to the number, because that is the
+          copy doing work. */}
       <div className="min-w-0 flex-1">
-        <p className="flex items-center gap-1.5 text-[12px] text-dim">
+        {/* With no ticker column left to mark it, the coin's own row takes the
+            accent instead. It is the balance the wallet is denominated in and
+            the one a reader looks for first, among names that all look alike. */}
+        <p
+          className={`flex items-center gap-1.5 text-[13px] ${
+            holding.token.native ? "text-accent-text" : "text-dim"
+          }`}
+        >
           <span className="truncate">{holding.token.name}</span>
           <TokenTags token={token} listed={listed} />
           {unverified && (
