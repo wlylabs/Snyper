@@ -8,7 +8,6 @@ import { WagmiProvider as BareWagmiProvider } from "wagmi";
 import { config } from "@/lib/wagmi";
 import { PRIVY_APP_ID, PRIVY_CLIENT_ID, PRIVY_CONFIGURED, privyConfig } from "@/lib/privy";
 import { ToastProvider } from "@/components/ui/Toast";
-import { PressWash } from "@/components/ui/PressWash";
 import { SnypeRunner } from "@/components/snype/SnypeRunner";
 import { VenueSync } from "@/hooks/useVenue";
 import { ConnectPromptProvider } from "@/hooks/useConnectPrompt";
@@ -123,7 +122,6 @@ export function Providers({ children }: { children: ReactNode }) {
         <ToastProvider>
           <ThemeSync />
           <LocaleSync />
-          <PressWash />
           <ServiceWorker />
           <VenueSync />
           <SnypeRunner />
