@@ -287,6 +287,8 @@ const en = {
   "reason.zeroSize": "Zero size",
 
   "toast.approving": "Approving {symbol}",
+  "toast.allowanceReset":
+    "Clearing the old {symbol} allowance — this token only accepts a new one from zero.",
   "toast.swapSubmitted": "Swap submitted · {from} → {to}",
   "toast.swapConfirmed": "Swap confirmed",
   "toast.swapReverted": "Swap reverted",
@@ -712,6 +714,8 @@ const id: Record<TKey, string> = {
   "reason.zeroSize": "Ukuran nol",
 
   "toast.approving": "Menyetujui {symbol}",
+  "toast.allowanceReset":
+    "Menghapus izin {symbol} yang lama — token ini hanya menerima izin baru dari nol.",
   "toast.swapSubmitted": "Penukaran terkirim · {from} → {to}",
   "toast.swapConfirmed": "Penukaran terkonfirmasi",
   "toast.swapReverted": "Penukaran gagal di chain",
