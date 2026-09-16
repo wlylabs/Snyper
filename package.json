@@ -9,7 +9,8 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "contracts:build": "node scripts/compile-contracts.mjs",
-    "contracts:test": "node --experimental-strip-types scripts/test-router.mjs"
+    "contracts:test": "node --experimental-strip-types scripts/test-router.mjs",
+    "discovery:test": "node --experimental-strip-types scripts/test-discovery.mjs"
   },
   "dependencies": {
     "@privy-io/react-auth": "^3.42.0",

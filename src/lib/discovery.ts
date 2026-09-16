@@ -2,6 +2,7 @@ import type { PublicClient } from "viem";
 import { getAddress, parseAbiItem } from "viem";
 import { erc20Abi } from "./abi";
 import { CHAIN_META } from "./chains";
+import { blockWindow, scanBack } from "./logscan";
 import type { Token } from "./tokens";
 
 /** A token found by scanning the wallet's own transfer history. */
@@ -20,20 +21,20 @@ export type DiscoveryResult = {
   partial: boolean;
 };
 
+/** Roughly a fortnight of history, which is what one budget reaches. */
+const WINDOW_DAYS = 14;
+
 const TRANSFER_EVENT = parseAbiItem(
   "event Transfer(address indexed from, address indexed to, uint256 value)",
 );
 
-const MAX_REQUESTS = 14;
-const MAX_CHUNK = 10_000n;
-const MIN_CHUNK = 500n;
 /** Reading metadata for more than this many contracts is not worth the RPC. */
 const MAX_CANDIDATES = 80;
 
 /**
  * Walks back from the chain head collecting ERC-20 Transfer logs addressed to
- * the wallet. Public endpoints cap both block range and result size, so the
- * window is chunked and the chunk shrinks whenever a request is rejected.
+ * the wallet. The chunking and the shrink-on-rejection live in `logscan.ts`,
+ * which the launchpad index walks with too.
  */
 async function collectContracts(
   client: PublicClient,
@@ -42,39 +43,21 @@ async function collectContracts(
   windowSize: bigint,
 ): Promise<{ contracts: Set<string>; scanned: bigint; partial: boolean }> {
   const contracts = new Set<string>();
-  const floor = head > windowSize ? head - windowSize : 0n;
-  let toBlock = head;
-  let chunk = MAX_CHUNK;
-  let requests = 0;
 
-  while (toBlock > floor && requests < MAX_REQUESTS) {
-    const span = chunk - 1n;
-    const fromBlock = toBlock > floor + span ? toBlock - span : floor;
-    requests += 1;
-    try {
-      const logs = await client.getLogs({
-        event: TRANSFER_EVENT,
-        args: { to: address },
-        fromBlock,
-        toBlock,
-      });
-      for (const log of logs) {
-        // ERC-721 shares this topic but carries a third indexed argument.
-        if (log.topics.length !== 3) continue;
-        contracts.add(getAddress(log.address));
-      }
-      if (fromBlock === floor) {
-        return { contracts, scanned: head - floor, partial: false };
-      }
-      toBlock = fromBlock - 1n;
-    } catch {
-      // Range or result-size rejection: retry the same window, smaller.
-      if (chunk <= MIN_CHUNK) break;
-      chunk = chunk / 2n > MIN_CHUNK ? chunk / 2n : MIN_CHUNK;
+  const { scanned, partial } = await scanBack(head, windowSize, async (range) => {
+    const logs = await client.getLogs({
+      event: TRANSFER_EVENT,
+      args: { to: address },
+      ...range,
+    });
+    for (const log of logs) {
+      // ERC-721 shares this topic but carries a third indexed argument.
+      if (log.topics.length !== 3) continue;
+      contracts.add(getAddress(log.address));
     }
-  }
+  });
 
-  return { contracts, scanned: head - toBlock, partial: toBlock > floor };
+  return { contracts, scanned, partial };
 }
 
 /**
@@ -91,7 +74,7 @@ export async function discoverWalletTokens(
   if (!CHAIN_META[chainId]) return { tokens: [], scannedBlocks: 0, partial: false };
 
   const head = await client.getBlockNumber();
-  const windowSize = options.windowBlocks ?? defaultWindow(chainId);
+  const windowSize = options.windowBlocks ?? blockWindow(chainId, WINDOW_DAYS);
   const { contracts, scanned, partial } = await collectContracts(
     client,
     address,
@@ -144,15 +127,4 @@ export async function discoverWalletTokens(
   });
 
   return { tokens, scannedBlocks: Number(scanned), partial };
-}
-
-/**
- * Roughly a fortnight of history, derived from the chain's own block time so a
- * 100 ms chain and a 12 s chain both land on a sensible window.
- */
-function defaultWindow(chainId: number): bigint {
-  const seconds = CHAIN_META[chainId]?.chain.blockTime;
-  const blockSeconds = seconds ? seconds / 1000 : 12;
-  const blocks = Math.round((14 * 24 * 60 * 60) / Math.max(0.05, blockSeconds));
-  return BigInt(Math.min(2_000_000, Math.max(50_000, blocks)));
 }

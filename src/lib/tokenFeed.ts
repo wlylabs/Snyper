@@ -20,10 +20,10 @@ const FEED = "https://api.dexscreener.com/latest/dex/tokens/";
  *   curl -s https://api.dexscreener.com/latest/dex/tokens/<a 4663 token> \
  *     | grep -o '"chainId":"[^"]*"' | sort -u
  */
-const CHAIN_SLUG = process.env.NEXT_PUBLIC_DEXSCREENER_CHAIN?.trim() || "robinhood";
+export const CHAIN_SLUG = process.env.NEXT_PUBLIC_DEXSCREENER_CHAIN?.trim() || "robinhood";
 
 /** Readers' browsers talk to this, so there is a way to say no to that. */
-const ENABLED = process.env.NEXT_PUBLIC_DEXSCREENER?.trim().toLowerCase() !== "off";
+export const FEED_ENABLED = process.env.NEXT_PUBLIC_DEXSCREENER?.trim().toLowerCase() !== "off";
 
 /** The endpoint's documented ceiling for one request. */
 const MAX_ADDRESSES = 30;
@@ -88,7 +88,7 @@ async function readBatch(
   addresses: readonly `0x${string}`[],
 ): Promise<Map<string, FeedQuote>> {
   const found = new Map<string, FeedQuote>();
-  if (!ENABLED || addresses.length === 0) return found;
+  if (!FEED_ENABLED || addresses.length === 0) return found;
 
   const batch = addresses.slice(0, MAX_ADDRESSES);
 

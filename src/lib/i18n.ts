@@ -83,6 +83,26 @@ const en = {
   "token.noneAvailable": "No assets available.",
   "token.selectShort": "Select",
 
+  /*
+   * The picker's second list: tokens the app was never told about, found rather
+   * than curated. The copy has to carry that difference, because a reader who
+   * suddenly has forty rows where there were three will otherwise read the new
+   * ones as vetted.
+   */
+  "token.discovered": "Found on chain",
+  "token.discoveredCount": "{count} not in your list",
+  "token.discovering": "Reading the chain and the market feed…",
+  "token.discoverNote":
+    "Traded tokens come from the market feed; new mints come from the Pons launchpad's own record. Nothing here is a curated list, and no one has vetted these contracts.",
+  "token.discoverChainOnly":
+    "The market feed answered with nothing, so this list is the Pons launchpad's record alone — tokens that trade but were not minted there are missing.",
+  "token.discoverPartial":
+    "The launch scan spends a fixed request budget and this one ran out, so mints older than it reached are missing. Paste an address to reach one by hand.",
+  "token.discoverFresh": "No pool",
+  "token.discoverFreshHint":
+    "Minted but not yet indexed in any pair, so there is no depth to report. Usually this means it launched minutes ago.",
+  "token.discoverDepthHint": "Dollars in the deepest pair, from the market feed",
+
   "swap.execute": "Execute",
   "swap.pay": "Pay",
   "swap.receive": "Receive",
@@ -520,6 +540,20 @@ const id: Record<TKey, string> = {
   "token.noMatch": "Tidak ada yang cocok.",
   "token.noneAvailable": "Tidak ada aset tersedia.",
   "token.selectShort": "Pilih",
+
+  "token.discovered": "Ditemukan di chain",
+  "token.discoveredCount": "{count} belum ada di daftarmu",
+  "token.discovering": "Membaca chain dan feed pasar…",
+  "token.discoverNote":
+    "Token yang diperdagangkan berasal dari feed pasar; token baru berasal dari catatan launchpad Pons sendiri. Tidak ada daftar kurasi di sini, dan tidak ada yang memverifikasi kontrak-kontrak ini.",
+  "token.discoverChainOnly":
+    "Feed pasar tidak menjawab, jadi daftar ini murni catatan launchpad Pons — token yang diperdagangkan tapi tidak dicetak di sana tidak muncul.",
+  "token.discoverPartial":
+    "Pemindaian launch punya jatah request tetap dan jatah itu habis, jadi token yang lebih lama dari jangkauannya tidak muncul. Tempel alamatnya untuk menjangkau satu per satu.",
+  "token.discoverFresh": "Belum ada pool",
+  "token.discoverFreshHint":
+    "Sudah dicetak tapi belum terindeks di pasangan mana pun, jadi tidak ada kedalaman yang bisa dilaporkan. Biasanya artinya baru diluncurkan beberapa menit lalu.",
+  "token.discoverDepthHint": "Dolar di pasangan terdalam, menurut feed pasar",
 
   "swap.execute": "Eksekusi",
   "swap.pay": "Bayar",

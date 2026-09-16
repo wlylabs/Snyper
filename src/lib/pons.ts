@@ -62,41 +62,43 @@ export type PonsV2Launch = {
 
 export type PonsLaunch = PonsV1Launch | PonsV2Launch;
 
-/**
- * Asks both launchpad generations whether they minted this address. This is the
- * detection that turns a pasted contract address into a known memecoin: the
- * launchpad's own record says what the token is, what it trades against and
- * where, with no indexer and no token list involved.
- */
-export async function readPonsLaunch(
-  client: PublicClient,
-  token: `0x${string}`,
-): Promise<PonsLaunch | undefined> {
-  const [v1, v2, status] = await client.multicall({
-    allowFailure: true,
-    contracts: [
-      {
-        address: PONS_V1_FACTORY,
-        abi: ponsV1FactoryAbi,
-        functionName: "getLaunchedToken" as const,
-        args: [token] as const,
-      },
-      {
-        address: PONS_V2_FACTORY,
-        abi: ponsV2FactoryAbi,
-        functionName: "getLaunchedToken" as const,
-        args: [token] as const,
-      },
-      {
-        address: PONS_V1_FACTORY,
-        abi: ponsV1FactoryAbi,
-        functionName: "graduationStatus" as const,
-        args: [token] as const,
-      },
-    ],
-  });
+/** What `getLaunchedToken` answers with, in the shape the decode below needs. */
+type V1Record = {
+  token: `0x${string}`;
+  deployer: `0x${string}`;
+  pairedToken: `0x${string}`;
+  restrictionsEndBlock: bigint;
+  supply: bigint;
+  poolFee: number | bigint;
+  exists: boolean;
+};
 
-  if (v2.status === "success" && v2.result.exists) {
+type V2Record = {
+  token: `0x${string}`;
+  curve: `0x${string}`;
+  deployer: `0x${string}`;
+  pairToken: `0x${string}`;
+  graduationThreshold: bigint;
+  poolFee: number | bigint;
+  creatorTaxBps: number | bigint;
+  phase: number | bigint;
+  exists: boolean;
+};
+
+/** A multicall entry, which either answered or did not. */
+type Answer<T> = { status: "success"; result: T } | { status: "failure"; error: unknown };
+
+/**
+ * Turns one token's three factory answers into a launch record. V2 is checked
+ * first: a token minted by V2 is never also a V1 launch, and its curve decides
+ * where a trade can go, so its record has to win if both somehow answered.
+ */
+function decodeLaunch(
+  v1: Answer<V1Record> | undefined,
+  v2: Answer<V2Record> | undefined,
+  status: Answer<readonly [bigint, bigint, boolean]> | undefined,
+): PonsLaunch | undefined {
+  if (v2?.status === "success" && v2.result.exists) {
     const record = v2.result;
     return {
       gen: "v2",
@@ -111,10 +113,10 @@ export async function readPonsLaunch(
     };
   }
 
-  if (v1.status === "success" && v1.result.exists) {
+  if (v1?.status === "success" && v1.result.exists) {
     const record = v1.result;
     const [lockedPrincipal, threshold, graduated] =
-      status.status === "success" ? status.result : [0n, 0n, false];
+      status?.status === "success" ? status.result : ([0n, 0n, false] as const);
     return {
       gen: "v1",
       token: getAddress(record.token),
@@ -130,6 +132,77 @@ export async function readPonsLaunch(
   }
 
   return undefined;
+}
+
+/**
+ * Asks both launchpad generations which of these addresses they minted.
+ *
+ * This is the detection that turns an address into a known memecoin, and it is
+ * also what makes an index of launches possible: a scan of the factories' logs
+ * produces addresses that merely appeared in a launch event — deployers, pair
+ * tokens, curves — and only the factory can say which of them is the token. So
+ * the batch form is the primitive and the single lookup is a call with one
+ * address in it.
+ *
+ * Each generation is asked in its own multicall so the decoded shapes stay
+ * uniform; the transport batches them into the same round trip anyway.
+ */
+export async function readPonsLaunches(
+  client: PublicClient,
+  tokens: readonly `0x${string}`[],
+): Promise<Map<string, PonsLaunch>> {
+  const found = new Map<string, PonsLaunch>();
+  if (tokens.length === 0) return found;
+
+  const [v1, v2, status] = await Promise.all([
+    client.multicall({
+      allowFailure: true,
+      contracts: tokens.map((token) => ({
+        address: PONS_V1_FACTORY,
+        abi: ponsV1FactoryAbi,
+        functionName: "getLaunchedToken" as const,
+        args: [token] as const,
+      })),
+    }),
+    client.multicall({
+      allowFailure: true,
+      contracts: tokens.map((token) => ({
+        address: PONS_V2_FACTORY,
+        abi: ponsV2FactoryAbi,
+        functionName: "getLaunchedToken" as const,
+        args: [token] as const,
+      })),
+    }),
+    client.multicall({
+      allowFailure: true,
+      contracts: tokens.map((token) => ({
+        address: PONS_V1_FACTORY,
+        abi: ponsV1FactoryAbi,
+        functionName: "graduationStatus" as const,
+        args: [token] as const,
+      })),
+    }),
+  ]);
+
+  tokens.forEach((token, index) => {
+    const launch = decodeLaunch(
+      v1[index] as Answer<V1Record> | undefined,
+      v2[index] as Answer<V2Record> | undefined,
+      status[index] as Answer<readonly [bigint, bigint, boolean]> | undefined,
+    );
+    if (launch) found.set(token.toLowerCase(), launch);
+  });
+
+  return found;
+}
+
+/** What the launchpad says one pasted address is, if anything. */
+export async function readPonsLaunch(
+  client: PublicClient,
+  token: `0x${string}`,
+): Promise<PonsLaunch | undefined> {
+  const found = await readPonsLaunches(client, [token]);
+  return found.get(token.toLowerCase());
 }
 
 /** True while a V2 launch still trades on its curve rather than a v4 pool. */
