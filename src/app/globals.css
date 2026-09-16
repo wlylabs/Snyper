@@ -76,6 +76,8 @@
   --shell-top: 56px;
   --shell-rail: 80px;
   --shell-tabs: 60px;
+  /* One rail row, and the distance the rail indicator travels per nav item. */
+  --nav-rail-item: 58px;
   --scrim: rgb(3 5 8 / 0.7);
   --grid-opacity: 0.25;
 
@@ -1292,13 +1294,11 @@
     align-items: center;
     justify-content: center;
     gap: 5px;
-    height: 58px;
+    height: var(--nav-rail-item);
     color: var(--color-faint);
+    /* Matches the indicator rail so the glyphs sit centred either way. */
     border-left: 2px solid transparent;
-    transition:
-      color var(--dur-tap) var(--ease-out),
-      border-color var(--dur-tap) var(--ease-out),
-      background-color var(--dur-tap) var(--ease-out);
+    transition: color var(--dur-travel) var(--ease-settle);
   }
 
   .rail-label {
@@ -1315,13 +1315,10 @@
 
   .rail-link:hover {
     color: var(--color-ink);
-    background: var(--color-panel);
   }
 
   .rail-link[data-active="true"] {
     color: var(--color-accent-text);
-    border-left-color: var(--color-accent-line);
-    background: var(--color-panel);
   }
 
   .tab-link {
@@ -1337,37 +1334,53 @@
     text-align: center;
     color: var(--color-faint);
     border-top: 2px solid transparent;
-    transition:
-      color var(--dur-tap) var(--ease-out),
-      border-color var(--dur-tap) var(--ease-out);
+    transition: color var(--dur-travel) var(--ease-settle);
   }
 
   .tab-link[data-active="true"] {
     color: var(--color-accent-text);
-    border-top-color: var(--color-accent-line);
   }
 
-  /* The icon of the tab you are on sits a pixel proud of the others. */
-  .rail-link svg,
-  .tab-link svg {
-    transition: transform var(--dur-travel) var(--ease-settle);
-  }
-
-  .rail-link[data-active="true"] svg,
-  .tab-link[data-active="true"] svg {
-    transform: translateY(-1px) scale(1.06);
+  /* Suppress the browser's own tap flash — the line is the only feedback. */
+  .rail-link,
+  .tab-link {
+    -webkit-tap-highlight-color: transparent;
   }
 
   /*
-   * The tab bar is the most-pressed thing in the app on a phone and it was the
-   * one surface answering with nothing at all — the page simply changed. Now
-   * the glyph presses in under the thumb and comes back up on the release
-   * curve, whether or not the tab it belongs to is the one being left.
+   * Nothing moves under the thumb: no press-in, no lift, no highlight block
+   * sliding around behind the glyphs. The only travel in the nav is the accent
+   * line itself, which slides from the tab you left to the tab you picked.
    */
-  .rail-link:active svg,
-  .tab-link:active svg {
-    transform: translateY(1px) scale(0.9);
-    transition-duration: var(--dur-press);
+  .nav-indicator {
+    position: absolute;
+    background: var(--color-accent-line);
+    opacity: 1;
+    pointer-events: none;
+    transition:
+      transform var(--dur-travel) var(--ease-settle),
+      opacity var(--dur-tap) var(--ease-out);
+  }
+
+  /* No nav item owns the current route, so there is no line to point with. */
+  .nav-indicator[data-visible="false"] {
+    opacity: 0;
+  }
+
+  .rail-indicator {
+    top: 0;
+    left: 0;
+    width: 2px;
+    height: var(--nav-rail-item);
+    transform: translateY(calc(var(--nav-index) * var(--nav-rail-item)));
+  }
+
+  .tab-indicator {
+    top: 0;
+    left: 0;
+    height: 2px;
+    width: calc(100% / var(--nav-count));
+    transform: translateX(calc(var(--nav-index) * 100%));
   }
 
   .tab-bar {

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { Logo } from "@/components/ui/Logo";
 import { ConnectControl } from "@/components/wallet/ConnectControl";
@@ -15,6 +15,14 @@ import { useI18n } from "@/hooks/useI18n";
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { t } = useI18n();
+
+  // The accent line is one element per nav that slides to the active item,
+  // rather than a border lit on each link, so switching tabs reads as travel.
+  const activeIndex = NAV_ITEMS.findIndex((item) => isActivePath(pathname, item.href));
+  const indicatorStyle = {
+    "--nav-index": String(Math.max(activeIndex, 0)),
+    "--nav-count": String(NAV_ITEMS.length),
+  } as CSSProperties;
 
   return (
     <div className="relative z-10 min-h-dvh">
@@ -41,6 +49,12 @@ export function AppShell({ children }: { children: ReactNode }) {
           style={{ width: "var(--shell-rail)" }}
           aria-label={t("a11y.primaryNav")}
         >
+          <span
+            className="nav-indicator rail-indicator"
+            style={indicatorStyle}
+            data-visible={activeIndex >= 0}
+            aria-hidden
+          />
           {NAV_ITEMS.map((item) => (
             <Link
               key={item.href}
@@ -63,6 +77,12 @@ export function AppShell({ children }: { children: ReactNode }) {
       </div>
 
       <nav className="tab-bar md:hidden" aria-label={t("a11y.primaryNav")}>
+        <span
+          className="nav-indicator tab-indicator"
+          style={indicatorStyle}
+          data-visible={activeIndex >= 0}
+          aria-hidden
+        />
         {NAV_ITEMS.map((item) => (
           <Link
             key={item.href}
