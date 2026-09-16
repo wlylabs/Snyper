@@ -93,15 +93,18 @@ const en = {
   "token.discoveredCount": "{count} not in your list",
   "token.discovering": "Reading the chain and the market feed…",
   "token.discoverNote":
-    "Traded tokens come from the market feed; new mints come from the Pons launchpad's own record. Nothing here is a curated list, and no one has vetted these contracts.",
+    "Tokens with a pool and a day's trading behind them, from the market feed, with the Pons launchpad asked which of them it minted. Nothing here is a curated list, and no one has vetted these contracts.",
   "token.discoverChainOnly":
-    "The market feed answered with nothing, so this list is the Pons launchpad's record alone — tokens that trade but were not minted there are missing.",
-  "token.discoverPartial":
-    "The launch scan spends a fixed request budget and this one ran out, so mints older than it reached are missing. Paste an address to reach one by hand.",
-  "token.discoverFresh": "No pool",
-  "token.discoverFreshHint":
-    "Minted but not yet indexed in any pair, so there is no depth to report. Usually this means it launched minutes ago.",
-  "token.discoverDepthHint": "Dollars in the deepest pair, from the market feed",
+    "The market feed answered with nothing, so there is nothing to offer beyond the assets above. Paste a contract address to import one by hand.",
+  "token.discoverFiltered":
+    "{count} more had no pool, no trading, or no cap to report, and are not offered; paste an address to reach one anyway.",
+  "token.discoverVolume": "VOL",
+  "token.discoverVolumeHint": "Traded over the last 24 hours, from the market feed",
+  "token.discoverMc": "MC",
+  "token.discoverMcHint": "Market cap — circulating supply at the market price",
+  "token.discoverFdv": "FDV",
+  "token.discoverFdvHint": "Fully diluted — total supply at the market price",
+  "token.copyAddress": "Copy contract address {address}",
 
   "swap.execute": "Execute",
   "swap.pay": "Pay",
@@ -545,15 +548,18 @@ const id: Record<TKey, string> = {
   "token.discoveredCount": "{count} belum ada di daftarmu",
   "token.discovering": "Membaca chain dan feed pasar…",
   "token.discoverNote":
-    "Token yang diperdagangkan berasal dari feed pasar; token baru berasal dari catatan launchpad Pons sendiri. Tidak ada daftar kurasi di sini, dan tidak ada yang memverifikasi kontrak-kontrak ini.",
+    "Token yang punya pool dan perdagangan sehari terakhir, menurut feed pasar, lalu launchpad Pons ditanya mana yang dia cetak. Tidak ada daftar kurasi di sini, dan tidak ada yang memverifikasi kontrak-kontrak ini.",
   "token.discoverChainOnly":
-    "Feed pasar tidak menjawab, jadi daftar ini murni catatan launchpad Pons — token yang diperdagangkan tapi tidak dicetak di sana tidak muncul.",
-  "token.discoverPartial":
-    "Pemindaian launch punya jatah request tetap dan jatah itu habis, jadi token yang lebih lama dari jangkauannya tidak muncul. Tempel alamatnya untuk menjangkau satu per satu.",
-  "token.discoverFresh": "Belum ada pool",
-  "token.discoverFreshHint":
-    "Sudah dicetak tapi belum terindeks di pasangan mana pun, jadi tidak ada kedalaman yang bisa dilaporkan. Biasanya artinya baru diluncurkan beberapa menit lalu.",
-  "token.discoverDepthHint": "Dolar di pasangan terdalam, menurut feed pasar",
+    "Feed pasar tidak menjawab, jadi tidak ada yang bisa ditawarkan selain aset di atas. Tempel alamat kontrak untuk mengimpor sendiri.",
+  "token.discoverFiltered":
+    "{count} lainnya tidak punya pool, tidak diperdagangkan, atau tidak punya kapitalisasi, jadi tidak ditawarkan; tempel alamatnya kalau tetap mau.",
+  "token.discoverVolume": "VOL",
+  "token.discoverVolumeHint": "Diperdagangkan dalam 24 jam terakhir, menurut feed pasar",
+  "token.discoverMc": "MC",
+  "token.discoverMcHint": "Kapitalisasi pasar — suplai beredar dikali harga pasar",
+  "token.discoverFdv": "FDV",
+  "token.discoverFdvHint": "Terdilusi penuh — total suplai dikali harga pasar",
+  "token.copyAddress": "Salin alamat kontrak {address}",
 
   "swap.execute": "Eksekusi",
   "swap.pay": "Bayar",

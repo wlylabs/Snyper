@@ -131,7 +131,29 @@ function fold(
 }
 
 /**
- * The chain's traded tokens, deepest first.
+ * Whether a reading describes a market at all.
+ *
+ * Depth says the token can be bought, volume says somebody did, and a cap says
+ * what buying it would be buying into. A chain like this one mints far more
+ * contracts than anybody trades, and a feed carries readings for plenty that
+ * have one of the three and are dead on the others — a pool minted at launch
+ * and never traded, a pair with a day of volume and no supply the feed can
+ * price. Offering those is not a fuller picker, it is a phone book with a
+ * handful of real entries buried in it, and each dead row costs the reader the
+ * time it takes to work out that it is dead.
+ *
+ * Nothing is hidden by this: an address still imports by hand. It is the
+ * difference between what the app offers and what the app allows.
+ */
+export function tradeable(market: MarketToken): boolean {
+  const cap = market.marketCapUsd ?? market.fdvUsd;
+  return (
+    (market.liquidityUsd ?? 0) > 0 && (market.volume24hUsd ?? 0) > 0 && (cap ?? 0) > 0
+  );
+}
+
+/**
+ * The chain's traded tokens, busiest first.
  *
  * `seeds` are the addresses every pool on the chain is paired against — the
  * wrapped native and the dollar — and they are both the search terms and the
@@ -158,7 +180,17 @@ export async function readMarketTokens(
   }
   for (const seed of skip) found.delete(seed);
 
+  /*
+   * Ranked by what changed hands today, not by what sits in the pool. Depth is
+   * a standing offer and a launch can mint itself any amount of it; volume is
+   * the part somebody had to pay for, which is why a scanner for this kind of
+   * token leads with it and why depth only breaks the ties.
+   */
   return [...found.values()]
-    .sort((a, b) => (b.liquidityUsd ?? 0) - (a.liquidityUsd ?? 0))
+    .sort((a, b) => {
+      const volume = (b.volume24hUsd ?? 0) - (a.volume24hUsd ?? 0);
+      if (volume !== 0) return volume;
+      return (b.liquidityUsd ?? 0) - (a.liquidityUsd ?? 0);
+    })
     .slice(0, MAX_TOKENS);
 }

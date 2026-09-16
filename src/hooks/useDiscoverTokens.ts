@@ -4,48 +4,51 @@ import { useQuery } from "@tanstack/react-query";
 import type { PublicClient } from "viem";
 import { usePublicClient } from "wagmi";
 import { erc20Abi } from "@/lib/abi";
-import { indexPonsLaunches } from "@/lib/launches";
-import { readMarketTokens, type MarketToken } from "@/lib/market";
-import type { PonsLaunch } from "@/lib/pons";
+import { readMarketTokens, tradeable, type MarketToken } from "@/lib/market";
+import { readPonsLaunches, type PonsLaunch } from "@/lib/pons";
 import { baseTokens, type Token } from "@/lib/tokens";
 import { useAppStore } from "@/store/useAppStore";
 
 /**
- * Where a token the app was never told about came from.
+ * Tokens the app was never told about, offered only where a market stands
+ * behind them.
  *
- * The two sources answer different questions and neither subsumes the other.
- * The market knows what people trade, and knows nothing about a token until a
- * pool has been indexed; the launchpad knows what was minted the moment it was
- * minted, and knows nothing about whether anyone wants it. A memecoin terminal
- * needs both, and a reader deciding what to do about a row needs to be told
- * which one is talking.
+ * A chain like this one mints far more contracts than anybody trades. Listing
+ * all of them is not a fuller picker, it is a phone book with a handful of real
+ * entries buried in it, and every row that cannot be bought costs the reader
+ * the time it takes to work out that it cannot be bought. So a pool, a day's
+ * volume and a cap are the price of admission here: those three are what a
+ * memecoin is read by, and a contract that has none of them has no market at
+ * all. It stays reachable — its address still imports by hand — it is simply
+ * not offered.
  */
-export type DiscoverSource = "market" | "launchpad";
-
 export type DiscoverToken = Token & {
-  sources: DiscoverSource[];
-  market?: MarketToken;
+  /** Always present: a token with no market reading is not offered at all. */
+  market: MarketToken;
+  /** What the whole token is worth, circulating where the feed knows it. */
+  marketCapUsd: number;
+  /** True when the cap above is fully diluted rather than circulating. */
+  diluted: boolean;
   /** The launchpad's own record, when it minted this token. */
   launch?: PonsLaunch;
   totalSupply?: bigint;
-  /** Block the launchpad log named it at, which orders the newest launches. */
-  launchedAt?: bigint;
 };
 
 export type DiscoverResult = {
   tokens: DiscoverToken[];
-  /** True when the launch scan's budget ran out before its window was covered. */
-  partial: boolean;
-  scannedBlocks: number;
-  /** True when the market feed answered with nothing, so the list is on-chain only. */
+  /** Contracts the feed knew of but that had no pool, no volume, or no cap. */
+  rejected: number;
+  /** True when the feed answered with nothing, so there is nothing to offer. */
   marketEmpty: boolean;
 };
 
 /** Identities confirmed in one multicall, which is one round trip. */
 const MAX_RESOLVE = 150;
 
-/** A minute. Long enough not to hammer the feed, short enough for a new launch. */
+/** A minute. Long enough not to hammer the feed, short enough to stay current. */
 const STALE_MS = 60_000;
+
+const EMPTY: DiscoverResult = { tokens: [], rejected: 0, marketEmpty: true };
 
 /**
  * Reads name, symbol and decimals off each contract.
@@ -93,31 +96,14 @@ async function resolveIdentities(
 }
 
 /**
- * Orders the list the way a reader reads it: what the most money stands behind,
- * then what was minted most recently. A launch with no pool yet has no depth to
- * sort by and is not therefore last — it is the newest thing on the chain, and
- * on this chain that is the point — so it follows the traded tokens rather than
- * being ranked against them at zero.
- */
-function rank(a: DiscoverToken, b: DiscoverToken): number {
-  const depthA = a.market?.liquidityUsd ?? 0;
-  const depthB = b.market?.liquidityUsd ?? 0;
-  if (depthA !== depthB) return depthB - depthA;
-
-  const blockA = a.launchedAt ?? 0n;
-  const blockB = b.launchedAt ?? 0n;
-  if (blockA !== blockB) return blockB > blockA ? 1 : -1;
-
-  return a.symbol.localeCompare(b.symbol);
-}
-
-/**
- * Every token on this chain that the app does not already carry.
+ * Every tradeable token on this chain that the app does not already carry.
  *
- * The two reads are independent and are allowed to fail independently: an
- * endpoint that refuses `eth_getLogs` should cost the launch list and not the
- * traded one, and a reader whose network blocks the feed should still see what
- * was minted this morning.
+ * Rows come from the market feed, because it is the only thing that can say a
+ * token is traded. The launchpad is then asked which of them it minted: that is
+ * one multicall against a contract that cannot be wrong about its own mints,
+ * and it is the strongest provenance signal available on this chain, so the
+ * Pons tag on a row is a fact rather than the name-and-supply guess the meme
+ * heuristics fall back on.
  */
 export function useDiscoverTokens(chainId: number | undefined) {
   const client = usePublicClient({ chainId });
@@ -131,90 +117,52 @@ export function useDiscoverTokens(chainId: number | undefined) {
     refetchOnWindowFocus: false,
     retry: false,
     queryFn: async () => {
-      if (!chainId || !client) {
-        return { tokens: [], partial: false, scannedBlocks: 0, marketEmpty: true };
-      }
+      if (!chainId || !client) return EMPTY;
 
       const base = baseTokens(chainId);
       /* The pair token every pool on this chain is quoted against, which is
          what the feed is searched by and what it must not hand back. */
-      const seeds = base
-        .filter((token) => !token.native)
-        .map((token) => token.address);
+      const seeds = base.filter((token) => !token.native).map((token) => token.address);
       const known = new Set(base.map((token) => token.address.toLowerCase()));
 
-      const [market, launches] = await Promise.all([
-        readMarketTokens(seeds).catch((): MarketToken[] => []),
-        indexPonsLaunches(client, chainId).catch(() => ({
-          launches: [],
-          scannedBlocks: 0,
-          partial: false,
-        })),
+      const market = await readMarketTokens(seeds).catch((): MarketToken[] => []);
+      if (market.length === 0) return EMPTY;
+
+      const offered = market.filter(
+        (token) => !known.has(token.address.toLowerCase()) && tradeable(token),
+      );
+      const rejected = market.length - offered.length;
+      const candidates = offered.slice(0, MAX_RESOLVE);
+      const addresses = candidates.map((token) => token.address);
+
+      /* Identity is the chain's to answer; provenance is the launchpad's. A
+         launchpad that will not answer costs a tag, never a row. */
+      const [identities, launches] = await Promise.all([
+        resolveIdentities(client, chainId, addresses),
+        readPonsLaunches(client, addresses).catch(
+          () => new Map<string, PonsLaunch>(),
+        ),
       ]);
 
-      type Entry = {
-        address: `0x${string}`;
-        sources: DiscoverSource[];
-        market?: MarketToken;
-        launch?: PonsLaunch;
-        launchedAt?: bigint;
-      };
-
-      const merged = new Map<string, Entry>();
-
-      const entryFor = (address: `0x${string}`): Entry | undefined => {
-        const key = address.toLowerCase();
-        if (known.has(key)) return undefined;
-        const held = merged.get(key);
-        if (held) return held;
-        const created: Entry = { address, sources: [] };
-        merged.set(key, created);
-        return created;
-      };
-
-      for (const token of market) {
-        const entry = entryFor(token.address);
-        if (!entry) continue;
-        entry.market = token;
-        entry.sources.push("market");
-      }
-
-      for (const listing of launches.launches) {
-        const entry = entryFor(listing.address);
-        if (!entry) continue;
-        entry.launch = listing.launch;
-        entry.launchedAt = listing.block;
-        entry.sources.push("launchpad");
-      }
-
-      const entries = [...merged.values()].slice(0, MAX_RESOLVE);
-      const identities = await resolveIdentities(
-        client,
-        chainId,
-        entries.map((entry) => entry.address),
-      );
-
       const tokens: DiscoverToken[] = [];
-      for (const entry of entries) {
-        const identity = identities.get(entry.address.toLowerCase());
+      for (const entry of candidates) {
+        const key = entry.address.toLowerCase();
+        const identity = identities.get(key);
         if (!identity) continue;
+        const circulating = entry.marketCapUsd;
+        const cap = circulating ?? entry.fdvUsd;
+        if (cap === undefined) continue;
         tokens.push({
           ...identity,
-          sources: entry.sources,
-          market: entry.market,
-          launch: entry.launch,
-          launchedAt: entry.launchedAt,
+          market: entry,
+          marketCapUsd: cap,
+          diluted: circulating === undefined,
+          launch: launches.get(key),
         });
       }
 
-      tokens.sort(rank);
-
-      return {
-        tokens,
-        partial: launches.partial,
-        scannedBlocks: launches.scannedBlocks,
-        marketEmpty: market.length === 0,
-      };
+      /* `readMarketTokens` already ranked these, and nothing above reorders. */
+      return { tokens, rejected, marketEmpty: false };
     },
   });
 }
