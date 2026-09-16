@@ -13,10 +13,11 @@ import assert from "node:assert/strict";
 register("./ts-resolve.mjs", import.meta.url);
 
 const { scanBack, blockWindow } = await import("../src/lib/logscan.ts");
-const { indexPonsLaunches } = await import("../src/lib/launches.ts");
 const { discoverWalletTokens } = await import("../src/lib/discovery.ts");
-const { readMarketTokens } = await import("../src/lib/market.ts");
-const { PONS_V1_FACTORY, PONS_V2_FACTORY } = await import("../src/lib/pons.ts");
+const { readMarketTokens, tradeable } = await import("../src/lib/market.ts");
+const { readPonsLaunches, PONS_V1_FACTORY, PONS_V2_FACTORY } = await import(
+  "../src/lib/pons.ts"
+);
 const { CHAIN_ID, dexMeta } = await import("../src/lib/chains.ts");
 const { CHAIN_SLUG } = await import("../src/lib/tokenFeed.ts");
 
@@ -83,160 +84,9 @@ test("blockWindow stays inside its clamps whatever the block time", () => {
   assert.equal(blockWindow(CHAIN_ID, 0), 50_000n, "a zero-day window still has a floor");
 });
 
-/**
- * A stub chain. `getLogs` answers with the factory logs given, and `multicall`
- * answers `getLaunchedToken` from a fixture keyed by address, which is exactly
- * the authority the index defers to.
- */
-function stubClient({ logs, v1 = {}, v2 = {} }) {
-  return {
-    async getBlockNumber() {
-      return 1_000n;
-    },
-    async getLogs({ fromBlock, toBlock }) {
-      return logs.filter(
-        (log) => log.blockNumber >= fromBlock && log.blockNumber <= toBlock,
-      );
-    },
-    async multicall({ contracts }) {
-      return contracts.map((call) => {
-        const address = String(call.args[0]).toLowerCase();
-        if (call.functionName === "graduationStatus") {
-          return { status: "success", result: [0n, 0n, false] };
-        }
-        const table = call.address === PONS_V2_FACTORY ? v2 : v1;
-        const record = table[address];
-        return {
-          status: "success",
-          result: record ?? { exists: false },
-        };
-      });
-    },
-  };
-}
-
-function v1Record(token) {
-  return {
-    token,
-    deployer: DEPLOYER,
-    pairedToken: dexMeta(CHAIN_ID).wrapped,
-    restrictionsEndBlock: 0n,
-    supply: 1_000_000n,
-    poolFee: 10_000,
-    exists: true,
-  };
-}
-
-test("the launch index finds a token named in a log topic", async () => {
-  const client = stubClient({
-    logs: [
-      {
-        address: PONS_V1_FACTORY,
-        blockNumber: 990n,
-        topics: [topic("0xdead"), topic(TOKEN_A), topic(DEPLOYER)],
-        data: "0x",
-      },
-    ],
-    v1: { [TOKEN_A.toLowerCase()]: v1Record(TOKEN_A) },
-  });
-
-  const index = await indexPonsLaunches(client, CHAIN_ID);
-  assert.equal(index.launches.length, 1);
-  assert.equal(index.launches[0].address.toLowerCase(), TOKEN_A.toLowerCase());
-  assert.equal(index.launches[0].launch.gen, "v1");
-});
-
-test("the launch index finds a token named in a log's data instead", async () => {
-  const client = stubClient({
-    logs: [
-      {
-        address: PONS_V1_FACTORY,
-        blockNumber: 995n,
-        topics: [topic("0xbeef")],
-        // A deployer, the token, a fee tier and a supply, none of them indexed.
-        data: `0x${word(DEPLOYER)}${word(TOKEN_A)}${word("0x2710")}${"f".repeat(64)}`,
-      },
-    ],
-    v1: { [TOKEN_A.toLowerCase()]: v1Record(TOKEN_A) },
-  });
-
-  const index = await indexPonsLaunches(client, CHAIN_ID);
-  assert.deepEqual(
-    index.launches.map((entry) => entry.address.toLowerCase()),
-    [TOKEN_A.toLowerCase()],
-  );
-});
-
-test("only what the factory confirms survives the scan", async () => {
-  const venue = dexMeta(CHAIN_ID);
-  const client = stubClient({
-    logs: [
-      {
-        address: PONS_V2_FACTORY,
-        blockNumber: 999n,
-        topics: [topic("0xfeed"), topic(TOKEN_A), topic(CURVE)],
-        data: `0x${word(DEPLOYER)}${word(venue.wrapped)}${word(PONS_V1_FACTORY)}`,
-      },
-    ],
-    v2: {
-      [TOKEN_A.toLowerCase()]: {
-        token: TOKEN_A,
-        curve: CURVE,
-        deployer: DEPLOYER,
-        pairToken: "0x0000000000000000000000000000000000000000",
-        graduationThreshold: 1n,
-        poolFee: 10_000,
-        creatorTaxBps: 100,
-        phase: 0,
-        exists: true,
-      },
-      // The curve is a real contract the factory knows, but it is not a token.
-      [CURVE.toLowerCase()]: { exists: false },
-    },
-  });
-
-  const index = await indexPonsLaunches(client, CHAIN_ID);
-  assert.deepEqual(
-    index.launches.map((entry) => entry.address.toLowerCase()),
-    [TOKEN_A.toLowerCase()],
-    "the deployer, the wrapped native, the factory and the curve all drop out",
-  );
-  assert.equal(index.launches[0].launch.gen, "v2");
-  assert.equal(index.launches[0].launch.phase, "curve");
-});
-
-test("the launch index returns the newest mint first", async () => {
-  const client = stubClient({
-    logs: [
-      {
-        address: PONS_V1_FACTORY,
-        blockNumber: 100n,
-        topics: [topic("0xdead"), topic(TOKEN_A)],
-        data: "0x",
-      },
-      {
-        address: PONS_V1_FACTORY,
-        blockNumber: 900n,
-        topics: [topic("0xdead"), topic(TOKEN_B)],
-        data: "0x",
-      },
-    ],
-    v1: {
-      [TOKEN_A.toLowerCase()]: v1Record(TOKEN_A),
-      [TOKEN_B.toLowerCase()]: v1Record(TOKEN_B),
-    },
-  });
-
-  const index = await indexPonsLaunches(client, CHAIN_ID);
-  assert.deepEqual(
-    index.launches.map((entry) => entry.address.toLowerCase()),
-    [TOKEN_B.toLowerCase(), TOKEN_A.toLowerCase()],
-  );
-});
-
 /*
- * The wallet scan shares `scanBack` with the index above, so these guard the
- * two filters that make it a token scan rather than a log dump.
+ * The wallet scan is the other caller of `scanBack`, so these guard the two
+ * filters that make it a token scan rather than a log dump.
  */
 const HOLDER = "0x5555555555555555555555555555555555555555";
 
@@ -298,15 +148,53 @@ test("the wallet scan skips NFT transfers and empty balances", async () => {
   assert.equal(result.tokens[0].balance, 42n);
 });
 
+/**
+ * The launchpad as the app now uses it: not a source of rows, but the one
+ * authority on whether a row it was handed is a Pons mint. Asked of the factory
+ * directly, which cannot be wrong about its own mints.
+ */
+test("the launchpad confirms its own mints and disowns everything else", async () => {
+  const client = {
+    async multicall({ contracts }) {
+      return contracts.map((call) => {
+        const token = String(call.args[0]).toLowerCase();
+        if (call.functionName === "graduationStatus") {
+          return { status: "success", result: [0n, 0n, false] };
+        }
+        if (call.address === PONS_V2_FACTORY || token !== TOKEN_A.toLowerCase()) {
+          return { status: "success", result: { exists: false } };
+        }
+        return {
+          status: "success",
+          result: {
+            token: TOKEN_A,
+            deployer: DEPLOYER,
+            pairedToken: dexMeta(CHAIN_ID).wrapped,
+            restrictionsEndBlock: 0n,
+            supply: 1_000_000n,
+            poolFee: 10_000,
+            exists: true,
+          },
+        };
+      });
+    },
+  };
+
+  const found = await readPonsLaunches(client, [TOKEN_A, TOKEN_B]);
+  assert.equal(found.size, 1);
+  assert.equal(found.get(TOKEN_A.toLowerCase()).gen, "v1");
+  assert.equal(found.get(TOKEN_B.toLowerCase()), undefined);
+});
+
 /** A DexScreener pair, shaped the way the documented search response is. */
-function pair({ base, quote, liquidity, chain = CHAIN_SLUG }) {
+function pair({ base, quote, liquidity, volume = liquidity * 2, chain = CHAIN_SLUG }) {
   return {
     chainId: chain,
     baseToken: { address: base, symbol: "MEME", name: "Meme Token" },
     quoteToken: { address: quote, symbol: "WETH", name: "Wrapped Ether" },
     priceUsd: "0.5",
     liquidity: { usd: liquidity },
-    volume: { h24: liquidity * 2 },
+    volume: { h24: volume },
     priceChange: { h24: 12.5 },
     fdv: liquidity * 10,
   };
@@ -351,22 +239,66 @@ test("the market read ignores pairs from another chain", async () => {
   assert.deepEqual(tokens, [], "an address is not unique across chains");
 });
 
-test("the market read keeps the deepest pair and ranks by depth", async () => {
+test("the market read keeps the deepest pair for a token", async () => {
   const wrapped = dexMeta(CHAIN_ID).wrapped;
   const tokens = await withFetch(
     [
       pair({ base: TOKEN_A, quote: wrapped, liquidity: 100 }),
       pair({ base: TOKEN_A, quote: wrapped, liquidity: 8_000 }),
-      pair({ base: TOKEN_B, quote: wrapped, liquidity: 3_000 }),
+    ],
+    () => readMarketTokens([wrapped]),
+  );
+
+  assert.equal(tokens.length, 1);
+  assert.equal(tokens[0].liquidityUsd, 8_000, "the shallow pair must not win");
+});
+
+test("the market read ranks by what changed hands, not by what sits in the pool", async () => {
+  const wrapped = dexMeta(CHAIN_ID).wrapped;
+  const tokens = await withFetch(
+    [
+      // Deep but barely traded: a launch can mint itself any amount of depth.
+      pair({ base: TOKEN_A, quote: wrapped, liquidity: 90_000, volume: 200 }),
+      pair({ base: TOKEN_B, quote: wrapped, liquidity: 4_000, volume: 60_000 }),
     ],
     () => readMarketTokens([wrapped]),
   );
 
   assert.deepEqual(
     tokens.map((token) => token.address.toLowerCase()),
-    [TOKEN_A.toLowerCase(), TOKEN_B.toLowerCase()],
+    [TOKEN_B.toLowerCase(), TOKEN_A.toLowerCase()],
   );
-  assert.equal(tokens[0].liquidityUsd, 8_000, "the shallow pair must not win");
+});
+
+/*
+ * The gate that decides what gets offered. Each of these contracts is real and
+ * reachable by pasting its address; none of them is a row worth putting in
+ * front of someone who is browsing.
+ */
+test("a token is offered only with a pool, a day's volume and a cap", () => {
+  const whole = { liquidityUsd: 5_000, volume24hUsd: 900, marketCapUsd: 40_000 };
+  assert.equal(tradeable(whole), true);
+
+  assert.equal(
+    tradeable({ ...whole, liquidityUsd: undefined }),
+    false,
+    "no pool means it cannot be bought",
+  );
+  assert.equal(
+    tradeable({ ...whole, volume24hUsd: 0 }),
+    false,
+    "a pool nobody has traded in a day is a pool nobody wants",
+  );
+  assert.equal(
+    tradeable({ ...whole, marketCapUsd: undefined, fdvUsd: undefined }),
+    false,
+    "no cap means nothing says what buying it would be buying into",
+  );
+  assert.equal(
+    tradeable({ ...whole, marketCapUsd: undefined, fdvUsd: 120_000 }),
+    true,
+    "a diluted cap is still a cap",
+  );
 });
 
 test("a feed that will not answer costs the list and nothing else", async () => {

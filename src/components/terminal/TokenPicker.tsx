@@ -4,9 +4,10 @@ import { useMemo, useState } from "react";
 import { isAddress } from "viem";
 import { usePublicClient } from "wagmi";
 import { Icon } from "@/components/ui/Icon";
+import { IconButton } from "@/components/ui/IconButton";
 import { Sheet } from "@/components/ui/Sheet";
 import { formatCompactMoney } from "@/lib/currency";
-import { formatSigned, truncateAddress } from "@/lib/format";
+import { truncateAddress } from "@/lib/format";
 import { memeSignal } from "@/lib/memecoin";
 import type { PonsLaunch } from "@/lib/pons";
 import { readToken, searchTokens, type Token } from "@/lib/tokens";
@@ -170,8 +171,8 @@ export function TokenPicker({
         {/*
          * Everything below this line is on the chain but not in the app's list.
          * The heading says so plainly: these rows were not vetted by anyone,
-         * they were found — by an indexer that knows what trades, and by the
-         * launchpad's own record of what it minted.
+         * they were found — by an indexer that knows what trades, and kept only
+         * where a pool, a day's volume and a cap agree that a market exists.
          */}
         {discovered.length > 0 && (
           <div className="flex items-center justify-between gap-2 border-b border-line bg-line/20 px-3 py-1.5">
@@ -183,24 +184,13 @@ export function TokenPicker({
         )}
 
         {discovered.map((token) => (
-          <button
+          <DiscoverRow
             key={token.address}
-            type="button"
-            className="row-link flex w-full items-center gap-3 border-b border-line px-3 py-2.5"
-            onClick={() => takeDiscovered(token)}
-          >
-            <span className="ticker">{token.symbol}</span>
-            <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5 text-left">
-              <span className="flex min-w-0 max-w-full items-center gap-1.5">
-                <span className="truncate text-[12px] text-dim">{token.name}</span>
-                <TokenTags token={token} listed={listed} launch={token.launch} />
-              </span>
-              <span className="num text-[10px] text-faint">
-                {truncateAddress(token.address, 6, 4)}
-              </span>
-            </span>
-            <DiscoverStat token={token} money={{ currency, fx, locale }} />
-          </button>
+            token={token}
+            listed={listed}
+            money={{ currency, fx, locale }}
+            onSelect={takeDiscovered}
+          />
         ))}
 
         {empty && (
@@ -239,8 +229,8 @@ export function TokenPicker({
       {/*
        * The footer states what the list is and is not. A reader who opens this
        * and sees forty rows where there used to be three is owed the reason:
-       * nothing here was curated, the scan reaches back only so far, and a
-       * quiet feed means the traded half of the list is missing entirely.
+       * nothing here was curated, what has no market was dropped rather than
+       * ranked last, and a quiet feed means there is nothing here at all.
        */}
       {chainId && (
         <div className="flex items-center justify-between gap-3 border-t border-line px-3 py-2">
@@ -250,64 +240,141 @@ export function TokenPicker({
               : discover.data?.marketEmpty
                 ? t("token.discoverChainOnly")
                 : t("token.discoverNote")}
-            {discover.data?.partial ? ` ${t("token.discoverPartial")}` : ""}
+            {discover.data?.rejected
+              ? ` ${t("token.discoverFiltered", { count: discover.data.rejected })}`
+              : ""}
           </p>
-          <button
-            type="button"
-            className="btn btn-sm shrink-0"
+          <IconButton
+            icon="refresh"
+            act="spin"
+            busy={discover.isFetching}
             onClick={() => void discover.refetch()}
             disabled={discover.isFetching}
             aria-label={t("common.refresh")}
-          >
-            <Icon name="refresh" size={13} />
-          </button>
+            title={t("common.refresh")}
+          />
         </div>
       )}
     </Sheet>
   );
 }
 
+type Money = Parameters<typeof formatCompactMoney>[1];
+
 /**
- * The one number a discovered row is worth carrying.
+ * A discovered row, which is not a holdings row and must not read like one.
  *
- * Depth, not price: a price is market cap divided by a supply each launch picks
- * arbitrarily, so it ranks nothing, while the dollars in a token's deepest pair
- * say how much of it can actually be bought. A launch with no pool yet has no
- * depth at all, and says that rather than printing a zero — on this chain being
- * minutes old is the whole attraction, not a defect.
+ * A holding answers "what do I have": an amount, what it is worth, how it moved
+ * since yesterday. A row here answers a different question — whether this is a
+ * thing at all — and the three figures that answer it are the day's volume, the
+ * cap, and the fully diluted cap beside it. Price is deliberately absent: it is
+ * the cap divided by a supply each launch picks arbitrarily, so two tokens at
+ * the same price are not comparable and two at the same cap are.
+ *
+ * The contract address gets its own button rather than a line of text. It is
+ * the thing a reader takes somewhere else — an explorer, a chart, a group chat
+ * — and on a chain where tickers are duplicated deliberately it is the only
+ * part of the row that identifies the token.
  */
-function DiscoverStat({
+function DiscoverRow({
   token,
+  listed,
   money,
+  onSelect,
 }: {
   token: DiscoverToken;
-  money: Parameters<typeof formatCompactMoney>[1];
+  listed?: Set<string>;
+  money: Money;
+  onSelect: (token: DiscoverToken) => void;
 }) {
   const { t } = useI18n();
-  const depth = token.market?.liquidityUsd;
-  const change = token.market?.change24h;
-
-  if (depth === undefined) {
-    return (
-      <span className="lbl shrink-0 text-faint" title={t("token.discoverFreshHint")}>
-        {t("token.discoverFresh")}
-      </span>
-    );
-  }
+  const { volume24hUsd, fdvUsd } = token.market;
 
   return (
-    <span className="flex shrink-0 flex-col items-end gap-0.5">
-      <span className="num text-[11px]" title={t("token.discoverDepthHint")}>
-        {formatCompactMoney(depth, money)}
-      </span>
-      <span
-        className={`num text-[10px] ${
-          change === undefined ? "text-faint" : change >= 0 ? "long" : "short"
-        }`}
+    <div className="flex items-center border-b border-line pr-2">
+      <button
+        type="button"
+        className="row-link flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5"
+        onClick={() => onSelect(token)}
       >
-        {change === undefined ? "—" : formatSigned(change)}
-      </span>
+        <span className="ticker">{token.symbol}</span>
+        <span className="flex min-w-0 flex-1 flex-col items-start gap-1 text-left">
+          <span className="flex min-w-0 max-w-full items-center gap-1.5">
+            <span className="truncate text-[12px] text-dim">{token.name}</span>
+            <TokenTags token={token} listed={listed} launch={token.launch} />
+          </span>
+          <span className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5">
+            <Stat
+              label={t("token.discoverVolume")}
+              value={formatCompactMoney(volume24hUsd, money)}
+              hint={t("token.discoverVolumeHint")}
+            />
+            <Stat
+              /* The feed reports a circulating cap when it can work one out;
+                 where it cannot, the figure is diluted and says so rather than
+                 passing itself off as the smaller number. */
+              label={token.diluted ? t("token.discoverFdv") : t("token.discoverMc")}
+              value={formatCompactMoney(token.marketCapUsd, money)}
+              hint={
+                token.diluted ? t("token.discoverFdvHint") : t("token.discoverMcHint")
+              }
+            />
+            {!token.diluted && fdvUsd !== undefined && (
+              <Stat
+                label={t("token.discoverFdv")}
+                value={formatCompactMoney(fdvUsd, money)}
+                hint={t("token.discoverFdvHint")}
+              />
+            )}
+          </span>
+        </span>
+      </button>
+      <CopyAddress address={token.address} />
+    </div>
+  );
+}
+
+function Stat({ label, value, hint }: { label: string; value: string; hint: string }) {
+  return (
+    <span className="flex items-baseline gap-1" title={hint}>
+      <span className="lbl text-faint">{label}</span>
+      <span className="num text-[10px]">{value}</span>
     </span>
+  );
+}
+
+/**
+ * Copies the contract address, and says the address it copied.
+ *
+ * A clipboard write can be refused — an insecure origin, a browser that wants a
+ * gesture it did not see — and a button that flashed "copied" either way would
+ * send a reader off to paste nothing into an explorer.
+ */
+function CopyAddress({ address }: { address: `0x${string}` }) {
+  const { t } = useI18n();
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(address);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  return (
+    <IconButton
+      icon={copied ? "check" : "copy"}
+      onClick={() => void copy()}
+      aria-label={t("token.copyAddress", { address: truncateAddress(address, 6, 4) })}
+      title={
+        copied
+          ? t("common.copied")
+          : t("token.copyAddress", { address: truncateAddress(address, 6, 4) })
+      }
+    />
   );
 }
 
