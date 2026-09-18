@@ -6,7 +6,7 @@ import { Icon } from "@/components/ui/Icon";
 import { Row } from "@/components/ui/Panel";
 import { Segmented } from "@/components/ui/Segmented";
 import { formatAmount } from "@/lib/format";
-import { SLIPPAGE, floorFor } from "@/lib/venue";
+import { SLIPPAGE_FLOOR, floorFor, slippageFor, tooThin } from "@/lib/venue";
 import { useRoutes, useSwapAction } from "@/hooks/useSwap";
 import type { Holding } from "@/hooks/useHoldings";
 import { useI18n } from "@/hooks/useI18n";
@@ -38,7 +38,6 @@ export function SwapPanel({ row, onSold }: { row: Holding; onSold: () => void })
   const { t } = useI18n();
   const [typed, setTyped] = useState("");
   const [exit, setExit] = useState<string>();
-  const [slippage, setSlippage] = useState<number>(SLIPPAGE[1]);
 
   const amountIn = useMemo(() => {
     const clean = typed.replace(",", ".").trim();
@@ -69,6 +68,9 @@ export function SwapPanel({ row, onSold }: { row: Holding; onSold: () => void })
 
   const chosen = tradable.find((option) => option.address === exit) ?? tradable[0];
   const route = settled > 0n && chosen ? bestFor(chosen) : undefined;
+  /* Worked out from the pool rather than asked for — see `slippageFor`. */
+  const slippage = route ? slippageFor(route.impactBps) : SLIPPAGE_FLOOR;
+  const thin = route !== undefined && tooThin(route.impactBps);
   const floor = route ? floorFor(route.amountOut, slippage) : 0n;
 
   const tooMuch = settled > row.raw;
@@ -78,7 +80,7 @@ export function SwapPanel({ row, onSold }: { row: Holding; onSold: () => void })
   const { approved, approve, approving, send, sending, done, blocked, checking, failure } =
     useSwapAction({
       token: row.address,
-      route: tooMuch ? undefined : route,
+      route: tooMuch || thin ? undefined : route,
       amountIn: settled,
       slippageBps: slippage,
       onDone: onSold,
@@ -96,7 +98,7 @@ export function SwapPanel({ row, onSold }: { row: Holding; onSold: () => void })
     );
   }
 
-  const ready = settled > 0n && steady && !tooMuch && route !== undefined;
+  const ready = settled > 0n && steady && !tooMuch && !thin && route !== undefined;
 
   return (
     <div className="mt-4">
@@ -140,13 +142,6 @@ export function SwapPanel({ row, onSold }: { row: Holding; onSold: () => void })
           </>
         )}
 
-        <p className="lbl mt-3 mb-1.5">{t("swap.slippage")}</p>
-        <Segmented
-          options={SLIPPAGE.map((bps) => ({ value: String(bps), label: `${percent(bps)}%` }))}
-          value={String(slippage)}
-          onChange={(value) => setSlippage(Number(value))}
-        />
-
         <div className="mt-3">
           <Row
             k={t("swap.receive")}
@@ -169,6 +164,15 @@ export function SwapPanel({ row, onSold }: { row: Holding; onSold: () => void })
             }
           />
           <Row
+            k={t("swap.impact")}
+            v={<span className="num">{route ? `${percent(route.impactBps)}%` : "—"}</span>}
+            tone={route && route.impactBps >= 100 ? "warn" : undefined}
+          />
+          <Row
+            k={t("swap.slippage")}
+            v={<span className="num">{route ? `${percent(slippage)}%` : "—"}</span>}
+          />
+          <Row
             k={t("swap.pool")}
             v={route ? t("swap.venue", { fee: percent(route.fee / 100) }) : "—"}
           />
@@ -176,6 +180,16 @@ export function SwapPanel({ row, onSold }: { row: Holding; onSold: () => void })
       </div>
 
       {tooMuch && <p className="warn mt-2 text-[11px]">{t("swap.tooMuch")}</p>}
+
+      {thin && !tooMuch && (
+        <div className="panel mt-2 flex items-start gap-3 p-3">
+          <Icon name="alert" size={16} className="mt-0.5 warn shrink-0" />
+          <div className="min-w-0">
+            <p className="warn text-[12px] font-semibold">{t("swap.thin")}</p>
+            <p className="mt-1 text-[11px] leading-relaxed text-dim">{t("swap.thinHint")}</p>
+          </div>
+        </div>
+      )}
 
       {blocked && (
         <div className="panel mt-2 flex items-start gap-3 p-3">
@@ -189,8 +203,12 @@ export function SwapPanel({ row, onSold }: { row: Holding; onSold: () => void })
 
       {failure && <p className="warn mt-2 text-[11px]">{t("swap.failed")}</p>}
 
+      {route && !thin && (
+        <p className="mt-3 text-[11px] leading-relaxed text-faint">{t("swap.slippageAuto")}</p>
+      )}
+
       {!approved && ready && (
-        <p className="mt-3 text-[11px] leading-relaxed text-faint">{t("swap.approveWhy")}</p>
+        <p className="mt-2 text-[11px] leading-relaxed text-faint">{t("swap.approveWhy")}</p>
       )}
 
       <button

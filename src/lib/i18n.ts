@@ -106,6 +106,18 @@ const en = {
   "swap.failed": "The transaction did not go through.",
   "swap.risky": "This token is marked above. Read that before selling into it.",
 
+  "swap.impact": "Price impact",
+  "swap.thin": "This pool cannot take a trade this size",
+  "swap.thinHint":
+    "The price it would fill at is far enough from the going rate that no tolerance worth offering would cover it. A smaller amount will find a better one.",
+  "swap.slippageAuto":
+    "The bound is read off how far this pool moves under this trade, so there is nothing here to choose.",
+  "balance.hide": "Hide from this list",
+  "balance.unhide": "List it again",
+  "balance.hideHint":
+    "The token stays in the wallet and stays sellable. Hiding it only stops this screen listing it, and keeps it out of the total.",
+  "balance.hidden": "{count} hidden",
+  "balance.hiddenLess": "Put the hidden ones away",
   "settings.title": "Settings",
   "settings.subtitle": "How the app reads on this device",
   "settings.appearance": "Appearance",
@@ -260,6 +272,18 @@ const id: Record<TKey, string> = {
   "swap.failed": "Transaksinya tidak tembus.",
   "swap.risky": "Token ini ditandai di atas. Baca dulu sebelum menjual ke dalamnya.",
 
+  "swap.impact": "Dampak harga",
+  "swap.thin": "Pool ini tidak sanggup menampung transaksi sebesar ini",
+  "swap.thinHint":
+    "Harga jadinya terlalu jauh dari harga berjalan, sampai tidak ada toleransi yang pantas ditawarkan untuk menutupinya. Jumlah yang lebih kecil akan dapat harga lebih baik.",
+  "swap.slippageAuto":
+    "Batasnya dibaca dari seberapa jauh pool ini bergeser oleh transaksi ini, jadi tidak ada yang perlu kamu pilih di sini.",
+  "balance.hide": "Sembunyikan dari daftar ini",
+  "balance.unhide": "Tampilkan lagi",
+  "balance.hideHint":
+    "Tokennya tetap ada di dompet dan tetap bisa dijual. Menyembunyikan hanya membuat layar ini berhenti mendaftarnya, dan mengeluarkannya dari total.",
+  "balance.hidden": "{count} disembunyikan",
+  "balance.hiddenLess": "Simpan lagi yang disembunyikan",
   "settings.title": "Pengaturan",
   "settings.subtitle": "Cara aplikasi ini tampil di perangkatmu",
   "settings.appearance": "Tampilan",

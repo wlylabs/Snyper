@@ -71,8 +71,43 @@ export const factoryAbi = parseAbi([
   "function getPool(address tokenA, address tokenB, uint24 fee) view returns (address pool)",
 ]);
 
-/** Bounds offered for how far a fill may drift before it is refused. */
-export const SLIPPAGE = [50, 100, 500] as const;
+/** The least this will ever accept, for a pool deep enough not to move. */
+export const SLIPPAGE_FLOOR = 50;
+
+/**
+ * The most it will accept before refusing to guess.
+ *
+ * Past five percent the number stops being a tolerance and starts being a
+ * haircut, and a reader clicking through a control they were handed has no way
+ * to tell the difference. A trade that needs more than this is a trade against
+ * a pool too thin to price, and the screen says so instead.
+ */
+export const SLIPPAGE_CEILING = 500;
+
+/**
+ * How far a fill may drift, worked out rather than asked for.
+ *
+ * Slippage is a bet on how much the pool will move between the quote and the
+ * block the swap lands in, and a reader has no way to price that. What they
+ * are usually handed instead is three buttons and the hope that they pick the
+ * one that neither fails nor gets them sandwiched.
+ *
+ * The pool answers it better than they can. Quoting the trade beside a
+ * hundredth of itself gives the price the trade moves through — thin pools
+ * move a lot, deep ones barely at all — and a pool that swallows this trade
+ * whole is a pool that will not have wandered far by the next block either.
+ * So the floor is what a deep pool gets, and the margin above it is set by
+ * what this trade already costs itself, with half again for the wait.
+ */
+export function slippageFor(impactBps: number): number {
+  const need = SLIPPAGE_FLOOR + Math.ceil((Math.max(impactBps, 0) * 3) / 2);
+  return Math.min(need, SLIPPAGE_CEILING);
+}
+
+/** Whether the pool is too thin for any tolerance worth offering. */
+export function tooThin(impactBps: number): boolean {
+  return slippageFor(impactBps) >= SLIPPAGE_CEILING;
+}
 
 /** Basis points, applied to a quote to get the floor a swap will accept. */
 export function floorFor(amountOut: bigint, slippageBps: number): bigint {

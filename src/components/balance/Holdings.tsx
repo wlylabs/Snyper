@@ -11,6 +11,7 @@ import { useHoldings, type Holding } from "@/hooks/useHoldings";
 import { SwapPanel } from "./SwapPanel";
 import { useI18n } from "@/hooks/useI18n";
 import { useMounted } from "@/hooks/useMounted";
+import { useAppStore } from "@/store/useAppStore";
 
 /**
  * What a holding has to be worth to earn a row.
@@ -40,6 +41,7 @@ function HoldingRow({
   value,
   unconfirmed,
   flagged,
+  dimmed,
   onClick,
 }: {
   title: string;
@@ -48,6 +50,8 @@ function HoldingRow({
   value: string;
   unconfirmed?: string;
   flagged?: boolean;
+  /** Hidden, and being looked at anyway. */
+  dimmed?: boolean;
   onClick?: () => void;
 }) {
   const inner = (
@@ -78,7 +82,7 @@ function HoldingRow({
   if (!onClick) return <span className="tile cursor-default">{inner}</span>;
 
   return (
-    <button type="button" className="tile" onClick={onClick}>
+    <button type="button" className={`tile ${dimmed ? "opacity-55" : ""}`} onClick={onClick}>
       {inner}
       <Icon name="chevron" size={13} className="-rotate-90 shrink-0 text-faint" />
     </button>
@@ -114,6 +118,7 @@ function TokenSheet({
   onSold: () => void;
 }) {
   const { t } = useI18n();
+  const setHidden = useAppStore((state) => state.setHidden);
   const [copied, setCopied] = useState(false);
 
   if (!row) return null;
@@ -201,6 +206,21 @@ function TokenSheet({
         </div>
 
         <SwapPanel row={row} onSold={onSold} />
+
+        {/*
+         * At the bottom, under everything this token can be made to do, because
+         * it is the one control here that takes the token off the screen — and
+         * it is worth reading what it does not do before pressing it.
+         */}
+        <button
+          type="button"
+          className="tile mt-4"
+          onClick={() => setHidden(row.address, !row.hidden)}
+        >
+          <Icon name="hide" size={14} className="text-dim" />
+          <span className="flex-1">{row.hidden ? t("balance.unhide") : t("balance.hide")}</span>
+        </button>
+        <p className="mt-2 text-[11px] leading-relaxed text-faint">{t("balance.hideHint")}</p>
       </div>
     </Sheet>
   );
@@ -211,7 +231,15 @@ export function Holdings() {
   const { t } = useI18n();
   const prompt = useConnectPrompt();
   const [expanded, setExpanded] = useState(false);
-  const [opened, setOpened] = useState<Holding>();
+  const [showHidden, setShowHidden] = useState(false);
+  /*
+   * The address rather than the row, so the sheet reads the live holding. Held
+   * as a copy, it froze: hiding a token from inside its own sheet left the
+   * button still offering to hide it, because the row it was reading had been
+   * taken at the moment of the tap and nothing after that reached it — and a
+   * sale would have left the amount above it stale in the same way.
+   */
+  const [openedToken, setOpenedToken] = useState<string>();
   const { address, holdings, native, nativeValue, total, loading, error, refetch } = useHoldings();
 
   const meta = chainMeta(CHAIN_ID);
@@ -259,14 +287,19 @@ export function Holdings() {
      * out why a transaction will not sign.
      */
     const hasCoin = native !== undefined && Number(native.formatted) > 0;
-    const listed = holdings.filter((row) => (row.value ?? 0) >= DOLLAR);
-    const folded = holdings.filter((row) => (row.value ?? 0) < DOLLAR);
+    const put = holdings.filter((row) => !row.hidden);
+    const away = holdings.filter((row) => row.hidden);
+    const listed = put.filter((row) => (row.value ?? 0) >= DOLLAR);
+    const folded = put.filter((row) => (row.value ?? 0) < DOLLAR);
 
     if (!hasCoin && holdings.length === 0) {
       return <Empty title={t("balance.empty")} hint={t("balance.emptyHint")} />;
     }
 
-    const shown = expanded ? [...listed, ...folded] : listed;
+    const shown = [
+      ...(expanded ? [...listed, ...folded] : listed),
+      ...(showHidden ? away : []),
+    ];
 
     return (
       <div className="flex flex-col gap-1.5">
@@ -291,10 +324,11 @@ export function Holdings() {
                   : row.name
             }
             flagged={Boolean(row.suspicion)}
+            dimmed={row.hidden}
             amount={formatAmount(row.amount)}
             value={usd(row.value)}
             unconfirmed={row.confirmed ? undefined : t("balance.unconfirmed")}
-            onClick={() => setOpened(row)}
+            onClick={() => setOpenedToken(row.address)}
           />
         ))}
 
@@ -310,6 +344,22 @@ export function Holdings() {
               size={13}
               className={expanded ? "rotate-180 text-faint" : "text-faint"}
             />
+          </button>
+        )}
+
+        {/*
+         * Its own line rather than folded in with the small holdings: those are
+         * out of the way because they are not worth a row, and these are out of
+         * the way because the reader said so. Two different sentences.
+         */}
+        {away.length > 0 && (
+          <button
+            type="button"
+            className="tile justify-center text-dim"
+            onClick={() => setShowHidden((open) => !open)}
+          >
+            {showHidden ? t("balance.hiddenLess") : t("balance.hidden", { count: away.length })}
+            <Icon name="hide" size={13} className="text-faint" />
           </button>
         )}
       </div>
@@ -335,8 +385,8 @@ export function Holdings() {
       <Panel label={t("balance.holdings")}>{body()}</Panel>
 
       <TokenSheet
-        row={opened}
-        onClose={() => setOpened(undefined)}
+        row={holdings.find((row) => row.address === openedToken)}
+        onClose={() => setOpenedToken(undefined)}
         onSold={refetch}
       />
     </div>
