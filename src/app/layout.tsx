@@ -1,7 +1,31 @@
 import type { Metadata, Viewport } from "next";
+import { Archivo, JetBrains_Mono } from "next/font/google";
 import { Providers } from "./providers";
 import { AppShell } from "@/components/shell/AppShell";
+import { PRIVY_CONFIGURED } from "@/lib/privy";
 import "./globals.css";
+
+/*
+ * Both faces are self-hosted rather than linked from fonts.googleapis.com.
+ * A stylesheet link to a third party is render-blocking and costs a DNS
+ * lookup and a TLS handshake to a host the browser has no connection to yet,
+ * on the same critical path as the header the connect control sits in.
+ * `next/font` inlines the @font-face rules, serves the files from this origin,
+ * and ships a metric-matched fallback so the swap does not move the layout.
+ */
+const archivo = Archivo({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+  variable: "--font-archivo",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  display: "swap",
+  variable: "--font-jetbrains-mono",
+});
 
 const description =
   "Non-custodial Robinhood Chain app. Connect a wallet — browser, mobile, or one Privy creates on the spot — and the session is yours on any device.";
@@ -74,14 +98,30 @@ const installBoot = `(function(){window.__snyperInstallPrompt=null;window.addEve
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" data-theme="dark" suppressHydrationWarning>
+    <html
+      lang="en"
+      data-theme="dark"
+      className={`${archivo.variable} ${jetbrainsMono.variable}`}
+      suppressHydrationWarning
+    >
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
-        />
+        {/*
+         * Privy opens a connection to its API the moment its provider mounts —
+         * that call is what restores a returning reader's session, and until it
+         * answers the header holds a skeleton where their address belongs. The
+         * handshake for it is started here instead, in parallel with the
+         * download and parse of the SDK that will make the call, so by the time
+         * Privy asks the socket is already open. The hosts are the ones Privy
+         * names in its own CSP guidance: the API, the captcha it fronts logins
+         * with, and the registry the WalletConnect list is read from.
+         */}
+        {PRIVY_CONFIGURED && (
+          <>
+            <link rel="preconnect" href="https://auth.privy.io" crossOrigin="anonymous" />
+            <link rel="preconnect" href="https://challenges.cloudflare.com" />
+            <link rel="dns-prefetch" href="https://explorer-api.walletconnect.com" />
+          </>
+        )}
         <script dangerouslySetInnerHTML={{ __html: themeBoot }} />
         <script dangerouslySetInnerHTML={{ __html: installBoot }} />
       </head>

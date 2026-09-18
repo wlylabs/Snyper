@@ -1,4 +1,4 @@
-import type { PrivyClientConfig } from "@privy-io/react-auth";
+import type { PrivyClientConfig, WalletListEntry } from "@privy-io/react-auth";
 import { CHAIN, SUPPORTED_CHAINS } from "./chains";
 import { translate, type Locale } from "./i18n";
 
@@ -60,6 +60,26 @@ function BrandLockup() {
 }
 
 /**
+ * What the last row of the wallet list should be, given the pointer in front of
+ * it.
+ *
+ * `wallet_connect` is the whole WalletConnect registry — every wallet that
+ * supports the chain, a few hundred of them, fetched from
+ * `explorer-api.walletconnect.com` and paged through in the modal. On a phone
+ * that list is the point: it is how a reader gets deep-linked into the wallet
+ * app they already have open.
+ *
+ * On a desktop none of those wallets are on the machine. Every one of those
+ * rows leads to the same place — a QR code to scan with the phone — so the
+ * registry is several hundred choices that resolve to one action.
+ * `wallet_connect_qr` is that action, as a single button, with no registry to
+ * fetch and nothing to scroll.
+ */
+function pairingEntry(touch: boolean): WalletListEntry {
+  return touch ? "wallet_connect" : "wallet_connect_qr";
+}
+
+/**
  * Login surface. The wallet row comes first because most readers arrive with
  * one; email and Google are there so someone who does not can still trade from
  * an embedded wallet Privy creates for them on the spot.
@@ -69,8 +89,14 @@ function BrandLockup() {
  * custom properties at the app's tokens. This side sets what Privy cannot read
  * off a stylesheet — the mark, the copy, and which wallets are worth offering
  * on a Robinhood Chain terminal.
+ *
+ * @param touch Whether the reader is on a coarse pointer — see `pairingEntry`.
  */
-export function privyConfig(theme: "dark" | "light", locale: Locale): PrivyClientConfig {
+export function privyConfig(
+  theme: "dark" | "light",
+  locale: Locale,
+  touch: boolean,
+): PrivyClientConfig {
   return {
     appearance: {
       theme,
@@ -83,12 +109,12 @@ export function privyConfig(theme: "dark" | "light", locale: Locale): PrivyClien
       showWalletLoginFirst: true,
       // The chain's own wallet leads, ahead of the usual browser extensions.
       walletList: [
-        "detected_wallets",
+        "detected_ethereum_wallets",
         "robinhood_wallet",
         "metamask",
         "coinbase_wallet",
         "rainbow",
-        "wallet_connect",
+        pairingEntry(touch),
       ],
     },
     loginMethods: ["wallet", "email", "google"],
