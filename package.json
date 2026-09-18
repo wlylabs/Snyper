@@ -13,6 +13,7 @@
     "@privy-io/react-auth": "^3.42.0",
     "@privy-io/wagmi": "^4.0.17",
     "@tanstack/react-query": "^5.102.8",
+    "lightweight-charts": "^5.2.1",
     "next": "^16.3.5",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",

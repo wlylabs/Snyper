@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { Icon } from "@/components/ui/Icon";
 import { Empty, Panel, Row, Skeleton } from "@/components/ui/Panel";
 import { Segmented } from "@/components/ui/Segmented";
@@ -19,6 +20,21 @@ import {
 import { useScreener, type Pair } from "@/hooks/useScreener";
 import { useI18n } from "@/hooks/useI18n";
 import { useMounted } from "@/hooks/useMounted";
+
+/**
+ * The chart is fetched only once a pair is opened.
+ *
+ * It carries a charting library and the query that feeds it, and neither is
+ * wanted by a reader scrolling the list — which is most of them, most of the
+ * time. Behind a dynamic import it stays off the bundle the screen opens with.
+ */
+const PairChart = dynamic(() => import("./PairChart").then((module) => module.PairChart), {
+  ssr: false,
+  loading: () => <Skeleton className="h-[190px] w-full rounded-[var(--radius-xs)]" />,
+});
+
+/** Where the rest of the market is already looking at this pair. */
+const DEXSCREENER = "https://dexscreener.com/robinhood";
 
 /** Under this many minutes old, a pair is still announcing itself. */
 const FRESH = 180;
@@ -110,6 +126,10 @@ function PairSheet({ pair, onClose }: { pair: Pair | undefined; onClose: () => v
       </div>
 
       <div className="px-3 pb-4">
+        <div className="mb-3">
+          <PairChart pair={pair} />
+        </div>
+
         <Panel>
           <Row k={t("memecoin.fdv")} v={<span className="num">{usd(pair.fdv)}</span>} />
           <Row
@@ -132,15 +152,31 @@ function PairSheet({ pair, onClose }: { pair: Pair | undefined; onClose: () => v
           />
         </Panel>
 
-        <a
-          href={explorerAddress(CHAIN_ID, pair.token)}
-          target="_blank"
-          rel="noreferrer"
-          className="tile mt-3 justify-center"
-        >
-          <Icon name="external" size={14} className="text-dim" />
-          {t("common.explorer")}
-        </a>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <a
+            href={explorerAddress(CHAIN_ID, pair.token)}
+            target="_blank"
+            rel="noreferrer"
+            className="tile justify-center"
+          >
+            <Icon name="external" size={14} className="text-dim" />
+            {t("common.explorer")}
+          </a>
+          {/*
+           * Out to the pair's own page, by pool address rather than by token:
+           * a token with several pools has a page per pool there, and the one
+           * worth opening is the one this row was built from.
+           */}
+          <a
+            href={`${DEXSCREENER}/${pair.pool}`}
+            target="_blank"
+            rel="noreferrer"
+            className="tile justify-center"
+          >
+            <Icon name="candles" size={14} className="text-dim" />
+            {t("memecoin.dexscreener")}
+          </a>
+        </div>
       </div>
     </Sheet>
   );
