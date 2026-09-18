@@ -55,8 +55,8 @@ const en = {
   "balance.total": "Portfolio value",
   "balance.indicative": "Priced by the explorer — indicative",
   "balance.holdings": "Holdings",
-  "balance.more": "Show {count} more",
-  "balance.less": "Show fewer",
+  "balance.more": "{count} under $1",
+  "balance.less": "Hide what is under $1",
   "balance.connect": "No wallet connected.",
   "balance.connectHint":
     "Connect one — from the header or from here — and this screen reads what it holds on Robinhood Chain.",
@@ -67,8 +67,20 @@ const en = {
   "balance.failedHint":
     "Which tokens an address holds is a question only the chain's explorer can answer, and it did not. The balances themselves come off the chain, so what is missing here is the list, not the money.",
   "balance.retry": "Try again",
-  "balance.refresh": "Refresh",
   "balance.unconfirmed": "The chain did not confirm this figure — it is the explorer's.",
+  "balance.token": "Token",
+  "balance.contract": "Contract",
+  "balance.name": "Name",
+  "balance.nameAsWritten": "As written by the contract",
+  "balance.amount": "Amount",
+  "balance.worth": "Value",
+  "balance.swapSoon": "Trading from here is not built yet.",
+  "balance.flagTicker": "Another token here uses this ticker",
+  "balance.flagTickerDetail":
+    "More than one contract in this wallet answers to {symbol}. A ticker is not a name — anyone can deploy a token under any letters they like, and wearing a real one is how a worthless contract gets mistaken for it. The address below is the only thing that says which token this is.",
+  "balance.flagLure": "This name is an advertisement",
+  "balance.flagLureDetail":
+    "The name carries a web address or an instruction. Tokens like this are sent to wallets unasked, and the site they point at exists to empty the wallet that visits it. Nothing real needs you to go anywhere to claim, verify or unfreeze anything.",
   "balance.source": "Listed by the explorer, counted on the chain",
 
   "settings.title": "Settings",
@@ -174,8 +186,8 @@ const id: Record<TKey, string> = {
   "balance.total": "Nilai portofolio",
   "balance.indicative": "Harga dari explorer — indikatif",
   "balance.holdings": "Isi dompet",
-  "balance.more": "Tampilkan {count} lagi",
-  "balance.less": "Tampilkan lebih sedikit",
+  "balance.more": "{count} di bawah $1",
+  "balance.less": "Sembunyikan yang di bawah $1",
   "balance.connect": "Belum ada dompet terhubung.",
   "balance.connectHint":
     "Hubungkan satu — lewat header atau dari sini — dan layar ini membaca isinya di Robinhood Chain.",
@@ -186,8 +198,20 @@ const id: Record<TKey, string> = {
   "balance.failedHint":
     "Token apa saja yang dipegang sebuah alamat hanya bisa dijawab explorer chain ini, dan ia tidak menjawab. Saldonya sendiri dibaca dari chain — jadi yang hilang di sini daftarnya, bukan uangnya.",
   "balance.retry": "Coba lagi",
-  "balance.refresh": "Muat ulang",
   "balance.unconfirmed": "Angka ini belum dikonfirmasi chain — ini angka explorer.",
+  "balance.token": "Token",
+  "balance.contract": "Kontrak",
+  "balance.name": "Nama",
+  "balance.nameAsWritten": "Sesuai yang ditulis kontraknya",
+  "balance.amount": "Jumlah",
+  "balance.worth": "Nilai",
+  "balance.swapSoon": "Menukar dari sini belum dibangun.",
+  "balance.flagTicker": "Token lain di sini memakai ticker yang sama",
+  "balance.flagTickerDetail":
+    "Lebih dari satu kontrak di dompet ini mengaku {symbol}. Ticker bukan nama — siapa pun bisa menerbitkan token dengan huruf apa pun, dan memakai ticker yang asli adalah cara kontrak tak berharga disangka yang asli. Alamat di bawah satu-satunya yang menyatakan token ini yang mana.",
+  "balance.flagLure": "Nama ini sebuah iklan",
+  "balance.flagLureDetail":
+    "Namanya membawa alamat web atau perintah. Token seperti ini dikirim ke dompet tanpa diminta, dan situs yang ditunjuknya ada untuk menguras dompet yang datang. Tidak ada hal asli yang menyuruhmu pergi ke mana pun untuk mengklaim, memverifikasi atau membuka blokir apa pun.",
   "balance.source": "Didaftar explorer, dihitung di chain",
 
   "settings.title": "Pengaturan",
