@@ -108,20 +108,18 @@ const en = {
   "balance.unhide": "List it again",
   "balance.hidden": "{count} hidden",
   "balance.hiddenLess": "Put the hidden ones away",
-  "memecoin.live": "Trading now · 5m",
-  "memecoin.sortHot": "Busiest",
+  "memecoin.live": "Under $10M · 5m",
+  "memecoin.gradeAll": "Any",
+  "memecoin.gradeHealthy": "Healthy",
   "memecoin.bandAll": "All",
   "memecoin.bandPump": "Pumping",
   "memecoin.bandFlat": "Flat",
   "memecoin.bandDump": "Dumping",
-  "memecoin.floorAny": "Any size",
   "memecoin.showing": "{shown} of {total}",
   "memecoin.noMatch": "Nothing here matches that.",
   "memecoin.noMatchHint":
-    "The chain is busy — these filters are what emptied the list. A size floor also drops any token whose supply its contract would not report, because an unknown size cannot clear one.",
+    "The chain is busy — these filters are what emptied the list. Anything already worth more than ten million is never on this screen, and a token whose supply its contract would not report cannot clear a floor, because an unknown size clears nothing.",
   "memecoin.clear": "Clear the filters",
-  "memecoin.sortNew": "Newest",
-  "memecoin.sortMovers": "Movers",
   "memecoin.fresh": "NEW",
   "memecoin.pair": "Pair",
   "memecoin.mcap": "Market cap",
@@ -141,6 +139,9 @@ const en = {
   "memecoin.failedHint":
     "Every pair here is built from swap events read straight off chain 4663, and that read did not come back.",
 
+  "faq.healthy.q": "What does Healthy filter for?",
+  "faq.healthy.a":
+    "Two ratios the trading write-ups agree on, and a dollar floor. Liquidity has to be at least a tenth of the market cap — the usual guidance is ten to twenty percent, and under it a position cannot be closed anywhere near the price on screen, which is what a rug is before anyone has to be dishonest. Fully diluted has to be no more than twice the market cap: under two is called healthy and means the supply is mostly out already, while over five is the danger line and eight to ten means around nine tenths of it is still waiting to land on whoever bought early. On top of both, the market cap, the volume and the fully diluted figure each have to clear a thousand dollars.\n\nVolume is a dollar floor rather than a ratio on purpose. The published ratios are against a day of trading — thirty percent of market cap by one account, a full turn by another — and this screen sees five minutes. Dividing a daily figure by two hundred and eighty-eight would assume a token trades evenly around the clock, which is the one thing a memecoin never does.\n\nThe LIQ figure on a row turns amber on its own when the pool is under that tenth, whether or not the filter is on.",
   "faq.bands.q": "What do Pumping, Flat and Dumping mean?",
   "faq.bands.a":
     "They band the move across the same five minutes the rest of the screen covers: up fifty percent or more, down fifty or more, or inside ten either way. Fifty is the line because on this chain it is an ordinary five minutes — the list routinely carries a token up three hundred percent beside one down forty, and a band drawn at ten would hold everything. Flat means flat for five minutes, which is not the same as accumulating: that is a claim about hours, and hours are not something this endpoint will serve.",
@@ -331,20 +332,18 @@ const id: Record<TKey, string> = {
   "balance.unhide": "Tampilkan lagi",
   "balance.hidden": "{count} disembunyikan",
   "balance.hiddenLess": "Simpan lagi yang disembunyikan",
-  "memecoin.live": "Sedang jalan · 5m",
-  "memecoin.sortHot": "Tersibuk",
+  "memecoin.live": "Di bawah $10M · 5m",
+  "memecoin.gradeAll": "Semua",
+  "memecoin.gradeHealthy": "Sehat",
   "memecoin.bandAll": "Semua",
   "memecoin.bandPump": "Naik",
   "memecoin.bandFlat": "Datar",
   "memecoin.bandDump": "Jatuh",
-  "memecoin.floorAny": "Semua ukuran",
   "memecoin.showing": "{shown} dari {total}",
   "memecoin.noMatch": "Tidak ada yang cocok dengan itu.",
   "memecoin.noMatchHint":
-    "Chain-nya sedang ramai — saringan inilah yang mengosongkan daftarnya. Lantai ukuran juga membuang token yang suplainya tidak dilaporkan kontraknya, karena ukuran yang tidak diketahui tidak bisa membuktikan apa pun.",
+    "Chain-nya sedang ramai — saringan inilah yang mengosongkan daftarnya. Apa pun yang sudah bernilai di atas sepuluh juta tidak pernah ada di layar ini, dan token yang suplainya tidak dilaporkan kontraknya tidak bisa melewati lantai mana pun, karena ukuran yang tidak diketahui tidak membuktikan apa-apa.",
   "memecoin.clear": "Bersihkan saringan",
-  "memecoin.sortNew": "Terbaru",
-  "memecoin.sortMovers": "Bergerak",
   "memecoin.fresh": "BARU",
   "memecoin.pair": "Pair",
   "memecoin.mcap": "Kapitalisasi pasar",
@@ -364,6 +363,9 @@ const id: Record<TKey, string> = {
   "memecoin.failedHint":
     "Setiap pair di sini dibangun dari event swap yang dibaca langsung dari chain 4663, dan bacaan itu tidak kembali.",
 
+  "faq.healthy.q": "Saringan Sehat itu menyaring apa?",
+  "faq.healthy.a":
+    "Dua rasio yang disepakati tulisan-tulisan trading, plus satu lantai dolar. Likuiditas harus minimal sepersepuluh market cap — panduan umumnya sepuluh sampai dua puluh persen, dan di bawah itu sebuah posisi tidak bisa ditutup mendekati harga yang tertera di layar, dan itulah rug sebelum ada yang perlu berbohong. Nilai terdilusi penuh maksimal dua kali market cap: di bawah dua disebut sehat dan berarti suplainya sudah sebagian besar beredar, sementara di atas lima adalah garis bahaya dan delapan sampai sepuluh berarti sekitar sembilan persepuluh suplainya masih menunggu untuk mendarat di atas siapa pun yang membeli awal. Di atas keduanya, market cap, volume, dan nilai terdilusi masing-masing harus melewati seribu dolar.\n\nVolume sengaja jadi lantai dolar, bukan rasio. Rasio yang diterbitkan dihitung terhadap perdagangan sehari — tiga puluh persen market cap menurut satu sumber, satu putaran penuh menurut yang lain — sementara layar ini melihat lima menit. Membagi angka harian dengan dua ratus delapan puluh delapan akan mengandaikan token diperdagangkan merata sepanjang hari, dan itu satu-satunya hal yang tidak pernah dilakukan memecoin.\n\nAngka LIQ di sebuah baris berubah kuning dengan sendirinya kalau pool-nya di bawah sepersepuluh itu, saringannya menyala atau tidak.",
   "faq.bands.q": "Apa arti Naik, Datar, dan Jatuh?",
   "faq.bands.a":
     "Ketiganya mengelompokkan pergerakan dalam lima menit yang sama dengan sisa layar ini: naik lima puluh persen atau lebih, turun lima puluh atau lebih, atau dalam sepuluh persen ke arah mana pun. Lima puluh jadi garisnya karena di chain ini itu lima menit yang biasa saja — daftarnya rutin memuat token naik tiga ratus persen bersebelahan dengan yang turun empat puluh, dan garis di sepuluh akan memuat semuanya. Datar berarti datar selama lima menit, dan itu bukan akumulasi: akumulasi itu klaim tentang berjam-jam, dan berjam-jam bukan sesuatu yang diberikan endpoint ini.",

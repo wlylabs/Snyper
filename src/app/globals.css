@@ -423,6 +423,8 @@
   }
 
   .faq-answer {
+    /* Long answers break into paragraphs; the blank line in the string is it. */
+    white-space: pre-line;
     padding-bottom: 12px;
     font-size: 11px;
     line-height: 1.75;

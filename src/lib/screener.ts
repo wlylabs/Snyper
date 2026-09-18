@@ -97,18 +97,12 @@ export const BURNED = [
   "0x000000000000000000000000000000000000dEaD",
 ] as const;
 
-/** How the list is ordered. */
-export type Sort = "volume" | "new" | "movers";
-
 /**
  * What the last five minutes did to a token.
  *
  * The bands describe the window and nothing wider. A token that is flat here
  * has been flat for five minutes, which is not the same as accumulating — that
- * is a claim about hours, and hours are what this endpoint will not serve. What
- * the bands are good for is the question a five-minute window answers well:
- * what just fell out of the sky, what just took off, and what is sitting still
- * while both of those happen.
+ * is a claim about hours, and hours are what this endpoint will not serve.
  *
  * Fifty percent either way is the line because on this chain it is an ordinary
  * five minutes: the screen routinely carries a token up three hundred percent
@@ -127,24 +121,44 @@ export function inBand(change: number, band: Band): boolean {
 }
 
 /**
- * The size a token has to prove before it is worth a row.
+ * The size past which a token is no longer an early entry.
  *
- * Applied to the market cap, the volume and the fully diluted figure together,
- * because a token can clear any one of them and still be nothing: a million
- * dollars of supply nobody has traded, or a thousand dollars traded against a
- * supply worth eight. All three or none.
- *
- * A token whose supply could not be read cannot prove anything, so it fails
- * every floor above `0`. That is the point of a floor — not that the token is
- * small, but that it has not been shown to be large.
- *
- * The rungs are set by the tightest of the three, which is the volume: a market
- * cap is a standing figure and this volume is five minutes of one. A hundred
- * thousand dollars of market cap is a small token; a hundred thousand dollars
- * traded in five minutes is near the top of everything this chain does, and a
- * ladder built on the market cap's scale emptied the list at its third rung
- * while a token worth four hundred and ninety million sat in it.
+ * This screen exists to find a position before the run rather than after it, so
+ * anything already worth more than this is not what it is for. It is a ceiling
+ * rather than a filter: nothing on the screen is above it, and there is no
+ * control to raise it.
  */
-export const FLOORS = [0, 1_000, 5_000, 25_000] as const;
+export const CEILING = 10_000_000;
 
-export type Floor = (typeof FLOORS)[number];
+/**
+ * How far a token has to clear the floor on every count.
+ *
+ * The dollar figures are the reader's own bar. The ratios are not: they are the
+ * ones the trading write-ups converge on, and both are between two standing
+ * quantities, so neither needs the five-minute window translated into a day to
+ * mean anything.
+ *
+ *   liquidity  at least a tenth of the market cap. The common guidance is ten
+ *              to twenty percent, and below it a position cannot be closed at
+ *              anything near the price the screen is quoting — which is what a
+ *              rug is, before anyone has to be dishonest about it.
+ *
+ *   fdv        no more than twice the market cap. Under two is called healthy
+ *              and means most of the supply is already out; over five is the
+ *              danger line, and eight to ten is where roughly nine tenths of
+ *              the supply is still waiting to land on whoever bought early.
+ *
+ * Volume is deliberately a dollar floor and not a ratio. The published ratio is
+ * against a day's volume — thirty percent of market cap by one account, a full
+ * turn by another — and this window is five minutes. Dividing a daily figure by
+ * two hundred and eighty-eight assumes a token trades evenly around the clock,
+ * which is the one thing a memecoin never does.
+ */
+export const HEALTHY_LIQUIDITY = 0.1;
+export const HEALTHY_DILUTION = 2;
+
+/** How hard the list is filtered, in one control. */
+export type Grade = "all" | "floor" | "healthy";
+
+/** The reader's bar, applied to the market cap, the volume and the FDV alike. */
+export const FLOOR = 1_000;

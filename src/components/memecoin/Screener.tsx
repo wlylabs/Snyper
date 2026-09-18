@@ -7,7 +7,15 @@ import { Segmented } from "@/components/ui/Segmented";
 import { Sheet } from "@/components/ui/Sheet";
 import { CHAIN_ID, explorerAddress } from "@/lib/chains";
 import { formatCompact, truncateAddress } from "@/lib/format";
-import { FLOORS, inBand, type Band, type Floor, type Sort } from "@/lib/screener";
+import {
+  CEILING,
+  FLOOR,
+  HEALTHY_DILUTION,
+  HEALTHY_LIQUIDITY,
+  inBand,
+  type Band,
+  type Grade,
+} from "@/lib/screener";
 import { useScreener, type Pair } from "@/hooks/useScreener";
 import { useI18n } from "@/hooks/useI18n";
 import { useMounted } from "@/hooks/useMounted";
@@ -40,28 +48,44 @@ function signed(change: number): string {
  * and sorts to the end of `new` rather than to the front — unknown is old here.
  */
 /**
- * Everything the reader has asked not to see.
+ * Whether a row survives the reader's questions.
  *
- * The floor is proof rather than size: a token whose supply the contract would
- * not report has not been shown to clear anything, so it fails every floor
- * above nothing. Undefined is not small — it is unknown, and the whole reason
- * to set a floor is to stop reading rows that have not been shown to be worth
- * reading.
+ * The ceiling comes first and is not theirs to move: a token already worth more
+ * than ten million is not an early entry whatever else is true of it.
+ *
+ * The floor is proof rather than size. A token whose supply the contract would
+ * not report has not been shown to clear anything, so it fails every grade
+ * above `all` — undefined is not small, it is unknown, and the reason to set a
+ * floor is to stop reading rows that have not been shown to be worth reading.
  */
-function keep(pair: Pair, band: Band, floor: Floor): boolean {
+function keep(pair: Pair, band: Band, grade: Grade): boolean {
+  if (pair.marketCap !== undefined && pair.marketCap > CEILING) return false;
   if (!inBand(pair.change, band)) return false;
-  if (floor === 0) return true;
-  if (pair.marketCap === undefined || pair.fdv === undefined) return false;
-  return pair.marketCap >= floor && pair.fdv >= floor && pair.volume >= floor;
+  if (grade === "all") return true;
+
+  const { marketCap, fdv, volume, liquidity } = pair;
+  if (marketCap === undefined || fdv === undefined) return false;
+  if (marketCap < FLOOR || fdv < FLOOR || volume < FLOOR) return false;
+  if (grade === "floor") return true;
+
+  return liquidity >= marketCap * HEALTHY_LIQUIDITY && fdv <= marketCap * HEALTHY_DILUTION;
 }
 
-function order(pairs: Pair[], sort: Sort): Pair[] {
-  const sorted = [...pairs];
-  if (sort === "new") {
-    return sorted.sort((a, b) => (a.age ?? Infinity) - (b.age ?? Infinity));
-  }
-  if (sort === "movers") return sorted.sort((a, b) => b.change - a.change);
-  return sorted.sort((a, b) => b.volume - a.volume);
+/** Whether the pool behind a row could absorb the position it is quoting. */
+function thin(pair: Pair): boolean {
+  return pair.marketCap !== undefined && pair.liquidity < pair.marketCap * HEALTHY_LIQUIDITY;
+}
+
+/**
+ * Busiest first, and only busiest.
+ *
+ * The sort control is gone: inside a ten-million ceiling the question of what
+ * to read first has one answer, which is what is being traded now. Newest was
+ * a list of launches most of which never traded at all, and biggest mover put
+ * a token up four hundred percent on nine dollars of volume at the top.
+ */
+function order(pairs: Pair[]): Pair[] {
+  return [...pairs].sort((a, b) => b.volume - a.volume);
 }
 
 function PairSheet({ pair, onClose }: { pair: Pair | undefined; onClose: () => void }) {
@@ -135,15 +159,14 @@ function Loading() {
 export function Screener() {
   const mounted = useMounted();
   const { t } = useI18n();
-  const [sort, setSort] = useState<Sort>("volume");
   const [band, setBand] = useState<Band>("all");
-  const [floor, setFloor] = useState<Floor>(0);
+  const [grade, setGrade] = useState<Grade>("all");
   const [opened, setOpened] = useState<string>();
   const { pairs, loading, error, refetch } = useScreener();
 
   const listed = useMemo(
-    () => order(pairs.filter((pair) => keep(pair, band, floor)), sort),
-    [pairs, sort, band, floor],
+    () => order(pairs.filter((pair) => keep(pair, band, grade))),
+    [pairs, band, grade],
   );
 
   const body = () => {
@@ -182,7 +205,7 @@ export function Screener() {
               className="btn btn-sm btn-short"
               onClick={() => {
                 setBand("all");
-                setFloor(0);
+                setGrade("all");
               }}
             >
               {t("memecoin.clear")}
@@ -213,8 +236,10 @@ export function Screener() {
                 <span className="lbl">{t("memecoin.volShort")}</span>{" "}
                 <span className="num">{usd(pair.volume)}</span>
                 {" · "}
-                <span className="lbl">{t("memecoin.liqShort")}</span>{" "}
-                <span className="num">{usd(pair.liquidity)}</span>
+                <span className={`lbl ${thin(pair) ? "warn" : ""}`}>
+                  {t("memecoin.liqShort")}
+                </span>{" "}
+                <span className={`num ${thin(pair) ? "warn" : ""}`}>{usd(pair.liquidity)}</span>
                 {" · "}
                 <span className="num">{age(pair.age)}</span>
               </span>
@@ -241,15 +266,6 @@ export function Screener() {
         <div className="mb-3 flex flex-col gap-1.5">
           <Segmented
             options={[
-              { value: "volume", label: t("memecoin.sortHot") },
-              { value: "new", label: t("memecoin.sortNew") },
-              { value: "movers", label: t("memecoin.sortMovers") },
-            ]}
-            value={sort}
-            onChange={setSort}
-          />
-          <Segmented
-            options={[
               { value: "all", label: t("memecoin.bandAll") },
               { value: "pumping", label: t("memecoin.bandPump") },
               { value: "flat", label: t("memecoin.bandFlat") },
@@ -259,12 +275,13 @@ export function Screener() {
             onChange={setBand}
           />
           <Segmented
-            options={FLOORS.map((size) => ({
-              value: String(size),
-              label: size === 0 ? t("memecoin.floorAny") : `$${formatCompact(size)}+`,
-            }))}
-            value={String(floor)}
-            onChange={(value) => setFloor(Number(value) as Floor)}
+            options={[
+              { value: "all", label: t("memecoin.gradeAll") },
+              { value: "floor", label: `$${formatCompact(FLOOR)}+` },
+              { value: "healthy", label: t("memecoin.gradeHealthy") },
+            ]}
+            value={grade}
+            onChange={setGrade}
           />
         </div>
       )}
