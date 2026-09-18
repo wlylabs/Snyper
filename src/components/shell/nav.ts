@@ -9,15 +9,21 @@ export type NavItem = {
 
 /**
  * Four surfaces: the home screen, what the connected wallet holds, where new
- * memecoins are found, and the settings. The first three are empty for now —
- * the shell, the wallet session and the chain badge are what this release
- * keeps, and what goes inside those pages is written next. Settings is not a
- * placeholder: it configures the two things that still exist.
+ * memecoins are found, and the settings.
+ *
+ * Home and memecoin are still empty, and what goes inside them is written
+ * next. The other two are not placeholders: balance reads the wallet and sells
+ * out of it, and settings configures what the app does with the screen it is
+ * read on.
+ *
+ * The path is the route, not the label. `/memecoin` is named for what the
+ * screen lists rather than for either dictionary's word for it — English calls
+ * it Memes and Indonesian calls it Memecoin, and a URL cannot be both.
  */
 export const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "nav.home", icon: "crosshair" },
   { href: "/balance", label: "nav.balance", icon: "stack" },
-  { href: "/discover", label: "nav.discover", icon: "search" },
+  { href: "/memecoin", label: "nav.memecoin", icon: "search" },
   { href: "/settings", label: "nav.settings", icon: "sliders" },
 ];
 

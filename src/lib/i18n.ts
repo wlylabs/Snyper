@@ -20,7 +20,7 @@ export const INTL_LOCALE: Record<Locale, string> = {
 const en = {
   "nav.home": "Snyper",
   "nav.balance": "Balance",
-  "nav.discover": "Memes",
+  "nav.memecoin": "Memes",
   "nav.settings": "Settings",
 
   "a11y.home": "Snyper home",
@@ -45,10 +45,10 @@ const en = {
 
   "page.balance.title": "Balance",
 
-  "page.discover.title": "Memes",
-  "page.discover.subtitle": "New memecoins on Robinhood Chain",
-  "page.discover.empty": "This screen is not built yet.",
-  "page.discover.hint":
+  "page.memecoin.title": "Memes",
+  "page.memecoin.subtitle": "New memecoins on Robinhood Chain",
+  "page.memecoin.empty": "This screen is not built yet.",
+  "page.memecoin.hint":
     "Where new contracts get found and read. Nothing is scanned until it is written.",
 
   "balance.total": "Portfolio value",
@@ -175,7 +175,7 @@ export type TKey = keyof typeof en;
 const id: Record<TKey, string> = {
   "nav.home": "Snyper",
   "nav.balance": "Saldo",
-  "nav.discover": "Memecoin",
+  "nav.memecoin": "Memecoin",
   "nav.settings": "Pengaturan",
 
   "a11y.home": "Beranda Snyper",
@@ -199,10 +199,10 @@ const id: Record<TKey, string> = {
 
   "page.balance.title": "Saldo",
 
-  "page.discover.title": "Memecoin",
-  "page.discover.subtitle": "Memecoin baru di Robinhood Chain",
-  "page.discover.empty": "Layar ini belum dibangun.",
-  "page.discover.hint":
+  "page.memecoin.title": "Memecoin",
+  "page.memecoin.subtitle": "Memecoin baru di Robinhood Chain",
+  "page.memecoin.empty": "Layar ini belum dibangun.",
+  "page.memecoin.hint":
     "Tempat kontrak baru ditemukan dan dibaca. Belum ada yang dipindai sampai ditulis.",
 
   "balance.total": "Nilai portofolio",

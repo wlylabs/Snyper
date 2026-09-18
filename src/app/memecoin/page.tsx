@@ -3,13 +3,13 @@ import { BlankPage } from "@/components/shell/BlankPage";
 
 export const metadata: Metadata = { title: "Memes" };
 
-export default function DiscoverPage() {
+export default function MemecoinPage() {
   return (
     <BlankPage
-      title="page.discover.title"
-      subtitle="page.discover.subtitle"
-      empty="page.discover.empty"
-      hint="page.discover.hint"
+      title="page.memecoin.title"
+      subtitle="page.memecoin.subtitle"
+      empty="page.memecoin.empty"
+      hint="page.memecoin.hint"
     />
   );
 }
