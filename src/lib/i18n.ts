@@ -24,6 +24,10 @@ const en = {
 
   "a11y.home": "Snyper home",
   "a11y.primaryNav": "Primary",
+  "a11y.language": "Switch language",
+
+  "theme.toDark": "Switch to dark",
+  "theme.toLight": "Switch to light",
 
   "common.close": "Close",
   "common.copied": "Copied",
@@ -117,6 +121,10 @@ const id: Record<TKey, string> = {
 
   "a11y.home": "Beranda Snyper",
   "a11y.primaryNav": "Navigasi utama",
+  "a11y.language": "Ganti bahasa",
+
+  "theme.toDark": "Pakai tema gelap",
+  "theme.toLight": "Pakai tema terang",
 
   "common.close": "Tutup",
   "common.copied": "Tersalin",
