@@ -32,7 +32,6 @@ export type ScanToken = {
   address_hash: string;
   decimals: string | null;
   exchange_rate: string | null;
-  icon_url: string | null;
   name: string | null;
   /** Blockscout's own verdict on the token. See `reputable` in `useHoldings`. */
   reputation: string | null;

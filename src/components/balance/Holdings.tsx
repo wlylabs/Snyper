@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { Empty, Panel, Skeleton } from "@/components/ui/Panel";
 import { CHAIN_ID, chainMeta } from "@/lib/chains";
@@ -24,57 +24,13 @@ function usd(value: number | undefined): string {
   return value === undefined ? "—" : `$${formatSignificant(value, 2)}`;
 }
 
-/**
- * A token's mark: the artwork the explorer carries, or its first letter.
- *
- * A plain `img`, not `next/image`. These are a handful of small remote icons on
- * a screen the reader has to be connected to reach, and routing them through an
- * optimiser would trade a cache hit on the explorer's CDN for a round trip to
- * this deployment, plus a list of remote hosts to keep in the build config.
- */
-function TokenMark({ icon, symbol }: { icon?: string; symbol: string }) {
-  /*
-   * The artwork is hosted by whoever listed the token, which means it can 404,
-   * move, or be stopped by a content blocker — and a browser answers all three
-   * with its own broken-image glyph, which is worse in a list of holdings than
-   * having had no artwork at all. The letters take over the moment it fails.
-   */
-  const [broken, setBroken] = useState(false);
-
-  if (icon && !broken) {
-    return (
-      <img
-        src={icon}
-        alt=""
-        width={26}
-        height={26}
-        loading="lazy"
-        onError={() => setBroken(true)}
-        className="shrink-0 rounded-full bg-raise"
-      />
-    );
-  }
-
-  return (
-    <span
-      className="avatar avatar-empty flex shrink-0 items-center justify-center text-[10px] font-bold text-dim"
-      style={{ width: 26, height: 26 }}
-      aria-hidden
-    >
-      {symbol.slice(0, 2).toUpperCase()}
-    </span>
-  );
-}
-
 function HoldingRow({
-  mark,
   title,
   subtitle,
   amount,
   value,
   unconfirmed,
 }: {
-  mark: ReactNode;
   title: string;
   subtitle: string;
   amount: string;
@@ -83,7 +39,6 @@ function HoldingRow({
 }) {
   return (
     <span className="tile cursor-default">
-      {mark}
       <span className="min-w-0 flex-1">
         <span className="block truncate">{title}</span>
         <span className="block truncate text-[11px] font-normal text-faint">{subtitle}</span>
@@ -195,15 +150,6 @@ export function Holdings() {
       <div className="flex flex-col gap-1.5">
         {hasCoin && native && (
           <HoldingRow
-            mark={
-              <span
-                className="avatar avatar-empty flex shrink-0 items-center justify-center"
-                style={{ width: 26, height: 26 }}
-                aria-hidden
-              >
-                <span className="text-[9px] font-bold text-dim">{meta?.mark}</span>
-              </span>
-            }
             title={native.symbol}
             subtitle={meta?.nativeName ?? t("common.network")}
             amount={formatAmount(Number(native.formatted), 5)}
@@ -214,7 +160,6 @@ export function Holdings() {
         {shown.map((row: Holding) => (
           <HoldingRow
             key={row.address}
-            mark={<TokenMark icon={row.icon} symbol={row.symbol} />}
             title={row.symbol}
             subtitle={row.name}
             amount={formatAmount(row.amount)}

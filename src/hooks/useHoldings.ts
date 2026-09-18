@@ -17,7 +17,6 @@ export type Holding = {
   symbol: string;
   name: string;
   decimals: number;
-  icon?: string;
   /** Units held. */
   amount: number;
   /** USD per unit, when anything prices this token. */
@@ -141,7 +140,6 @@ export function useHoldings() {
         symbol: entry.token.symbol ?? "—",
         name: entry.token.name ?? "",
         decimals,
-        icon: entry.token.icon_url ?? undefined,
         amount,
         rate,
         value: rate === undefined ? undefined : amount * rate,
