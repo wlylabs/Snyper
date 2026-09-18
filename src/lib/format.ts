@@ -35,6 +35,39 @@ export function formatAmount(value: number, maxDecimals = 6): string {
   return formatSignificant(value, 3, numberLocale, 6);
 }
 
+/** Where a figure stops being read in full, and what it is marked with. */
+const MAGNITUDES = [
+  { at: 1e9, mark: "B" },
+  { at: 1e6, mark: "M" },
+  { at: 1e3, mark: "K" },
+] as const;
+
+/**
+ * A figure at a glance: 1.2K, 290K, 12.4M.
+ *
+ * A market cap is read as a magnitude and almost never as a number — nobody
+ * counts the digits in 12,431,907 to work out that it is twelve million — so
+ * the digits are spent on the part that distinguishes one token from another.
+ *
+ * The mark stays K/M/B in both languages while the decimal separator follows
+ * the reader's. `Intl`'s own compact notation would write 12,4 jt in
+ * Indonesian, which is correct Indonesian and is not what anyone trading a
+ * memecoin reads: the suffixes here are the notation of the market rather than
+ * of the language, and the comma is the part that belongs to the reader.
+ */
+export function formatCompact(value: number, tag = numberLocale): string {
+  if (!Number.isFinite(value)) return "—";
+  const abs = Math.abs(value);
+  for (const { at, mark } of MAGNITUDES) {
+    if (abs < at) continue;
+    const scaled = value / at;
+    return `${scaled.toLocaleString(tag, {
+      maximumFractionDigits: Math.abs(scaled) >= 100 ? 0 : 1,
+    })}${mark}`;
+  }
+  return value.toLocaleString(tag, { maximumFractionDigits: 0 });
+}
+
 /**
  * Unicode subscript digits, used to write a run of leading zeros as a count.
  *
