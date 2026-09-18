@@ -330,6 +330,59 @@
     background: var(--color-line);
   }
 
+  /* ---------- faq ---------- */
+
+  /*
+   * A question is a row until it is asked.
+   *
+   * `details` rather than state, because the one behaviour here is the one
+   * behaviour browsers already agree on: it opens from the keyboard, it is
+   * announced as a disclosure without being told to be, and it works in a
+   * document that never finished hydrating.
+   */
+  .faq + .faq {
+    border-top: 1px solid var(--color-line);
+  }
+
+  .faq summary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 0;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    /* Both, because Safari keeps its marker behind the vendor pseudo-element. */
+    list-style: none;
+    transition: color var(--dur-tap) var(--ease-out);
+  }
+
+  .faq summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .faq summary:hover {
+    color: var(--color-accent-text);
+  }
+
+  .faq summary svg {
+    flex-shrink: 0;
+    margin-left: auto;
+    color: var(--color-faint);
+    transition: transform var(--dur-tap) var(--ease-out);
+  }
+
+  .faq[open] summary svg {
+    transform: rotate(180deg);
+  }
+
+  .faq-answer {
+    padding-bottom: 12px;
+    font-size: 11px;
+    line-height: 1.75;
+    color: var(--color-dim);
+  }
+
   /* ---------- press ---------- */
 
   /*

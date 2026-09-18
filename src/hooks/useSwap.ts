@@ -25,7 +25,21 @@ export type Route = {
   exit: Exit;
   fee: number;
   amountOut: bigint;
+  /**
+   * What this trade costs itself, in basis points — the gap between the price
+   * it gets and the price a trade too small to move anything would get.
+   */
+  impactBps: number;
 };
+
+/**
+ * The trade this one is measured against: a hundredth of it.
+ *
+ * Small enough through any pool worth trading in to come back at what the
+ * price is before this trade touches it, and large enough to survive being
+ * divided down on a six-decimal token.
+ */
+const REFERENCE = 100n;
 
 /** One `eth_call` for every tier of every exit, rather than one per tier. */
 const ONE_CALL = 0;
@@ -44,26 +58,36 @@ export function useRoutes(token: `0x${string}` | undefined, amountIn: bigint) {
     [token],
   );
 
+  const reference = amountIn / REFERENCE > 0n ? amountIn / REFERENCE : amountIn;
+
+  /*
+   * Every pair, every tier, twice: once for the trade and once for the small
+   * one it is priced against. Sixteen quotes still leave as a single call, and
+   * asking for the comparison separately would have been a second round trip
+   * for an answer the first one could have carried.
+   */
   const contracts = useMemo(() => {
     if (!token || amountIn <= 0n) return [];
-    return exits.flatMap((exit) =>
-      FEE_TIERS.map((fee) => ({
-        address: VENUE.quoter,
-        abi: quoterAbi,
-        functionName: "quoteExactInputSingle" as const,
-        args: [
-          {
-            tokenIn: token,
-            tokenOut: exit.address,
-            amountIn,
-            fee,
-            sqrtPriceLimitX96: 0n,
-          },
-        ] as const,
-        chainId: CHAIN_ID,
-      })),
-    );
-  }, [token, amountIn, exits]);
+    const ask = (size: bigint) =>
+      exits.flatMap((exit) =>
+        FEE_TIERS.map((fee) => ({
+          address: VENUE.quoter,
+          abi: quoterAbi,
+          functionName: "quoteExactInputSingle" as const,
+          args: [
+            {
+              tokenIn: token,
+              tokenOut: exit.address,
+              amountIn: size,
+              fee,
+              sqrtPriceLimitX96: 0n,
+            },
+          ] as const,
+          chainId: CHAIN_ID,
+        })),
+      );
+    return [...ask(amountIn), ...ask(reference)];
+  }, [token, amountIn, reference, exits]);
 
   const quoted = useReadContracts({
     contracts,
@@ -73,20 +97,44 @@ export function useRoutes(token: `0x${string}` | undefined, amountIn: bigint) {
   });
 
   const routes = useMemo(() => {
-    const found: Route[] = [];
-    contracts.forEach((_, index) => {
+    const half = contracts.length / 2;
+    const out = (index: number): bigint | undefined => {
       const outcome = quoted.data?.[index];
-      if (outcome?.status !== "success") return;
-      const amountOut = (outcome.result as readonly unknown[])?.[0];
-      if (typeof amountOut !== "bigint" || amountOut <= 0n) return;
+      if (outcome?.status !== "success") return undefined;
+      const value = (outcome.result as readonly unknown[])?.[0];
+      return typeof value === "bigint" && value > 0n ? value : undefined;
+    };
+
+    const found: Route[] = [];
+    for (let index = 0; index < half; index++) {
+      const amountOut = out(index);
+      if (amountOut === undefined) continue;
+      const refOut = out(index + half);
+
+      /*
+       * Unpriceable impact is treated as none rather than as infinite: the
+       * comparison failing does not make the trade worse, and the floor below
+       * still protects it. A pool that genuinely cannot absorb the small trade
+       * could not have filled the large one either.
+       */
+      const impactBps =
+        refOut !== undefined && refOut > 0n && reference > 0n
+          ? Math.max(
+              0,
+              10_000 -
+                Number((amountOut * reference * 10_000n) / (refOut * amountIn)),
+            )
+          : 0;
+
       found.push({
         exit: exits[Math.floor(index / FEE_TIERS.length)],
         fee: FEE_TIERS[index % FEE_TIERS.length],
         amountOut,
+        impactBps,
       });
-    });
+    }
     return found;
-  }, [contracts, quoted.data, exits]);
+  }, [contracts, quoted.data, exits, amountIn, reference]);
 
   /** The deepest pool for a given exit, which is the one worth trading in. */
   const bestFor = useMemo(

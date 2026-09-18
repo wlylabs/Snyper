@@ -23,7 +23,7 @@ export type NavItem = {
 export const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "nav.home", icon: "crosshair" },
   { href: "/balance", label: "nav.balance", icon: "stack" },
-  { href: "/memecoin", label: "nav.memecoin", icon: "search" },
+  { href: "/memecoin", label: "nav.memecoin", icon: "pulse" },
   { href: "/settings", label: "nav.settings", icon: "sliders" },
 ];
 

@@ -28,7 +28,8 @@ export type IconName =
   | "moon"
   | "link"
   | "arrow-up"
-  | "arrow-down";
+  | "arrow-down"
+  | "hide";
 
 const PATHS: Record<IconName, string> = {
   candles: "M8 4v3M8 15v5M5.5 7h5v8h-5zM16 4v5M16 17v3M13.5 9h5v8h-5z",
@@ -59,6 +60,8 @@ const PATHS: Record<IconName, string> = {
   link: "M10.5 13.5a4 4 0 0 0 5.7 0l2.8-2.8a4 4 0 1 0-5.7-5.7L11.9 6.4M13.5 10.5a4 4 0 0 0-5.7 0L5 13.3a4 4 0 1 0 5.7 5.7l1.4-1.4",
   "arrow-up": "M12 19V5M12 5l-6 6M12 5l6 6",
   "arrow-down": "M12 5v14M12 19l-6-6M12 19l6-6",
+  /* An eye, struck through: what this does is stop showing a thing, not end it. */
+  hide: "M3 12s3.5-6 9-6c1.4 0 2.7.4 3.8 1M21 12s-3.5 6-9 6c-1.4 0-2.7-.4-3.8-1M9.9 9.9a3 3 0 0 0 4.2 4.2M4 4l16 16",
 };
 
 type Props = SVGProps<SVGSVGElement> & {

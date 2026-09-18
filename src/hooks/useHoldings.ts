@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { erc20Abi, formatUnits } from "viem";
 import { useAccount, useBalance, useReadContracts } from "wagmi";
+import { useAppStore } from "@/store/useAppStore";
 import { CHAIN_ID } from "@/lib/chains";
 import {
   SCAN_CONFIGURED,
@@ -36,6 +37,8 @@ export type Holding = {
   confirmed: boolean;
   /** Why this row should not be read at face value, when it should not. */
   suspicion?: Suspicion;
+  /** The reader has asked for this one not to be listed. */
+  hidden: boolean;
 };
 
 /**
@@ -158,6 +161,7 @@ function mark(rows: Holding[]): Holding[] {
 
 export function useHoldings() {
   const { address } = useAccount();
+  const hiddenTokens = useAppStore((state) => state.hidden);
 
   /** What the index believes, which is the list of contracts worth asking. */
   const listed = useQuery({
@@ -228,6 +232,7 @@ export function useHoldings() {
         rate,
         value: rate === undefined ? undefined : amount * rate,
         confirmed: onChain !== undefined,
+        hidden: hiddenTokens.includes(entry.token.address_hash.toLowerCase()),
       } satisfies Holding;
     });
 
@@ -236,7 +241,7 @@ export function useHoldings() {
      * the index is a moment behind the chain, and this is where that shows.
      */
     return mark(rows.filter((row) => row.amount > 0).sort(byWorth));
-  }, [candidates, confirmed.data]);
+  }, [candidates, confirmed.data, hiddenTokens]);
 
   const nativeValue =
     native.data && coinPrice.data !== undefined
@@ -245,17 +250,25 @@ export function useHoldings() {
 
   /*
    * Only what is priced can be totalled. An unpriced token is left out of the
-   * figure rather than counted as nothing, which is why the screen says the
-   * total is indicative rather than presenting it as the wallet's worth.
+   * figure rather than counted as nothing, which is why the screen never calls
+   * this the wallet's worth.
+   *
+   * A hidden token is left out too. Hiding one is the reader saying it is not
+   * theirs in any sense they care about — usually because it is a contract
+   * wearing a real token's ticker — and counting its money would be arguing
+   * with them.
    */
-  const total = holdings.reduce((sum, row) => sum + (row.value ?? 0), nativeValue ?? 0);
+  const total = holdings.reduce(
+    (sum, row) => sum + (row.hidden ? 0 : (row.value ?? 0)),
+    nativeValue ?? 0,
+  );
 
   return {
     address,
     holdings,
     native: native.data,
     nativeValue,
-    total: nativeValue === undefined && holdings.every((row) => row.value === undefined)
+    total: nativeValue === undefined && holdings.every((row) => row.hidden || row.value === undefined)
       ? undefined
       : total,
     /** The index is what the screen cannot draw without; the chain refines it. */

@@ -1,5 +1,6 @@
 "use client";
 
+import { Faq } from "@/components/settings/Faq";
 import { Panel } from "@/components/ui/Panel";
 import { Segmented } from "@/components/ui/Segmented";
 import { useI18n } from "@/hooks/useI18n";
@@ -8,14 +9,15 @@ import { LOCALES } from "@/lib/i18n";
 import { useAppStore } from "@/store/useAppStore";
 
 /**
- * The settings the app still has, which is what it looks like and what language
- * it speaks. Both live here and nowhere else — the header carried a pair of
- * keys for them for a while, and a switch in two places is one place too many
- * for a setting a reader touches once.
+ * The settings the app still has — what it looks like and what language it
+ * speaks — and, under them, what it does. Both switches live here and nowhere
+ * else: the header carried a pair of keys for them for a while, and a switch in
+ * two places is one place too many for a setting a reader touches once.
  *
  * Nothing renders before mount: every control here reflects stored state, and a
  * segmented control marking the wrong option for a frame is worse than one that
- * arrives a frame late.
+ * arrives a frame late. The questions below are not stored state and render
+ * straight away.
  */
 export default function SettingsPage() {
   const mounted = useMounted();
@@ -70,6 +72,15 @@ export default function SettingsPage() {
             <div className="skel h-[34px] w-[168px]" />
           )}
         </div>
+      </Panel>
+
+      {/*
+       * The answers the screens used to carry next to their own controls. They
+       * are here because a sentence under a button is read by everyone who was
+       * not asking, every time they pass it.
+       */}
+      <Panel label={t("settings.faq")} bodyClassName="px-3">
+        <Faq />
       </Panel>
     </div>
   );
