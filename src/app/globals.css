@@ -15,8 +15,11 @@
  * white; on dark all three stay the brand lime.
  */
 @theme {
-  --font-sans: "Archivo", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  /* Both families are self-hosted by `next/font` in the root layout, which sets
+   * these two variables on <html> and pairs each with a metric-matched fallback
+   * so the face can swap in without shifting a line. */
+  --font-sans: var(--font-archivo), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, "SF Mono", Menlo, monospace;
 
   --color-void: #07080a;
   --color-base: #0a0c0f;
