@@ -45,15 +45,31 @@ const en = {
 
   "page.balance.title": "Balance",
   "page.balance.subtitle": "What this wallet holds on Robinhood Chain",
-  "page.balance.empty": "This screen is not built yet.",
-  "page.balance.hint":
-    "Holdings will be read from the chain once this screen exists. The wallet session it needs is already running.",
 
   "page.discover.title": "Discover",
   "page.discover.subtitle": "New memecoins on Robinhood Chain",
   "page.discover.empty": "This screen is not built yet.",
   "page.discover.hint":
     "Where new contracts get found and read. Nothing is scanned until it is written.",
+
+  "balance.total": "Portfolio value",
+  "balance.indicative": "Priced by the explorer — indicative",
+  "balance.holdings": "Holdings",
+  "balance.more": "Show {count} more",
+  "balance.less": "Show fewer",
+  "balance.connect": "No wallet connected.",
+  "balance.connectHint":
+    "Connect one — from the header or from here — and this screen reads what it holds on Robinhood Chain.",
+  "balance.empty": "This wallet holds nothing on Robinhood Chain.",
+  "balance.emptyHint":
+    "Neither the coin nor a token. Anything sent to this address turns up here.",
+  "balance.failed": "The holdings list could not be read.",
+  "balance.failedHint":
+    "Which tokens an address holds is a question only the chain's explorer can answer, and it did not. The balances themselves come off the chain, so what is missing here is the list, not the money.",
+  "balance.retry": "Try again",
+  "balance.refresh": "Refresh",
+  "balance.unconfirmed": "The chain did not confirm this figure — it is the explorer's.",
+  "balance.source": "Listed by the explorer, counted on the chain",
 
   "settings.title": "Settings",
   "settings.subtitle": "How the app reads on this device",
@@ -148,15 +164,31 @@ const id: Record<TKey, string> = {
 
   "page.balance.title": "Saldo",
   "page.balance.subtitle": "Isi dompet ini di Robinhood Chain",
-  "page.balance.empty": "Layar ini belum dibangun.",
-  "page.balance.hint":
-    "Isi dompet akan dibaca dari chain begitu layar ini ada. Sesi dompet yang dibutuhkannya sudah jalan.",
 
   "page.discover.title": "Memecoin",
   "page.discover.subtitle": "Memecoin baru di Robinhood Chain",
   "page.discover.empty": "Layar ini belum dibangun.",
   "page.discover.hint":
     "Tempat kontrak baru ditemukan dan dibaca. Belum ada yang dipindai sampai ditulis.",
+
+  "balance.total": "Nilai portofolio",
+  "balance.indicative": "Harga dari explorer — indikatif",
+  "balance.holdings": "Isi dompet",
+  "balance.more": "Tampilkan {count} lagi",
+  "balance.less": "Tampilkan lebih sedikit",
+  "balance.connect": "Belum ada dompet terhubung.",
+  "balance.connectHint":
+    "Hubungkan satu — lewat header atau dari sini — dan layar ini membaca isinya di Robinhood Chain.",
+  "balance.empty": "Dompet ini tidak memegang apa pun di Robinhood Chain.",
+  "balance.emptyHint":
+    "Tidak koinnya, tidak tokennya. Apa pun yang dikirim ke alamat ini akan muncul di sini.",
+  "balance.failed": "Daftar isi dompet tidak bisa dibaca.",
+  "balance.failedHint":
+    "Token apa saja yang dipegang sebuah alamat hanya bisa dijawab explorer chain ini, dan ia tidak menjawab. Saldonya sendiri dibaca dari chain — jadi yang hilang di sini daftarnya, bukan uangnya.",
+  "balance.retry": "Coba lagi",
+  "balance.refresh": "Muat ulang",
+  "balance.unconfirmed": "Angka ini belum dikonfirmasi chain — ini angka explorer.",
+  "balance.source": "Didaftar explorer, dihitung di chain",
 
   "settings.title": "Pengaturan",
   "settings.subtitle": "Cara aplikasi ini tampil di perangkatmu",

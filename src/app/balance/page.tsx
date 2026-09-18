@@ -1,15 +1,8 @@
 import type { Metadata } from "next";
-import { BlankPage } from "@/components/shell/BlankPage";
+import { Holdings } from "@/components/balance/Holdings";
 
 export const metadata: Metadata = { title: "Balance" };
 
 export default function BalancePage() {
-  return (
-    <BlankPage
-      title="page.balance.title"
-      subtitle="page.balance.subtitle"
-      empty="page.balance.empty"
-      hint="page.balance.hint"
-    />
-  );
+  return <Holdings />;
 }
