@@ -11,7 +11,6 @@ export { NATIVE, isNative } from "./native";
  */
 export const CHAIN: Chain = robinhood;
 export const CHAIN_ID = robinhood.id;
-export const DEFAULT_CHAIN_ID = robinhood.id;
 export const SUPPORTED_CHAINS = [robinhood] as const;
 
 /**

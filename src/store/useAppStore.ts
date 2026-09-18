@@ -28,7 +28,6 @@ export const DEFAULT_SETTINGS: Settings = {
   tickSeconds: 30,
   theme: "dark",
   autoDispatch: false,
-  priorityFeeGwei: 0,
   maxImpactBps: 1_500,
 };
 
@@ -331,12 +330,13 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: "snyper.state.v1",
-      version: 5,
+      version: 6,
       storage: createJSONStorage(() => localStorage),
       /**
-       * Token artwork kept by earlier releases is dropped rather than carried.
-       * Nothing draws it now, and on a browser that has scanned a wallet it is
-       * the largest thing this store holds.
+       * Settings and artwork earlier releases kept are dropped rather than
+       * carried. Token logos are the largest thing this store held and nothing
+       * draws them now; the priority fee is a knob that never did anything on
+       * chain 4663, whose sequencer orders by arrival rather than by tip.
        */
       migrate: (persisted, version) => {
         const state =
@@ -344,6 +344,8 @@ export const useAppStore = create<AppState>()(
             ? migrateState(persisted)
             : { ...((persisted ?? {}) as Record<string, unknown>) };
         delete state.tokenLogos;
+        const settings = state.settings as Record<string, unknown> | undefined;
+        if (settings) delete settings.priorityFeeGwei;
         return state;
       },
       partialize: (state) => ({

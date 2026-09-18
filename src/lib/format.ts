@@ -11,10 +11,6 @@ export function setNumberLocale(tag: string): void {
   numberLocale = tag;
 }
 
-export function activeNumberLocale(): string {
-  return numberLocale;
-}
-
 export function truncateAddress(address: string, lead = 6, tail = 4): string {
   if (address.length <= lead + tail) return address;
   return `${address.slice(0, lead)}…${address.slice(-tail)}`;
@@ -43,16 +39,6 @@ export function formatAmount(value: number, maxDecimals = 6): string {
 
 export function formatUnitsFixed(value: bigint, decimals: number, maxDecimals = 6): string {
   return formatAmount(Number(formatUnits(value, decimals)), maxDecimals);
-}
-
-export function formatUsd(value: number | undefined): string {
-  if (value === undefined || !Number.isFinite(value)) return "—";
-  const abs = Math.abs(value);
-  const digits = abs >= 1000 ? 0 : abs >= 1 ? 2 : abs >= 0.01 ? 4 : 6;
-  return `$${value.toLocaleString(numberLocale, {
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  })}`;
 }
 
 /**

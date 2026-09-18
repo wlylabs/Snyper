@@ -1,5 +1,5 @@
 import type { PublicClient } from "viem";
-import { getAddress, isAddress } from "viem";
+import { getAddress } from "viem";
 import { erc20Abi } from "./abi";
 import { CHAIN_META, NATIVE, dexMeta } from "./chains";
 
@@ -133,10 +133,6 @@ export function routingAddress(token: Token): `0x${string}` {
   return token.address;
 }
 
-export function tokenKey(token: Token): string {
-  return `${token.chainId}:${token.address.toLowerCase()}`;
-}
-
 export function searchTokens(tokens: Token[], query: string): Token[] {
   const q = query.trim().toLowerCase();
   if (!q) return tokens;
@@ -146,8 +142,4 @@ export function searchTokens(tokens: Token[], query: string): Token[] {
       t.name.toLowerCase().includes(q) ||
       t.address.toLowerCase() === q,
   );
-}
-
-export function isTokenAddress(value: string): value is `0x${string}` {
-  return isAddress(value.trim());
 }

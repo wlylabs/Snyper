@@ -45,7 +45,6 @@ const en = {
   "wallet.switchTo": "Switch to {chain}",
   "wallet.balancesOnly": "Balances only — no routing venue",
   "wallet.embedded": "Embedded wallet",
-  "wallet.otherWallets": "Other wallets",
   "wallet.use": "Use",
   "wallet.exportKey": "Export private key",
   "wallet.privyDisabled":
@@ -57,7 +56,6 @@ const en = {
   "wallet.wallets": "Wallets",
   "wallet.addWallet": "Connect another wallet",
   "wallet.active": "Active",
-  "wallet.balance": "Balance",
   "wallet.otherNetwork":
     "Your wallet is pointing at another network. What it holds on {chain} is read over this app's own endpoint either way — switching networks only matters for signing.",
   "wallet.securedBy": "Secured by Privy",
@@ -208,12 +206,8 @@ const en = {
   "assets.change24hHint": "Change over the last 24 hours, from the market feed.",
   "assets.changeUnknownHint":
     "No market feed reported a 24-hour change for this token. An explorer quote and a pool's mid price are each a single reading, with no yesterday to compare against.",
-  "assets.marketCap": "MC",
-  "assets.fdv": "FDV",
   "assets.capLine": "Market cap {value} — circulating supply at the market price.",
   "assets.fdvLine": "Fully diluted {value} — total supply at the market price.",
-  "assets.capHint": "Market cap — circulating supply at the market price.",
-  "assets.fdvHint": "Fully diluted — total supply at the market price. No feed reported a circulating supply.",
   "assets.priceHint": "Price {price}",
   "assets.depthHint": "Depth {value} in the deepest pair",
   "assets.noDepthHint": "No pair depth reported, so nothing corroborates this price.",
@@ -221,7 +215,6 @@ const en = {
   "assets.sourceIndexer": "Explorer quote — matched by the explorer, not by a pool this app read",
   "assets.sourcePool": "Mid price of one pool on this chain",
   "assets.sourceStable": "The chain's USD unit, held at one dollar",
-  "assets.capUnknown": "no cap",
   "assets.unverifiedHint":
     "Nothing this app read corroborates this figure: no market feed covers the token, or the pair behind it is too thin for the price to mean much. Treat it as a guess.",
   "assets.live": "Live",
@@ -238,10 +231,6 @@ const en = {
   "assets.detecting": "Scanning transfers…",
   "assets.detectResult": "{count} token(s) found across the last {blocks} blocks.",
   "assets.detectPartial": "The window was cut short by the endpoint; run it again to reach further back.",
-  "assets.detected": "Detected tokens",
-  "assets.noneDetected": "Nothing detected yet",
-  "assets.imported": "Imported tokens",
-  "assets.noneImported": "None imported",
 
   "activity.title": "Activity",
   "activity.all": "All",
@@ -460,10 +449,7 @@ const en = {
   "positions.realised": "Realised",
   "positions.unpriced": "No route",
 
-  "settings.priorityFee": "Priority fee (gwei)",
   "settings.maxImpact": "Impact guard (bps)",
-  "settings.priorityFeeHint":
-    "Rides on top of the base fee; 0 leaves the tip to the wallet.",
   "settings.impactHint":
     "Refuses any swap that would cost more than this in depth — which is what a drained pool looks like from the outside.",
 
@@ -506,7 +492,6 @@ const id: Record<TKey, string> = {
   "wallet.switchTo": "Pindah ke {chain}",
   "wallet.balancesOnly": "Hanya saldo — belum ada tempat routing",
   "wallet.embedded": "Dompet bawaan",
-  "wallet.otherWallets": "Dompet lain",
   "wallet.use": "Pakai",
   "wallet.exportKey": "Ekspor kunci privat",
   "wallet.privyDisabled":
@@ -518,7 +503,6 @@ const id: Record<TKey, string> = {
   "wallet.wallets": "Dompet",
   "wallet.addWallet": "Hubungkan dompet lain",
   "wallet.active": "Aktif",
-  "wallet.balance": "Saldo",
   "wallet.otherNetwork":
     "Dompetmu sedang menunjuk jaringan lain. Isi dompet di {chain} tetap dibaca lewat endpoint aplikasi ini — pindah jaringan hanya perlu saat menandatangani transaksi.",
   "wallet.securedBy": "Diamankan oleh Privy",
@@ -656,8 +640,6 @@ const id: Record<TKey, string> = {
   "assets.scopeOnly": "Hanya cakupan",
   "assets.scopeOnlyHint":
     "Indexer chain tidak menjawab, jadi daftar ini hanya memuat token yang sudah dikenal aplikasi. Jalankan pemindaian dompet di bawah untuk menemukan sisanya.",
-  "assets.marketCap": "MC",
-  "assets.fdv": "FDV",
   "assets.dustHidden": "{count} kepemilikan di bawah $1 atau tanpa harga disembunyikan",
   "assets.dustShown": "{count} kepemilikan di bawah $1 atau tanpa harga",
   "assets.dustShow": "Tampilkan",
@@ -667,8 +649,6 @@ const id: Record<TKey, string> = {
     "Tidak ada feed pasar yang melaporkan perubahan 24 jam untuk token ini. Kutipan explorer dan harga tengah pool sama-sama hanya satu pembacaan, tanpa data kemarin untuk dibandingkan.",
   "assets.capLine": "Market cap {value} — suplai beredar dikali harga pasar.",
   "assets.fdvLine": "Terdilusi penuh {value} — total suplai dikali harga pasar.",
-  "assets.capHint": "Market cap — suplai beredar dikali harga pasar.",
-  "assets.fdvHint": "Terdilusi penuh — total suplai dikali harga pasar. Tidak ada feed yang melaporkan suplai beredar.",
   "assets.priceHint": "Harga {price}",
   "assets.depthHint": "Likuiditas {value} di pair terdalam",
   "assets.noDepthHint": "Tidak ada data likuiditas, jadi tidak ada yang menguatkan harga ini.",
@@ -676,7 +656,6 @@ const id: Record<TKey, string> = {
   "assets.sourceIndexer": "Kutipan explorer — dicocokkan oleh explorer, bukan dari pool yang dibaca app ini",
   "assets.sourcePool": "Harga tengah satu pool di chain ini",
   "assets.sourceStable": "Unit dolar chain ini, dipegang di satu dolar",
-  "assets.capUnknown": "tanpa cap",
   "assets.unverifiedHint":
     "Tidak ada yang menguatkan angka ini: tidak ada feed pasar yang meliput token ini, atau pair di baliknya terlalu tipis untuk membuat harganya berarti. Anggap saja perkiraan.",
   "assets.live": "Live",
@@ -693,10 +672,6 @@ const id: Record<TKey, string> = {
   "assets.detecting": "Memindai transfer…",
   "assets.detectResult": "{count} token ditemukan dalam {blocks} blok terakhir.",
   "assets.detectPartial": "Jangkauan dipotong oleh endpoint; jalankan lagi untuk menelusuri lebih jauh.",
-  "assets.detected": "Token terdeteksi",
-  "assets.noneDetected": "Belum ada yang terdeteksi",
-  "assets.imported": "Token terimpor",
-  "assets.noneImported": "Belum ada",
 
   "activity.title": "Aktivitas",
   "activity.all": "Semua",
@@ -915,10 +890,7 @@ const id: Record<TKey, string> = {
   "positions.realised": "Terkunci",
   "positions.unpriced": "Tidak ada rute",
 
-  "settings.priorityFee": "Priority fee (gwei)",
   "settings.maxImpact": "Penjaga dampak (bps)",
-  "settings.priorityFeeHint":
-    "Ditambahkan di atas base fee; 0 berarti tipnya diserahkan ke dompet.",
   "settings.impactHint":
     "Menolak swap yang biayanya melebihi angka ini — begitulah pool yang sudah dikuras terlihat dari luar.",
 
