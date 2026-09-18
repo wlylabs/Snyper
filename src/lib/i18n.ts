@@ -139,42 +139,8 @@ const en = {
   "memecoin.failedHint":
     "Every pair here is built from swap events read straight off chain 4663, and that read did not come back.",
 
-  "faq.healthy.q": "What does Healthy filter for?",
-  "faq.healthy.a":
-    "Two ratios the trading write-ups agree on, and a dollar floor. Liquidity has to be at least a tenth of the market cap — the usual guidance is ten to twenty percent, and under it a position cannot be closed anywhere near the price on screen, which is what a rug is before anyone has to be dishonest. Fully diluted has to be no more than twice the market cap: under two is called healthy and means the supply is mostly out already, while over five is the danger line and eight to ten means around nine tenths of it is still waiting to land on whoever bought early. On top of both, the market cap, the volume and the fully diluted figure each have to clear a thousand dollars.\n\nVolume is a dollar floor rather than a ratio on purpose. The published ratios are against a day of trading — thirty percent of market cap by one account, a full turn by another — and this screen sees five minutes. Dividing a daily figure by two hundred and eighty-eight would assume a token trades evenly around the clock, which is the one thing a memecoin never does.\n\nThe LIQ figure on a row turns amber on its own when the pool is under that tenth, whether or not the filter is on.",
-  "faq.bands.q": "What do Pumping, Flat and Dumping mean?",
-  "faq.bands.a":
-    "They band the move across the same five minutes the rest of the screen covers: up fifty percent or more, down fifty or more, or inside ten either way. Fifty is the line because on this chain it is an ordinary five minutes — the list routinely carries a token up three hundred percent beside one down forty, and a band drawn at ten would hold everything. Flat means flat for five minutes, which is not the same as accumulating: that is a claim about hours, and hours are not something this endpoint will serve.",
-  "faq.window.q": "Why does the memes screen only cover five minutes?",
-  "faq.window.a":
-    "Because that is what the chain will hand over in one question. Chain 4663 settles a block every hundred milliseconds and puts about four thousand swaps in five minutes, which is close to the most the public endpoint returns at once — ask for fifteen and it refuses. Narrowing to a handful of pools buys no more reach. So the column says 5m, because five minutes is what there is, and a screen labelled 24h would be inventing the other twenty-three.",
 
-  "settings.faq": "Questions",
 
-  "faq.numbers.q": "Where do these balances come from?",
-  "faq.numbers.a":
-    "Which tokens an address holds is a question no single chain call answers, so the chain's explorer is asked for the list — that is how every wallet does it. The amounts are not taken from it: every listed token is read back off the chain in one call, and what you see is what the chain returned. A figure the chain would not confirm is marked.",
-  "faq.total.q": "Why is the total lower than what I hold?",
-  "faq.total.a":
-    "Only holdings something has priced are counted. Two thirds of the tokens on this chain have no price at all, and counting those as nothing would be as wrong as counting them as anything else. Tokens you have hidden are left out too.",
-  "faq.small.q": "Where did my small holdings go?",
-  "faq.small.a":
-    "Anything worth under a dollar is folded away, the unpriced with it, so that what is worth reading is not buried under a couple of hundred airdrops. The line under the list says how many, and a tap brings them back. The coin is never folded, whatever it is worth, because gas comes out of it.",
-  "faq.marked.q": "Why is a token marked?",
-  "faq.marked.a":
-    "One of two reasons. Either something else in this wallet answers to the same ticker — anyone can deploy a token under any letters they like, and thirty-five separate contracts on this chain call themselves USDG — or the name is an advertisement carrying a web address. Nothing real asks you to visit a site to claim, verify or unfreeze anything. The contract address on a token's own screen is the only thing that says which token you are holding.",
-  "faq.hide.q": "What happens when I hide a token?",
-  "faq.hide.a":
-    "It stops being listed here and stops counting toward the total, and nothing else. The token is still in the wallet, still yours and still sellable — hiding is a note this app keeps for itself, not something the chain is told. The line under the list brings them all back.",
-  "faq.approve.q": "Why does selling ask for two signatures?",
-  "faq.approve.a":
-    "A router cannot move a token it has not been allowed to move, so the first signature is the allowance and the second is the sale. The allowance is written for exactly the amount being sold rather than the unlimited one most apps ask for, so nothing is left standing behind you once the trade is done.",
-  "faq.slippage.q": "Why can I not choose a slippage?",
-  "faq.slippage.a":
-    "Slippage is a bet on how far a pool moves between the quote and the block the trade lands in — not something you can see, and something the pool can answer. Every quote goes out beside a hundredth of itself, and the gap between the two prices is how far this trade moves the pool. One that barely moves gets the smallest bound there is; one that moves gets a margin above what it moved. Past five percent it stops being a tolerance and the trade is refused instead.",
-  "faq.nosell.q": "Why can I not sell some tokens?",
-  "faq.nosell.a":
-    "Nothing on this chain trades them. A token can be held, named and even priced without a pool existing for it here, and this app will not invent a market that is not there.",
 
   "settings.title": "Settings",
   "settings.subtitle": "How the app reads on this device",
@@ -363,42 +329,8 @@ const id: Record<TKey, string> = {
   "memecoin.failedHint":
     "Setiap pair di sini dibangun dari event swap yang dibaca langsung dari chain 4663, dan bacaan itu tidak kembali.",
 
-  "faq.healthy.q": "Saringan Sehat itu menyaring apa?",
-  "faq.healthy.a":
-    "Dua rasio yang disepakati tulisan-tulisan trading, plus satu lantai dolar. Likuiditas harus minimal sepersepuluh market cap — panduan umumnya sepuluh sampai dua puluh persen, dan di bawah itu sebuah posisi tidak bisa ditutup mendekati harga yang tertera di layar, dan itulah rug sebelum ada yang perlu berbohong. Nilai terdilusi penuh maksimal dua kali market cap: di bawah dua disebut sehat dan berarti suplainya sudah sebagian besar beredar, sementara di atas lima adalah garis bahaya dan delapan sampai sepuluh berarti sekitar sembilan persepuluh suplainya masih menunggu untuk mendarat di atas siapa pun yang membeli awal. Di atas keduanya, market cap, volume, dan nilai terdilusi masing-masing harus melewati seribu dolar.\n\nVolume sengaja jadi lantai dolar, bukan rasio. Rasio yang diterbitkan dihitung terhadap perdagangan sehari — tiga puluh persen market cap menurut satu sumber, satu putaran penuh menurut yang lain — sementara layar ini melihat lima menit. Membagi angka harian dengan dua ratus delapan puluh delapan akan mengandaikan token diperdagangkan merata sepanjang hari, dan itu satu-satunya hal yang tidak pernah dilakukan memecoin.\n\nAngka LIQ di sebuah baris berubah kuning dengan sendirinya kalau pool-nya di bawah sepersepuluh itu, saringannya menyala atau tidak.",
-  "faq.bands.q": "Apa arti Naik, Datar, dan Jatuh?",
-  "faq.bands.a":
-    "Ketiganya mengelompokkan pergerakan dalam lima menit yang sama dengan sisa layar ini: naik lima puluh persen atau lebih, turun lima puluh atau lebih, atau dalam sepuluh persen ke arah mana pun. Lima puluh jadi garisnya karena di chain ini itu lima menit yang biasa saja — daftarnya rutin memuat token naik tiga ratus persen bersebelahan dengan yang turun empat puluh, dan garis di sepuluh akan memuat semuanya. Datar berarti datar selama lima menit, dan itu bukan akumulasi: akumulasi itu klaim tentang berjam-jam, dan berjam-jam bukan sesuatu yang diberikan endpoint ini.",
-  "faq.window.q": "Kenapa layar memes cuma mencakup lima menit?",
-  "faq.window.a":
-    "Karena itu yang diberikan chain dalam satu pertanyaan. Chain 4663 menutup blok tiap seratus milidetik dan menampung sekitar empat ribu swap dalam lima menit — mendekati batas yang dikembalikan endpoint publik sekali jalan; minta lima belas menit dan ia menolak. Mempersempit ke segelintir pool pun tidak menambah jangkauan. Jadi kolomnya tertulis 5m, karena lima menit itulah yang ada, dan layar berlabel 24 jam akan mengarang dua puluh tiga jam sisanya.",
 
-  "settings.faq": "Pertanyaan",
 
-  "faq.numbers.q": "Angka saldo ini datang dari mana?",
-  "faq.numbers.a":
-    "Token apa saja yang dipegang sebuah alamat tidak bisa dijawab satu panggilan chain mana pun, jadi daftarnya ditanyakan ke explorer chain ini — begitu pula cara setiap dompet bekerja. Jumlahnya tidak diambil dari sana: setiap token yang didaftar dibaca ulang dari chain dalam satu panggilan, dan yang kamu lihat adalah jawaban chain. Angka yang tidak dikonfirmasi chain akan ditandai.",
-  "faq.total.q": "Kenapa totalnya lebih kecil dari yang saya pegang?",
-  "faq.total.a":
-    "Hanya yang ada harganya yang dihitung. Dua pertiga token di chain ini sama sekali tidak punya harga, dan menghitungnya sebagai nol sama kelirunya dengan menghitungnya sebagai angka lain. Token yang kamu sembunyikan juga tidak ikut.",
-  "faq.small.q": "Ke mana perginya token-token kecil saya?",
-  "faq.small.a":
-    "Apa pun yang bernilai di bawah satu dolar dilipat, termasuk yang tak berharga, supaya yang layak dibaca tidak terkubur di bawah ratusan airdrop. Baris di bawah daftar menyebut berapa banyak, dan satu ketukan mengembalikannya. Koinnya sendiri tidak pernah dilipat berapa pun nilainya, karena gas dibayar dengannya.",
-  "faq.marked.q": "Kenapa ada token yang ditandai?",
-  "faq.marked.a":
-    "Salah satu dari dua sebab. Ada token lain di dompet ini yang memakai ticker yang sama — siapa pun bisa menerbitkan token dengan huruf apa pun, dan tiga puluh lima kontrak berbeda di chain ini mengaku USDG — atau namanya sebuah iklan yang membawa alamat web. Tidak ada hal asli yang menyuruhmu datang ke sebuah situs untuk mengklaim, memverifikasi atau membuka blokir apa pun. Alamat kontrak di layar token itu satu-satunya yang menyatakan token mana yang kamu pegang.",
-  "faq.hide.q": "Apa yang terjadi kalau saya sembunyikan token?",
-  "faq.hide.a":
-    "Ia berhenti didaftar di sini dan berhenti dihitung ke total, dan hanya itu. Tokennya tetap ada di dompet, tetap milikmu dan tetap bisa dijual — menyembunyikan adalah catatan yang disimpan aplikasi ini sendiri, bukan sesuatu yang diberitahukan ke chain. Baris di bawah daftar mengembalikan semuanya.",
-  "faq.approve.q": "Kenapa menjual minta dua tanda tangan?",
-  "faq.approve.a":
-    "Router tidak bisa memindahkan token yang belum diizinkan, jadi tanda tangan pertama adalah izinnya dan yang kedua penjualannya. Izin itu ditulis persis sebanyak yang dijual, bukan izin tak terbatas seperti kebanyakan aplikasi, jadi tidak ada sisa yang tertinggal di belakangmu setelah transaksinya selesai.",
-  "faq.slippage.q": "Kenapa saya tidak bisa memilih slippage?",
-  "faq.slippage.a":
-    "Slippage itu taruhan tentang seberapa jauh pool bergeser antara quote dan blok tempat transaksinya mendarat — bukan sesuatu yang bisa kamu lihat, dan justru bisa dijawab pool-nya. Setiap quote dikirim berdampingan dengan seperseratus dirinya, dan selisih kedua harganya adalah seberapa jauh transaksi ini menggeser pool. Yang nyaris tidak bergeser mendapat batas terkecil yang ada; yang bergeser mendapat margin di atas pergeserannya. Di atas lima persen itu bukan lagi toleransi, dan transaksinya ditolak.",
-  "faq.nosell.q": "Kenapa ada token yang tidak bisa saya jual?",
-  "faq.nosell.a":
-    "Tidak ada yang memperdagangkannya di chain ini. Sebuah token bisa dipegang, punya nama, bahkan punya harga, tanpa ada pool untuknya di sini — dan aplikasi ini tidak akan mengarang pasar yang tidak ada.",
 
   "settings.title": "Pengaturan",
   "settings.subtitle": "Cara aplikasi ini tampil di perangkatmu",

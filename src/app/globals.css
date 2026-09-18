@@ -330,107 +330,6 @@
     background: var(--color-line);
   }
 
-  /* ---------- faq ---------- */
-
-  /*
-   * A question is a row until it is asked.
-   *
-   * `details` rather than state, because the one behaviour here is the one
-   * behaviour browsers already agree on: it opens from the keyboard, it is
-   * announced as a disclosure without being told to be, and it works in a
-   * document that never finished hydrating.
-   */
-  .faq + .faq {
-    border-top: 1px solid var(--color-line);
-  }
-
-  .faq summary {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 11px 0;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    /* Both, because Safari keeps its marker behind the vendor pseudo-element. */
-    list-style: none;
-    transition: color var(--dur-tap) var(--ease-out);
-  }
-
-  .faq summary::-webkit-details-marker {
-    display: none;
-  }
-
-  .faq summary:hover {
-    color: var(--color-accent-text);
-  }
-
-  .faq summary svg {
-    flex-shrink: 0;
-    margin-left: auto;
-    color: var(--color-faint);
-    transition: transform var(--dur-tap) var(--ease-out);
-  }
-
-  .faq[open] summary svg {
-    transform: rotate(180deg);
-  }
-
-  /*
-   * The answer arrives rather than appearing.
-   *
-   * `details` has no transition of its own — the content is there or it is not,
-   * which reads as a snap beside a chevron that took 140ms to turn. So the
-   * content pane is animated directly.
-   *
-   * In two layers, because the engines are not in the same place. Every current
-   * browser can transition the pane's opacity, so everyone gets the fade. Only
-   * an engine with `interpolate-size` can transition a height to `auto`, which
-   * today is Chromium alone, so the height is asked for rather than assumed and
-   * scoped to this pane rather than switched on at the root — turning keyword
-   * interpolation on globally changes how every other height in the app would
-   * animate. Where neither lands, the answer appears exactly as it did before.
-   *
-   * `content-visibility` is transitioned as a discrete property because the
-   * browser sets it to `hidden` the moment the element closes; without it the
-   * close has nothing left on screen to animate.
-   */
-  .faq::details-content {
-    opacity: 0;
-    transition:
-      opacity var(--dur-enter) var(--ease-out),
-      content-visibility var(--dur-enter) allow-discrete;
-  }
-
-  .faq[open]::details-content {
-    opacity: 1;
-  }
-
-  @supports (interpolate-size: allow-keywords) {
-    .faq::details-content {
-      block-size: 0;
-      overflow: hidden;
-      interpolate-size: allow-keywords;
-      transition:
-        block-size var(--dur-enter) var(--ease-out),
-        opacity var(--dur-enter) var(--ease-out),
-        content-visibility var(--dur-enter) allow-discrete;
-    }
-
-    .faq[open]::details-content {
-      block-size: auto;
-    }
-  }
-
-  .faq-answer {
-    /* Long answers break into paragraphs; the blank line in the string is it. */
-    white-space: pre-line;
-    padding-bottom: 12px;
-    font-size: 11px;
-    line-height: 1.75;
-    color: var(--color-dim);
-  }
-
   /* ---------- press ---------- */
 
   /*
@@ -1634,8 +1533,7 @@
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
-    *::after,
-    *::details-content {
+    *::after {
       animation-duration: 1ms !important;
       animation-iteration-count: 1 !important;
       transition-duration: 1ms !important;
