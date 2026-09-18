@@ -90,8 +90,6 @@ const en = {
   "swap.venue": "Uniswap v3 · {fee}% fee",
   "swap.approve": "Allow {symbol}",
   "swap.approving": "Waiting for the allowance…",
-  "swap.approveWhy":
-    "A router cannot move a token it has not been allowed to move. This is written for exactly the amount being sold, so nothing is left standing afterwards.",
   "swap.send": "Sell {symbol}",
   "swap.sending": "Selling…",
   "swap.checking": "Checking with the chain…",
@@ -256,8 +254,6 @@ const id: Record<TKey, string> = {
   "swap.venue": "Uniswap v3 · biaya {fee}%",
   "swap.approve": "Izinkan {symbol}",
   "swap.approving": "Menunggu izinnya…",
-  "swap.approveWhy":
-    "Router tidak bisa memindahkan token yang belum diizinkan. Izin ini ditulis persis sebanyak yang dijual, jadi tidak ada sisa yang tertinggal setelahnya.",
   "swap.send": "Jual {symbol}",
   "swap.sending": "Menjual…",
   "swap.checking": "Memastikan ke chain…",

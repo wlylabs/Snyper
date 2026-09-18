@@ -207,9 +207,6 @@ export function SwapPanel({ row, onSold }: { row: Holding; onSold: () => void })
         <p className="mt-3 text-[11px] leading-relaxed text-faint">{t("swap.slippageAuto")}</p>
       )}
 
-      {!approved && ready && (
-        <p className="mt-2 text-[11px] leading-relaxed text-faint">{t("swap.approveWhy")}</p>
-      )}
 
       <button
         type="button"
