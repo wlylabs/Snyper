@@ -1,18 +1,17 @@
 "use client";
 
-import { Icon } from "@/components/ui/Icon";
 import { Panel } from "@/components/ui/Panel";
 import { Segmented } from "@/components/ui/Segmented";
-import { useToast } from "@/components/ui/Toast";
 import { useI18n } from "@/hooks/useI18n";
 import { useMounted } from "@/hooks/useMounted";
 import { LOCALES } from "@/lib/i18n";
-import { DEFAULT_SETTINGS, useAppStore } from "@/store/useAppStore";
+import { useAppStore } from "@/store/useAppStore";
 
 /**
  * The settings the app still has, which is what it looks like and what language
- * it speaks. Both are also one press away in the header — this is where they are
- * named and explained, rather than a second place to reach them.
+ * it speaks. Both live here and nowhere else — the header carried a pair of
+ * keys for them for a while, and a switch in two places is one place too many
+ * for a setting a reader touches once.
  *
  * Nothing renders before mount: every control here reflects stored state, and a
  * segmented control marking the wrong option for a frame is worse than one that
@@ -21,7 +20,6 @@ import { DEFAULT_SETTINGS, useAppStore } from "@/store/useAppStore";
 export default function SettingsPage() {
   const mounted = useMounted();
   const { t } = useI18n();
-  const toast = useToast();
   const settings = useAppStore((state) => state.settings);
   const setSettings = useAppStore((state) => state.setSettings);
 
@@ -72,23 +70,6 @@ export default function SettingsPage() {
             <div className="skel h-[34px] w-[168px]" />
           )}
         </div>
-      </Panel>
-
-      <Panel label={t("settings.localData")} bodyClassName="p-3">
-        <p className="text-[11px] leading-relaxed text-dim">{t("settings.localDataNote")}</p>
-        <button
-          type="button"
-          className="btn btn-sm mt-3 w-full"
-          onClick={() => {
-            // Back to the defaults, which includes following the browser's own
-            // language again — that is what a reader resetting this is asking for.
-            setSettings(DEFAULT_SETTINGS);
-            toast.push({ tone: "info", message: t("settings.resetDone") });
-          }}
-        >
-          <Icon name="refresh" size={13} />
-          {t("settings.reset")}
-        </button>
       </Panel>
     </div>
   );

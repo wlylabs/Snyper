@@ -74,7 +74,8 @@
 :root {
   color-scheme: dark;
   --shell-top: 56px;
-  --shell-rail: 80px;
+  /* Wide enough for the longest nav label — "Pengaturan" — unabbreviated. */
+  --shell-rail: 96px;
   --shell-tabs: 60px;
   /* One rail row, and the distance the rail indicator travels per nav item. */
   --nav-rail-item: 58px;

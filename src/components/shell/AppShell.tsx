@@ -7,7 +7,6 @@ import { Icon } from "@/components/ui/Icon";
 import { Logo } from "@/components/ui/Logo";
 import { ConnectControl } from "@/components/wallet/ConnectControl";
 import { ChainControl } from "@/components/wallet/ChainControl";
-import { LocaleToggle, ThemeToggle } from "./DisplayToggles";
 import { InstallBanner } from "./InstallPrompt";
 import { StatusStrip } from "./StatusStrip";
 import { NAV_ITEMS, isActivePath } from "./nav";
@@ -35,8 +34,6 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Link>
           <span className="chip hidden lg:inline-flex">{t("common.nonCustodial")}</span>
           <div className="ml-auto flex items-center gap-2">
-            <ThemeToggle />
-            <LocaleToggle />
             <ChainControl />
             <ConnectControl />
           </div>
