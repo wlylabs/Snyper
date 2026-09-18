@@ -7,14 +7,29 @@ import { useAppStore } from "@/store/useAppStore";
 import { useMounted } from "@/hooks/useMounted";
 import { useI18n } from "@/hooks/useI18n";
 
+/**
+ * How often the head is asked for, for the readout below.
+ *
+ * Not the client's own interval, which viem derives from the chain's block time
+ * and which chain 4663 makes 500ms — two `eth_blockNumber` calls a second, for
+ * every open tab, forever, which is how a decorative number becomes the app's
+ * heaviest caller and the first thing a rate limited endpoint refuses. That
+ * interval is right for what it is actually for, which is waiting on a receipt
+ * a reader just signed. A block height on the status bar is not that: it is
+ * there to show the chain is moving, and it shows that just as well four
+ * seconds at a time.
+ */
+const HEAD_INTERVAL = 4000;
+
 export function StatusStrip() {
   const mounted = useMounted();
   const { t } = useI18n();
   const { chainId, isConnected } = useAccount();
   const meta = chainMeta(chainId);
+  const watching = mounted && isConnected && Boolean(meta);
   const { data: blockNumber } = useBlockNumber({
-    watch: mounted && isConnected && Boolean(meta),
-    query: { enabled: mounted && isConnected && Boolean(meta) },
+    watch: watching ? { poll: true, pollingInterval: HEAD_INTERVAL } : false,
+    query: { enabled: watching },
   });
 
   const snypes = useAppStore((state) => state.snypes);
