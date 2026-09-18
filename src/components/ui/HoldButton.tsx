@@ -19,11 +19,11 @@ type Props = {
 /**
  * Press and hold to confirm.
  *
- * The two actions in Snyper that cannot be undone — dropping a wallet from the
- * session, deleting a finished strategy — used to be a single tap, or a tap
- * followed by a second button that looked exactly like the first. Both are the
- * same mistake: a dialog answered on reflex is not a confirmation, it is a
- * habit, and the tap that opened it was the only deliberate part.
+ * Dropping a wallet from the session — the one action here a reader cannot take
+ * back — used to be a single tap, or a tap followed by a second button that
+ * looked exactly like the first. Both are the same mistake: a dialog answered
+ * on reflex is not a confirmation, it is a habit, and the tap that opened it
+ * was the only deliberate part.
  *
  * Holding moves the deliberation into the press itself. The fill sweeping
  * across the button is the reader's own commitment being drawn, letting go

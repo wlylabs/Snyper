@@ -4,7 +4,6 @@ import { useAccount, useChainId, useSwitchChain } from "wagmi";
 import { CHAIN_ID, chainMeta } from "@/lib/chains";
 import { useMounted } from "@/hooks/useMounted";
 import { useI18n } from "@/hooks/useI18n";
-import { useVenue } from "@/hooks/useVenue";
 
 /**
  * The network badge. Snyper speaks one chain, so there is nothing to pick here:
@@ -17,7 +16,6 @@ export function ChainControl() {
   const activeChainId = useChainId();
   const { chainId: accountChainId, isConnected } = useAccount();
   const { switchChain, isPending } = useSwitchChain();
-  const { hasRouting } = useVenue();
 
   const currentId = accountChainId ?? activeChainId;
   const meta = chainMeta(CHAIN_ID);
@@ -43,11 +41,8 @@ export function ChainControl() {
   }
 
   return (
-    <span
-      className="btn btn-sm cursor-default"
-      title={hasRouting ? meta?.label : t("wallet.balancesOnly")}
-    >
-      <span className={`dot ${hasRouting ? "dot-live" : ""}`} />
+    <span className="btn btn-sm cursor-default" title={meta?.label}>
+      <span className={`dot ${isConnected ? "dot-live" : ""}`} />
       <span>{meta?.mark ?? t("common.network")}</span>
     </span>
   );

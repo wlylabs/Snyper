@@ -7,11 +7,17 @@ export type NavItem = {
   icon: IconName;
 };
 
+/**
+ * Four surfaces: the home screen, what the connected wallet holds, where new
+ * memecoins are found, and the settings. The first three are empty for now —
+ * the shell, the wallet session and the chain badge are what this release
+ * keeps, and what goes inside those pages is written next. Settings is not a
+ * placeholder: it configures the two things that still exist.
+ */
 export const NAV_ITEMS: NavItem[] = [
-  { href: "/", label: "nav.terminal", icon: "candles" },
-  { href: "/bots", label: "nav.bots", icon: "grid" },
-  { href: "/assets", label: "nav.assets", icon: "stack" },
-  { href: "/activity", label: "nav.activity", icon: "pulse" },
+  { href: "/", label: "nav.home", icon: "crosshair" },
+  { href: "/balance", label: "nav.balance", icon: "stack" },
+  { href: "/discover", label: "nav.discover", icon: "search" },
   { href: "/settings", label: "nav.settings", icon: "sliders" },
 ];
 

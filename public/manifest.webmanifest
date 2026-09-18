@@ -1,80 +1,68 @@
 {
   "id": "/",
-  "name": "Snyper — Robinhood Chain terminal",
+  "name": "Snyper — Robinhood Chain",
   "short_name": "Snyper",
-  "description": "Non-custodial Robinhood Chain terminal: paste a memecoin contract, price it against its Uniswap pool or its Pons bonding curve, and run snypes — buy at your price, take profit, cut loss — from any device.",
+  "description": "Non-custodial Robinhood Chain app. Connect a wallet — browser, mobile, or one Privy creates on the spot — and the session is yours on any device.",
   "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",
-  "display_override": ["window-controls-overlay", "standalone", "minimal-ui", "browser"],
+  "display_override": [
+    "window-controls-overlay",
+    "standalone",
+    "minimal-ui",
+    "browser"
+  ],
   "orientation": "any",
   "background_color": "#07080a",
   "theme_color": "#07080a",
   "lang": "en",
   "dir": "ltr",
-  "categories": ["finance", "productivity", "utilities"],
+  "categories": [
+    "finance",
+    "productivity",
+    "utilities"
+  ],
   "prefer_related_applications": false,
-  "launch_handler": { "client_mode": ["navigate-existing", "auto"] },
+  "launch_handler": {
+    "client_mode": [
+      "navigate-existing",
+      "auto"
+    ]
+  },
   "handle_links": "preferred",
-  "edge_side_panel": { "preferred_width": 420 },
+  "edge_side_panel": {
+    "preferred_width": 420
+  },
   "icons": [
-    { "src": "/icons/icon.svg?v=2", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
-    { "src": "/icons/icon-192.png?v=2", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/icon-512.png?v=2", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/maskable-192.png?v=2", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
-    { "src": "/icons/maskable-512.png?v=2", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
-  ],
-  "screenshots": [
     {
-      "src": "/screenshots/terminal-wide.png?v=2",
-      "sizes": "1440x900",
+      "src": "/icons/icon.svg?v=2",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192.png?v=2",
+      "sizes": "192x192",
       "type": "image/png",
-      "form_factor": "wide",
-      "label": "Execution terminal with live pool pricing"
+      "purpose": "any"
     },
     {
-      "src": "/screenshots/assets-wide.png?v=2",
-      "sizes": "1440x900",
+      "src": "/icons/icon-512.png?v=2",
+      "sizes": "512x512",
       "type": "image/png",
-      "form_factor": "wide",
-      "label": "Holdings read straight from the chain"
+      "purpose": "any"
     },
     {
-      "src": "/screenshots/terminal-narrow.png?v=2",
-      "sizes": "430x932",
+      "src": "/icons/maskable-192.png?v=2",
+      "sizes": "192x192",
       "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Execution terminal on mobile"
+      "purpose": "maskable"
     },
     {
-      "src": "/screenshots/strategies-narrow.png?v=2",
-      "sizes": "430x932",
+      "src": "/icons/maskable-512.png?v=2",
+      "sizes": "512x512",
       "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Strategy list on mobile"
-    }
-  ],
-  "shortcuts": [
-    {
-      "name": "Strategies",
-      "short_name": "Strategies",
-      "description": "Set up a snype and watch the ones already armed",
-      "url": "/bots?source=pwa",
-      "icons": [{ "src": "/icons/shortcuts/strategies.png?v=2", "sizes": "96x96", "type": "image/png" }]
-    },
-    {
-      "name": "Assets",
-      "short_name": "Assets",
-      "description": "Balances read straight from the chain",
-      "url": "/assets?source=pwa",
-      "icons": [{ "src": "/icons/shortcuts/assets.png?v=2", "sizes": "96x96", "type": "image/png" }]
-    },
-    {
-      "name": "Activity",
-      "short_name": "Activity",
-      "description": "Local ledger of submitted transactions",
-      "url": "/activity?source=pwa",
-      "icons": [{ "src": "/icons/shortcuts/activity.png?v=2", "sizes": "96x96", "type": "image/png" }]
+      "purpose": "maskable"
     }
   ]
 }

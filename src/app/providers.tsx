@@ -8,8 +8,6 @@ import { WagmiProvider as BareWagmiProvider } from "wagmi";
 import { config } from "@/lib/wagmi";
 import { PRIVY_APP_ID, PRIVY_CLIENT_ID, PRIVY_CONFIGURED, privyConfig } from "@/lib/privy";
 import { ToastProvider } from "@/components/ui/Toast";
-import { SnypeRunner } from "@/components/snype/SnypeRunner";
-import { VenueSync } from "@/hooks/useVenue";
 import { ConnectPromptProvider } from "@/hooks/useConnectPrompt";
 import { ActiveWalletSync } from "@/components/wallet/ActiveWalletSync";
 import { useAppStore } from "@/store/useAppStore";
@@ -32,7 +30,6 @@ function ThemeSync() {
 function LocaleSync() {
   const locale = useAppStore((state) => state.settings.locale);
   const localeChosen = useAppStore((state) => state.settings.localeChosen);
-  const currency = useAppStore((state) => state.settings.currency);
   const hydrated = useAppStore((state) => state.hydrated);
   const setSettings = useAppStore((state) => state.setSettings);
 
@@ -43,11 +40,8 @@ function LocaleSync() {
       navigator.languages?.length ? navigator.languages : [navigator.language],
     );
     if (detected === locale) return;
-    setSettings({
-      locale: detected,
-      currency: detected === "id" && currency === "USD" ? "IDR" : currency,
-    });
-  }, [hydrated, localeChosen, locale, currency, setSettings]);
+    setSettings({ locale: detected });
+  }, [hydrated, localeChosen, locale, setSettings]);
 
   useEffect(() => {
     setNumberLocale(INTL_LOCALE[locale]);
@@ -123,8 +117,6 @@ export function Providers({ children }: { children: ReactNode }) {
           <ThemeSync />
           <LocaleSync />
           <ServiceWorker />
-          <VenueSync />
-          <SnypeRunner />
           {children}
         </ToastProvider>
       </WalletProviders>
