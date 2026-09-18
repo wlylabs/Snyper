@@ -46,6 +46,16 @@ export type Pair = {
   liquidity: number;
   /** Minutes since the pool was created, when that is known. */
   age?: number;
+  /**
+   * What the chart needs to turn one of this pool's swaps into a dollar price:
+   * which side the token sits on, the two decimals the pool's own figure is
+   * scaled by, and what a quote unit is worth. Carried from the busiest pool,
+   * which is the one the fold keeps and the one the chart reads.
+   */
+  baseIsToken0: boolean;
+  decimals0: number;
+  decimals1: number;
+  usdRate: number;
 };
 
 type Tally = {
@@ -289,6 +299,10 @@ async function read(client: PublicClient): Promise<Pair[]> {
           ? (Number(resting.result) / 10 ** quote.decimals) * rate
           : 0,
       age: entry.block === undefined ? undefined : Number(head - entry.block) / 600,
+      baseIsToken0: entry.baseIsToken0,
+      decimals0,
+      decimals1,
+      usdRate: rate,
     } satisfies Pair;
   });
 
