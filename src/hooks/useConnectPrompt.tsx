@@ -7,10 +7,10 @@ import { usePrivy } from "@privy-io/react-auth";
  * One way in, from anywhere.
  *
  * Connecting is not something that only happens in the header. A reader who has
- * priced a swap and reached for the execute button is already at the connect
- * moment, and sending them back up to the corner to start it again is a seam
- * where there should be none. This carries Privy's login modal down to whatever
- * control needs it.
+ * reached a control that needs an address is already at the connect moment, and
+ * sending them back up to the corner to start it again is a seam where there
+ * should be none. This carries Privy's login modal down to whatever control
+ * needs it.
  *
  * It is a context rather than a hook over `usePrivy` because `usePrivy` throws
  * outside a `PrivyProvider`, and a build with no app id has no provider to be

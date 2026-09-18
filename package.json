@@ -7,10 +7,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit",
-    "contracts:build": "node scripts/compile-contracts.mjs",
-    "contracts:test": "node --experimental-strip-types scripts/test-router.mjs",
-    "discovery:test": "node --experimental-strip-types scripts/test-discovery.mjs"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@privy-io/react-auth": "^3.42.0",
@@ -28,7 +25,6 @@
     "@types/node": "^22.10.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "solc": "^0.8.28",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.9.3"
   }

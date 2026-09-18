@@ -94,7 +94,6 @@
   --dur-tap: 140ms;
   --dur-enter: 200ms;
   --dur-travel: 260ms;
-  --dur-flash: 640ms;
   --ease-out: cubic-bezier(0, 0, 0.3, 1);
   --ease-emphasis: cubic-bezier(0.2, 0, 0, 1);
   --ease-settle: cubic-bezier(0.16, 1, 0.3, 1);
@@ -255,14 +254,6 @@
     color: var(--color-accent-text);
   }
 
-  /*
-   * Beside its quote a ticker is half of a phrase rather than the head of a
-   * column, so it gives up the width that was holding the column straight.
-   */
-  .ticker-inline {
-    min-width: 0;
-  }
-
   .panel {
     position: relative;
     background: var(--color-panel);
@@ -367,7 +358,6 @@
    */
   .btn,
   .icon-btn,
-  .flip,
   .pill,
   button.chip {
     --plinth: var(--color-plinth);
@@ -377,7 +367,6 @@
   /* Approaching a key lights its face; it is the press that moves it. */
   .btn:hover:not(:disabled),
   .icon-btn:hover:not(:disabled),
-  .flip:hover,
   .pill:hover,
   button.chip:hover:not(:disabled) {
     background-color: color-mix(in srgb, var(--color-raise) 92%, var(--color-ink));
@@ -392,7 +381,6 @@
    */
   .btn:active:not(:disabled),
   .icon-btn:active:not(:disabled),
-  .flip:active,
   .pill:active,
   button.chip:active:not(:disabled) {
     transform: translateY(var(--press-drop));
@@ -743,163 +731,6 @@
     }
   }
 
-  /* ---------- invert ---------- */
-
-  /*
-   * The control that turns the trade around, and the one press in the app that
-   * earns a piece of choreography.
-   *
-   * It used to be a 34-pixel square with two arrows in it that shrank 6% when
-   * tapped — the same answer the refresh beside it gave, for an action that
-   * rewrites both halves of the panel. Now the press is the swap: the glyph
-   * turns a half-circle and *stays* turned, counting up so it never rewinds
-   * against the reader; the rule it sits on charges out to both edges; and the
-   * two legs trade places, the one being paid dipping as the one being received
-   * rises. Uniswap taught the rotation, which is the part every trader already
-   * reads. The rest is the panel showing its work — the movement carries it,
-   * with nothing drawn around the button to help.
-   */
-  .flip {
-    position: relative;
-    z-index: 1;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 38px;
-    height: 38px;
-    border: 1px solid var(--color-line);
-    border-radius: var(--radius-xs);
-    background: var(--color-raise);
-    color: var(--color-dim);
-    cursor: pointer;
-    transition:
-      color var(--dur-tap) var(--ease-out),
-      border-color var(--dur-tap) var(--ease-out),
-      background-color var(--dur-tap) var(--ease-out),
-      box-shadow var(--dur-tap) var(--ease-out),
-      transform var(--dur-release) var(--ease-settle);
-  }
-
-  .flip:hover {
-    color: var(--color-ink);
-  }
-
-  .flip svg {
-    transform: rotate(calc(var(--turn, 0) * 180deg));
-    transition: transform var(--dur-travel) var(--ease-emphasis);
-  }
-
-  /*
-   * The hairline the button straddles, run out from the middle. It brightens in
-   * the ink of the surface rather than the accent: turning the pair around is a
-   * movement, not a reading, and the accent on this panel is spoken for — it
-   * says what is live and what is selected. A lime streak here would be the
-   * app raising its voice to say nothing in particular.
-   */
-  .rule-charge {
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: 50%;
-    height: 1px;
-    pointer-events: none;
-    opacity: 0;
-    background: linear-gradient(
-      90deg,
-      transparent,
-      color-mix(in srgb, var(--color-ink) 70%, transparent) 35%,
-      color-mix(in srgb, var(--color-ink) 70%, transparent) 65%,
-      transparent
-    );
-  }
-
-  [data-parity="0"] .rule-charge {
-    animation: charge-a 520ms var(--ease-out);
-  }
-
-  [data-parity="1"] .rule-charge {
-    animation: charge-b 520ms var(--ease-out);
-  }
-
-  @keyframes charge-a {
-    0% {
-      opacity: 0;
-      transform: scaleX(0.05);
-    }
-    30% {
-      opacity: 1;
-    }
-    100% {
-      opacity: 0;
-      transform: scaleX(1);
-    }
-  }
-
-  @keyframes charge-b {
-    0% {
-      opacity: 0;
-      transform: scaleX(0.05);
-    }
-    30% {
-      opacity: 1;
-    }
-    100% {
-      opacity: 0;
-      transform: scaleX(1);
-    }
-  }
-
-  /*
-   * The legs themselves. They pass each other rather than cross-fade: the leg
-   * being paid goes down and the leg being received comes up, both dimming
-   * through the middle of the move, so the eye follows the exchange instead of
-   * being handed a new panel. Nothing is keyed or remounted — the field keeps
-   * its focus and the quote keeps ticking underneath.
-   */
-  [data-parity="0"] .leg-pay {
-    animation: leg-down-a var(--dur-travel) var(--ease-emphasis);
-  }
-
-  [data-parity="1"] .leg-pay {
-    animation: leg-down-b var(--dur-travel) var(--ease-emphasis);
-  }
-
-  [data-parity="0"] .leg-get {
-    animation: leg-up-a var(--dur-travel) var(--ease-emphasis);
-  }
-
-  [data-parity="1"] .leg-get {
-    animation: leg-up-b var(--dur-travel) var(--ease-emphasis);
-  }
-
-  @keyframes leg-down-a {
-    50% {
-      opacity: 0.4;
-      transform: translateY(9px);
-    }
-  }
-
-  @keyframes leg-down-b {
-    50% {
-      opacity: 0.4;
-      transform: translateY(9px);
-    }
-  }
-
-  @keyframes leg-up-a {
-    50% {
-      opacity: 0.4;
-      transform: translateY(-9px);
-    }
-  }
-
-  @keyframes leg-up-b {
-    50% {
-      opacity: 0.4;
-      transform: translateY(-9px);
-    }
-  }
-
   .field {
     width: 100%;
     height: 40px;
@@ -933,20 +764,6 @@
     border-color: var(--color-edge);
     background-size: 100% 1px;
     outline: none;
-  }
-
-  /*
-   * The leg being spent, while the amount is being typed into it.
-   *
-   * Not by lighting the box it sits in: a rectangle traced in accent — with or
-   * without a glow behind it — is the loudest possible way to say "the caret is
-   * here", and it turns a readout into a sign. The figure itself is what is
-   * being worked on, so the figure is what is marked: its label goes accent and
-   * a hairline draws itself under the number, left to right, the way a reading
-   * is underlined on paper.
-   */
-  .leg-pay:focus-within .lbl {
-    color: var(--color-accent-text);
   }
 
   .field-lg {
@@ -1620,19 +1437,6 @@
 
   /* ---------- misc ---------- */
 
-  .marquee-track {
-    display: inline-flex;
-    gap: 28px;
-    padding-right: 28px;
-    animation: marquee 38s linear infinite;
-  }
-
-  @keyframes marquee {
-    to {
-      transform: translateX(-50%);
-    }
-  }
-
   /*
    * A toast is the one surface that interrupts, so it enters on its own terms:
    * up from where it will sit, with a hair of scale so it reads as arriving
@@ -1658,43 +1462,6 @@
     from {
       opacity: 0;
       transform: translateY(10px) scale(0.98);
-    }
-  }
-
-  /*
-   * Tick flash. When a live number changes, a wash of the direction's colour
-   * lands behind it and drains away — the one habit borrowed wholesale from
-   * dealing screens, where a cell that changed has to catch the eye without
-   * moving anything. The wash sits behind its own element so the digits never
-   * reflow, and it is mounted fresh on each change so repeats always replay.
-   */
-  .flash {
-    position: relative;
-    display: inline-block;
-  }
-
-  .flash-wash {
-    position: absolute;
-    inset: -3px -6px;
-    border-radius: var(--radius-xs);
-    pointer-events: none;
-    animation: flash-wash var(--dur-flash) var(--ease-out) forwards;
-  }
-
-  .flash-wash[data-dir="up"] {
-    background: color-mix(in srgb, var(--color-accent-line) 24%, transparent);
-  }
-
-  .flash-wash[data-dir="down"] {
-    background: color-mix(in srgb, var(--color-short-line) 24%, transparent);
-  }
-
-  @keyframes flash-wash {
-    from {
-      opacity: 1;
-    }
-    to {
-      opacity: 0;
     }
   }
 

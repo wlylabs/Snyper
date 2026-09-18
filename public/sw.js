@@ -1,5 +1,5 @@
 /* Snyper service worker — shell caching only. */
-const VERSION = "snyper-v4";
+const VERSION = "snyper-v5";
 const SHELL = `${VERSION}-shell`;
 const STATIC = `${VERSION}-static`;
 const OFFLINE_URL = "/";
@@ -63,14 +63,13 @@ function isImmutableAsset(url) {
 }
 
 /**
- * Icons, screenshots and the manifest keep their path across releases, so these
- * are read from the network first. Serving them cache-first is what pinned the
+ * Icons and the manifest keep their path across releases, so these are read
+ * from the network first. Serving them cache-first is what pinned the
  * install prompt to the previous mark.
  */
 function isBrandedAsset(url) {
   return (
     url.pathname.startsWith("/icons/") ||
-    url.pathname.startsWith("/screenshots/") ||
     url.pathname === "/favicon.ico" ||
     url.pathname === "/manifest.webmanifest"
   );
