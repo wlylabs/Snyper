@@ -1,12 +1,8 @@
-import { BlankPage } from "@/components/shell/BlankPage";
+import type { Metadata } from "next";
+import { Terminal } from "@/components/snipe/Terminal";
+
+export const metadata: Metadata = { title: "Snyper" };
 
 export default function HomePage() {
-  return (
-    <BlankPage
-      title="page.home.title"
-      subtitle="page.home.subtitle"
-      empty="page.home.empty"
-      hint="page.home.hint"
-    />
-  );
+  return <Terminal />;
 }

@@ -38,10 +38,6 @@ const en = {
   "common.nonCustodial": "Non-custodial",
 
   "page.home.title": "Snyper",
-  "page.home.subtitle": "Robinhood Chain, non-custodial",
-  "page.home.empty": "Nothing here yet.",
-  "page.home.hint":
-    "The app has been stripped back to its wallet session. Connect a wallet from the header; what this screen does is written next.",
 
   "page.balance.title": "Balance",
 
@@ -141,6 +137,55 @@ const en = {
   "memecoin.failedHint":
     "Every pair here is built from swap events read straight off chain 4663, and that read did not come back.",
 
+  "snipe.target": "Target",
+  "snipe.targets": "Targets",
+  "snipe.pick": "Pick one",
+  "snipe.change": "Change",
+  "snipe.noTarget": "Nothing is aimed at yet.",
+  "snipe.noTargetHint":
+    "Pick a target and this quotes the shot against the pool it trades in — what it fills at, what that costs, and whether it can be sold again.",
+  "snipe.empty": "Nothing on this chain is worth a shot right now.",
+  "snipe.emptyHint":
+    "A target is a pair under $10M with at least $1K resting in its pool and $1K traded through it in the last five minutes. The list fills again on its own.",
+  "snipe.stake": "Stake, in {coin}",
+  "snipe.youGet": "You get",
+  "snipe.atLeast": "At least",
+  "snipe.impact": "Price impact",
+  "snipe.slippage": "Slippage",
+  "snipe.exit": "Exit check",
+  "snipe.exitBack": "{percent}% back",
+  "snipe.exitNone": "No exit",
+  "snipe.route": "Route",
+  "snipe.oneHop": "Straight in · {fee}% pool",
+  "snipe.twoHops": "Through USDG · {fee}% pool",
+  "snipe.fire": "Fire · buy {symbol}",
+  "snipe.firing": "Firing…",
+  "snipe.checking": "Asking the chain…",
+  "snipe.done": "Filled",
+  "snipe.receipt": "Receipt",
+  "snipe.oneSignature": "No approval to grant first — one signature, and nothing left standing after it.",
+  "snipe.trapped": "This token cannot be sold",
+  "snipe.trappedHint":
+    "The chain was asked to quote selling this position straight back, and it refused. A token that can be bought and not sold is the oldest trick there is, so nothing is offered to sign here.",
+  "snipe.thin": "This pool cannot take a stake this size",
+  "snipe.thinHint":
+    "The price it would fill at is far enough from the going rate that no tolerance worth offering would cover it. A smaller stake will find a better one.",
+  "snipe.unquotable": "This pool would not quote the trade",
+  "snipe.unquotableHint":
+    "The route into this token came back empty at this size. That is the pool saying it cannot fill it — try a smaller stake, or another target.",
+  "snipe.short": "Not enough {coin} in this wallet",
+  "snipe.shortHint":
+    "Gas comes out of the same balance the stake does, so a wallet holding exactly the stake cannot fire it.",
+  "snipe.blocked": "The chain refused this shot",
+  "snipe.blockedHint":
+    "It was run against the current state before anything reached your wallet, and it did not go through. The pool may have moved since the quote.",
+  "snipe.failed": "The transaction did not go through.",
+  "snipe.position": "Position",
+  "snipe.held": "Held",
+  "snipe.dump": "Sell all {symbol}",
+  "snipe.twoSignatures":
+    "Out costs two: a token can only be moved by a contract that has been allowed to move it. The allowance is written for exactly this position.",
+
 
 
 
@@ -230,10 +275,6 @@ const id: Record<TKey, string> = {
   "common.nonCustodial": "Non-kustodial",
 
   "page.home.title": "Snyper",
-  "page.home.subtitle": "Robinhood Chain, non-kustodial",
-  "page.home.empty": "Belum ada apa-apa di sini.",
-  "page.home.hint":
-    "Aplikasi ini dikosongkan sampai tersisa sesi dompetnya. Hubungkan dompet lewat header; isi layar ini ditulis berikutnya.",
 
   "page.balance.title": "Saldo",
 
@@ -332,6 +373,55 @@ const id: Record<TKey, string> = {
   "memecoin.failed": "Chain tidak menjawab.",
   "memecoin.failedHint":
     "Setiap pair di sini dibangun dari event swap yang dibaca langsung dari chain 4663, dan bacaan itu tidak kembali.",
+
+  "snipe.target": "Target",
+  "snipe.targets": "Target",
+  "snipe.pick": "Pilih satu",
+  "snipe.change": "Ganti",
+  "snipe.noTarget": "Belum ada yang dibidik.",
+  "snipe.noTargetHint":
+    "Pilih target dan tembakannya langsung dihitung ke pool tempat token itu jalan — dapat berapa, biayanya berapa, dan apakah masih bisa dijual lagi.",
+  "snipe.empty": "Belum ada yang layak ditembak di chain ini.",
+  "snipe.emptyHint":
+    "Target itu pair di bawah $10J dengan minimal $1R mengendap di pool-nya dan $1R yang lewat dalam lima menit terakhir. Daftarnya terisi lagi sendiri.",
+  "snipe.stake": "Modal, dalam {coin}",
+  "snipe.youGet": "Kamu dapat",
+  "snipe.atLeast": "Minimal",
+  "snipe.impact": "Dampak harga",
+  "snipe.slippage": "Slippage",
+  "snipe.exit": "Cek jalan keluar",
+  "snipe.exitBack": "Balik {percent}%",
+  "snipe.exitNone": "Tidak ada",
+  "snipe.route": "Rute",
+  "snipe.oneHop": "Langsung · pool {fee}%",
+  "snipe.twoHops": "Lewat USDG · pool {fee}%",
+  "snipe.fire": "Tembak · beli {symbol}",
+  "snipe.firing": "Menembak…",
+  "snipe.checking": "Memastikan ke chain…",
+  "snipe.done": "Kena",
+  "snipe.receipt": "Bukti transaksi",
+  "snipe.oneSignature": "Tidak ada izin yang perlu diberikan dulu — satu tanda tangan, dan tidak ada sisa setelahnya.",
+  "snipe.trapped": "Token ini tidak bisa dijual",
+  "snipe.trappedHint":
+    "Chain diminta menghitung penjualan posisi ini balik saat itu juga, dan ia menolak. Token yang bisa dibeli tapi tidak bisa dijual adalah trik paling tua yang ada, jadi di sini tidak ada yang ditawarkan untuk ditandatangani.",
+  "snipe.thin": "Pool ini tidak sanggup menampung modal sebesar ini",
+  "snipe.thinHint":
+    "Harga isiannya terlalu jauh dari harga berjalan sampai tidak ada toleransi yang pantas ditawarkan. Modal yang lebih kecil akan dapat harga lebih baik.",
+  "snipe.unquotable": "Pool ini tidak mau menghitung tradenya",
+  "snipe.unquotableHint":
+    "Rute masuk ke token ini kembali kosong di ukuran segini. Itu cara pool bilang ia tidak sanggup mengisinya — coba modal lebih kecil, atau target lain.",
+  "snipe.short": "{coin} di dompet ini tidak cukup",
+  "snipe.shortHint":
+    "Gas keluar dari saldo yang sama dengan modalnya, jadi dompet yang isinya pas sebesar modal tidak bisa menembak.",
+  "snipe.blocked": "Chain menolak tembakan ini",
+  "snipe.blockedHint":
+    "Ia dijalankan ke kondisi terkini sebelum apa pun sampai ke dompetmu, dan tidak lolos. Pool-nya mungkin sudah bergerak sejak perhitungan tadi.",
+  "snipe.failed": "Transaksinya tidak jadi.",
+  "snipe.position": "Posisi",
+  "snipe.held": "Dipegang",
+  "snipe.dump": "Jual semua {symbol}",
+  "snipe.twoSignatures":
+    "Keluarnya butuh dua: token hanya bisa dipindahkan oleh kontrak yang sudah diizinkan memindahkannya. Izinnya ditulis pas sebesar posisi ini.",
 
 
 

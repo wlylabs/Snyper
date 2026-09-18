@@ -29,9 +29,15 @@ function useSettled(value: bigint, ms = 350): bigint {
   return settled;
 }
 
-/** Basis points as a percent, for a label. 50 reads as 0.5. */
+/**
+ * Basis points as a percent, for a label. 50 reads as 0.5, or 0,5.
+ *
+ * Through the app's own formatter rather than `String`, so the separator is the
+ * reader's. An Indonesian screen printing 135.873,41 MEOWTON beside 0.04% is
+ * using two conventions in one panel, and the one it borrowed is not theirs.
+ */
 function percent(bps: number): string {
-  return String(bps / 100);
+  return formatAmount(bps / 100);
 }
 
 export function SwapPanel({ row, onSold }: { row: Holding; onSold: () => void }) {

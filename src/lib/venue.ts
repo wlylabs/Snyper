@@ -1,4 +1,4 @@
-import { parseAbi } from "viem";
+import { encodePacked, parseAbi } from "viem";
 
 /**
  * Where a trade on Robinhood Chain actually happens.
@@ -59,13 +59,83 @@ export const FEE_TIERS = [100, 500, 3000, 10000] as const;
 export const quoterAbi = parseAbi([
   "struct QuoteExactInputSingleParams { address tokenIn; address tokenOut; uint256 amountIn; uint24 fee; uint160 sqrtPriceLimitX96; }",
   "function quoteExactInputSingle(QuoteExactInputSingleParams params) view returns (uint256 amountOut, uint160 sqrtPriceX96After, uint32 initializedTicksCrossed, uint256 gasEstimate)",
+  "function quoteExactInput(bytes path, uint256 amountIn) view returns (uint256 amountOut, uint160[] sqrtPriceX96AfterList, uint32[] initializedTicksCrossedList, uint256 gasEstimate)",
 ]);
 
-/** SwapRouter02's shape: no deadline in the struct. Verified against bytecode. */
+/**
+ * SwapRouter02's shape: no deadline in the struct. Verified against bytecode.
+ *
+ * Both entry points are here because they answer different questions. The
+ * single one names its two tokens and is what a sale out of the balance screen
+ * uses. The path one takes the road packed into bytes and is what the terminal
+ * fires, because a token quoted in dollars is two hops from the coin and one
+ * hop from nothing — reading `exactInput` as the only way in means the terminal
+ * never has to care which.
+ *
+ * `0xb858183f` is present in the deployed bytecode and `0xc04b8d59`, the
+ * variant carrying a deadline, is not — checked the same way the single one was.
+ */
 export const routerAbi = parseAbi([
   "struct ExactInputSingleParams { address tokenIn; address tokenOut; uint24 fee; address recipient; uint256 amountIn; uint256 amountOutMinimum; uint160 sqrtPriceLimitX96; }",
   "function exactInputSingle(ExactInputSingleParams params) payable returns (uint256 amountOut)",
+  "struct ExactInputParams { bytes path; address recipient; uint256 amountIn; uint256 amountOutMinimum; }",
+  "function exactInput(ExactInputParams params) payable returns (uint256 amountOut)",
 ]);
+
+/**
+ * The tier the coin crosses on its way to the dollar.
+ *
+ * A pair quoted in USDG cannot be reached from the coin in one hop, so the
+ * trade goes through the WETH/USDG pool — the same 0.01% pool the memecoin
+ * screen prices the coin from, which is the deepest thing on this chain and
+ * the only pool on the road that is not the one being sniped.
+ */
+export const HOP_FEE = 100;
+
+/**
+ * The road into a token, packed the way the router reads it.
+ *
+ * A path is addresses and tiers laid end to end with nothing between them:
+ * twenty bytes, three bytes, twenty bytes, and again for every further hop.
+ * One hop when the pair is already quoted in the coin's own wrapper, two when
+ * it is quoted in dollars.
+ *
+ * The point of routing every buy through a path, even the one-hop ones, is that
+ * the coin going in is the chain's own. It rides on the transaction as its
+ * value, so there is no allowance to grant first and none left standing after —
+ * which is the whole of what the terminal promises, and it holds for both
+ * shapes of pair only because the second hop is paid for out of the first.
+ */
+export function buyPath(
+  token: `0x${string}`,
+  quoteToken: `0x${string}`,
+  fee: number,
+): `0x${string}` {
+  return direct(quoteToken)
+    ? encodePacked(["address", "uint24", "address"], [VENUE.wrapped, fee, token])
+    : encodePacked(
+        ["address", "uint24", "address", "uint24", "address"],
+        [VENUE.wrapped, HOP_FEE, quoteToken, fee, token],
+      );
+}
+
+/** The same road walked backwards, which is what a sale would have to take. */
+export function sellPath(
+  token: `0x${string}`,
+  quoteToken: `0x${string}`,
+  fee: number,
+): `0x${string}` {
+  return direct(quoteToken)
+    ? encodePacked(["address", "uint24", "address"], [token, fee, VENUE.wrapped])
+    : encodePacked(
+        ["address", "uint24", "address", "uint24", "address"],
+        [token, fee, quoteToken, HOP_FEE, VENUE.wrapped],
+      );
+}
+
+function direct(quoteToken: `0x${string}`): boolean {
+  return quoteToken.toLowerCase() === VENUE.wrapped.toLowerCase();
+}
 
 export const factoryAbi = parseAbi([
   "function getPool(address tokenA, address tokenB, uint24 fee) view returns (address pool)",
