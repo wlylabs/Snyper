@@ -110,6 +110,16 @@ const en = {
   "balance.hiddenLess": "Put the hidden ones away",
   "memecoin.live": "Trading now · 5m",
   "memecoin.sortHot": "Busiest",
+  "memecoin.bandAll": "All",
+  "memecoin.bandPump": "Pumping",
+  "memecoin.bandFlat": "Flat",
+  "memecoin.bandDump": "Dumping",
+  "memecoin.floorAny": "Any size",
+  "memecoin.showing": "{shown} of {total}",
+  "memecoin.noMatch": "Nothing here matches that.",
+  "memecoin.noMatchHint":
+    "The chain is busy — these filters are what emptied the list. A size floor also drops any token whose supply its contract would not report, because an unknown size cannot clear one.",
+  "memecoin.clear": "Clear the filters",
   "memecoin.sortNew": "Newest",
   "memecoin.sortMovers": "Movers",
   "memecoin.fresh": "NEW",
@@ -131,6 +141,9 @@ const en = {
   "memecoin.failedHint":
     "Every pair here is built from swap events read straight off chain 4663, and that read did not come back.",
 
+  "faq.bands.q": "What do Pumping, Flat and Dumping mean?",
+  "faq.bands.a":
+    "They band the move across the same five minutes the rest of the screen covers: up fifty percent or more, down fifty or more, or inside ten either way. Fifty is the line because on this chain it is an ordinary five minutes — the list routinely carries a token up three hundred percent beside one down forty, and a band drawn at ten would hold everything. Flat means flat for five minutes, which is not the same as accumulating: that is a claim about hours, and hours are not something this endpoint will serve.",
   "faq.window.q": "Why does the memes screen only cover five minutes?",
   "faq.window.a":
     "Because that is what the chain will hand over in one question. Chain 4663 settles a block every hundred milliseconds and puts about four thousand swaps in five minutes, which is close to the most the public endpoint returns at once — ask for fifteen and it refuses. Narrowing to a handful of pools buys no more reach. So the column says 5m, because five minutes is what there is, and a screen labelled 24h would be inventing the other twenty-three.",
@@ -320,6 +333,16 @@ const id: Record<TKey, string> = {
   "balance.hiddenLess": "Simpan lagi yang disembunyikan",
   "memecoin.live": "Sedang jalan · 5m",
   "memecoin.sortHot": "Tersibuk",
+  "memecoin.bandAll": "Semua",
+  "memecoin.bandPump": "Naik",
+  "memecoin.bandFlat": "Datar",
+  "memecoin.bandDump": "Jatuh",
+  "memecoin.floorAny": "Semua ukuran",
+  "memecoin.showing": "{shown} dari {total}",
+  "memecoin.noMatch": "Tidak ada yang cocok dengan itu.",
+  "memecoin.noMatchHint":
+    "Chain-nya sedang ramai — saringan inilah yang mengosongkan daftarnya. Lantai ukuran juga membuang token yang suplainya tidak dilaporkan kontraknya, karena ukuran yang tidak diketahui tidak bisa membuktikan apa pun.",
+  "memecoin.clear": "Bersihkan saringan",
   "memecoin.sortNew": "Terbaru",
   "memecoin.sortMovers": "Bergerak",
   "memecoin.fresh": "BARU",
@@ -341,6 +364,9 @@ const id: Record<TKey, string> = {
   "memecoin.failedHint":
     "Setiap pair di sini dibangun dari event swap yang dibaca langsung dari chain 4663, dan bacaan itu tidak kembali.",
 
+  "faq.bands.q": "Apa arti Naik, Datar, dan Jatuh?",
+  "faq.bands.a":
+    "Ketiganya mengelompokkan pergerakan dalam lima menit yang sama dengan sisa layar ini: naik lima puluh persen atau lebih, turun lima puluh atau lebih, atau dalam sepuluh persen ke arah mana pun. Lima puluh jadi garisnya karena di chain ini itu lima menit yang biasa saja — daftarnya rutin memuat token naik tiga ratus persen bersebelahan dengan yang turun empat puluh, dan garis di sepuluh akan memuat semuanya. Datar berarti datar selama lima menit, dan itu bukan akumulasi: akumulasi itu klaim tentang berjam-jam, dan berjam-jam bukan sesuatu yang diberikan endpoint ini.",
   "faq.window.q": "Kenapa layar memes cuma mencakup lima menit?",
   "faq.window.a":
     "Karena itu yang diberikan chain dalam satu pertanyaan. Chain 4663 menutup blok tiap seratus milidetik dan menampung sekitar empat ribu swap dalam lima menit — mendekati batas yang dikembalikan endpoint publik sekali jalan; minta lima belas menit dan ia menolak. Mempersempit ke segelintir pool pun tidak menambah jangkauan. Jadi kolomnya tertulis 5m, karena lima menit itulah yang ada, dan layar berlabel 24 jam akan mengarang dua puluh tiga jam sisanya.",

@@ -97,5 +97,54 @@ export const BURNED = [
   "0x000000000000000000000000000000000000dEaD",
 ] as const;
 
-/** How the list is ordered, which is the only question this screen asks. */
+/** How the list is ordered. */
 export type Sort = "volume" | "new" | "movers";
+
+/**
+ * What the last five minutes did to a token.
+ *
+ * The bands describe the window and nothing wider. A token that is flat here
+ * has been flat for five minutes, which is not the same as accumulating — that
+ * is a claim about hours, and hours are what this endpoint will not serve. What
+ * the bands are good for is the question a five-minute window answers well:
+ * what just fell out of the sky, what just took off, and what is sitting still
+ * while both of those happen.
+ *
+ * Fifty percent either way is the line because on this chain it is an ordinary
+ * five minutes: the screen routinely carries a token up three hundred percent
+ * beside one down forty. A band drawn at ten would hold everything.
+ */
+export type Band = "all" | "pumping" | "flat" | "dumping";
+
+export const MOVE = 50;
+export const STILL = 10;
+
+export function inBand(change: number, band: Band): boolean {
+  if (band === "pumping") return change >= MOVE;
+  if (band === "dumping") return change <= -MOVE;
+  if (band === "flat") return Math.abs(change) < STILL;
+  return true;
+}
+
+/**
+ * The size a token has to prove before it is worth a row.
+ *
+ * Applied to the market cap, the volume and the fully diluted figure together,
+ * because a token can clear any one of them and still be nothing: a million
+ * dollars of supply nobody has traded, or a thousand dollars traded against a
+ * supply worth eight. All three or none.
+ *
+ * A token whose supply could not be read cannot prove anything, so it fails
+ * every floor above `0`. That is the point of a floor — not that the token is
+ * small, but that it has not been shown to be large.
+ *
+ * The rungs are set by the tightest of the three, which is the volume: a market
+ * cap is a standing figure and this volume is five minutes of one. A hundred
+ * thousand dollars of market cap is a small token; a hundred thousand dollars
+ * traded in five minutes is near the top of everything this chain does, and a
+ * ladder built on the market cap's scale emptied the list at its third rung
+ * while a token worth four hundred and ninety million sat in it.
+ */
+export const FLOORS = [0, 1_000, 5_000, 25_000] as const;
+
+export type Floor = (typeof FLOORS)[number];

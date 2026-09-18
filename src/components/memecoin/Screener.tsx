@@ -7,7 +7,7 @@ import { Segmented } from "@/components/ui/Segmented";
 import { Sheet } from "@/components/ui/Sheet";
 import { CHAIN_ID, explorerAddress } from "@/lib/chains";
 import { formatCompact, truncateAddress } from "@/lib/format";
-import type { Sort } from "@/lib/screener";
+import { FLOORS, inBand, type Band, type Floor, type Sort } from "@/lib/screener";
 import { useScreener, type Pair } from "@/hooks/useScreener";
 import { useI18n } from "@/hooks/useI18n";
 import { useMounted } from "@/hooks/useMounted";
@@ -39,6 +39,22 @@ function signed(change: number): string {
  * what has moved furthest. A pair with no creation in the last day has no age,
  * and sorts to the end of `new` rather than to the front — unknown is old here.
  */
+/**
+ * Everything the reader has asked not to see.
+ *
+ * The floor is proof rather than size: a token whose supply the contract would
+ * not report has not been shown to clear anything, so it fails every floor
+ * above nothing. Undefined is not small — it is unknown, and the whole reason
+ * to set a floor is to stop reading rows that have not been shown to be worth
+ * reading.
+ */
+function keep(pair: Pair, band: Band, floor: Floor): boolean {
+  if (!inBand(pair.change, band)) return false;
+  if (floor === 0) return true;
+  if (pair.marketCap === undefined || pair.fdv === undefined) return false;
+  return pair.marketCap >= floor && pair.fdv >= floor && pair.volume >= floor;
+}
+
 function order(pairs: Pair[], sort: Sort): Pair[] {
   const sorted = [...pairs];
   if (sort === "new") {
@@ -120,10 +136,15 @@ export function Screener() {
   const mounted = useMounted();
   const { t } = useI18n();
   const [sort, setSort] = useState<Sort>("volume");
+  const [band, setBand] = useState<Band>("all");
+  const [floor, setFloor] = useState<Floor>(0);
   const [opened, setOpened] = useState<string>();
   const { pairs, loading, error, refetch } = useScreener();
 
-  const listed = useMemo(() => order(pairs, sort), [pairs, sort]);
+  const listed = useMemo(
+    () => order(pairs.filter((pair) => keep(pair, band, floor)), sort),
+    [pairs, sort, band, floor],
+  );
 
   const body = () => {
     if (!mounted || loading) return <Loading />;
@@ -144,7 +165,31 @@ export function Screener() {
     }
 
     if (listed.length === 0) {
-      return <Empty title={t("memecoin.empty")} hint={t("memecoin.emptyHint")} />;
+      /*
+       * An empty five minutes and an empty filter are different failures, and
+       * a reader who has narrowed the list to nothing should be told that they
+       * did it rather than that the chain went quiet.
+       */
+      return pairs.length === 0 ? (
+        <Empty title={t("memecoin.empty")} hint={t("memecoin.emptyHint")} />
+      ) : (
+        <Empty
+          title={t("memecoin.noMatch")}
+          hint={t("memecoin.noMatchHint")}
+          action={
+            <button
+              type="button"
+              className="btn btn-sm btn-short"
+              onClick={() => {
+                setBand("all");
+                setFloor(0);
+              }}
+            >
+              {t("memecoin.clear")}
+            </button>
+          }
+        />
+      );
     }
 
     return (
@@ -193,19 +238,49 @@ export function Screener() {
       <h1 className="sr-only">{t("page.memecoin.title")}</h1>
 
       {mounted && (
-        <Segmented
-          className="mb-3"
-          options={[
-            { value: "volume", label: t("memecoin.sortHot") },
-            { value: "new", label: t("memecoin.sortNew") },
-            { value: "movers", label: t("memecoin.sortMovers") },
-          ]}
-          value={sort}
-          onChange={setSort}
-        />
+        <div className="mb-3 flex flex-col gap-1.5">
+          <Segmented
+            options={[
+              { value: "volume", label: t("memecoin.sortHot") },
+              { value: "new", label: t("memecoin.sortNew") },
+              { value: "movers", label: t("memecoin.sortMovers") },
+            ]}
+            value={sort}
+            onChange={setSort}
+          />
+          <Segmented
+            options={[
+              { value: "all", label: t("memecoin.bandAll") },
+              { value: "pumping", label: t("memecoin.bandPump") },
+              { value: "flat", label: t("memecoin.bandFlat") },
+              { value: "dumping", label: t("memecoin.bandDump") },
+            ]}
+            value={band}
+            onChange={setBand}
+          />
+          <Segmented
+            options={FLOORS.map((size) => ({
+              value: String(size),
+              label: size === 0 ? t("memecoin.floorAny") : `$${formatCompact(size)}+`,
+            }))}
+            value={String(floor)}
+            onChange={(value) => setFloor(Number(value) as Floor)}
+          />
+        </div>
       )}
 
-      <Panel label={t("memecoin.live")}>{body()}</Panel>
+      <Panel
+        label={t("memecoin.live")}
+        meta={
+          mounted && pairs.length > 0 ? (
+            <span className="lbl">
+              {t("memecoin.showing", { shown: listed.length, total: pairs.length })}
+            </span>
+          ) : undefined
+        }
+      >
+        {body()}
+      </Panel>
 
       <PairSheet
         pair={listed.find((pair) => pair.pool === opened)}

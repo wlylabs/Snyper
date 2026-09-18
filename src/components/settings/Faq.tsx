@@ -26,6 +26,7 @@ const QUESTIONS: readonly { q: TKey; a: TKey }[] = [
   { q: "faq.slippage.q", a: "faq.slippage.a" },
   { q: "faq.nosell.q", a: "faq.nosell.a" },
   { q: "faq.window.q", a: "faq.window.a" },
+  { q: "faq.bands.q", a: "faq.bands.a" },
 ];
 
 export function Faq() {
