@@ -17,8 +17,14 @@ export type Holding = {
   symbol: string;
   name: string;
   decimals: number;
-  /** Units held. */
+  /** Units held, for reading. */
   amount: number;
+  /**
+   * Units held, in base units, for spending. Selling everything has to send the
+   * balance the chain holds — a float round-trip through `amount` leaves dust
+   * behind or asks for more than exists, and both of those are a failed trade.
+   */
+  raw: bigint;
   /** USD per unit, when anything prices this token. */
   rate?: number;
   /** `amount * rate`, and undefined when nothing prices it. */
@@ -208,7 +214,8 @@ export function useHoldings() {
           : undefined;
 
       const decimals = Number(entry.token.decimals);
-      const amount = Number(formatUnits(onChain ?? BigInt(entry.value), decimals));
+      const raw = onChain ?? BigInt(entry.value);
+      const amount = Number(formatUnits(raw, decimals));
       const rate = entry.token.exchange_rate ? Number(entry.token.exchange_rate) : undefined;
 
       return {
@@ -217,6 +224,7 @@ export function useHoldings() {
         name: entry.token.name ?? "",
         decimals,
         amount,
+        raw,
         rate,
         value: rate === undefined ? undefined : amount * rate,
         confirmed: onChain !== undefined,

@@ -8,6 +8,7 @@ import { CHAIN_ID, chainMeta, explorerAddress } from "@/lib/chains";
 import { formatAmount, formatSignificant, truncateAddress } from "@/lib/format";
 import { useConnectPrompt } from "@/hooks/useConnectPrompt";
 import { useHoldings, type Holding } from "@/hooks/useHoldings";
+import { SwapPanel } from "./SwapPanel";
 import { useI18n } from "@/hooks/useI18n";
 import { useMounted } from "@/hooks/useMounted";
 
@@ -103,7 +104,15 @@ function Loading() {
  * copy it. This is also where a lure's name is allowed to appear in full, under
  * a label saying whose words they are, rather than in the place a name goes.
  */
-function TokenSheet({ row, onClose }: { row: Holding | undefined; onClose: () => void }) {
+function TokenSheet({
+  row,
+  onClose,
+  onSold,
+}: {
+  row: Holding | undefined;
+  onClose: () => void;
+  onSold: () => void;
+}) {
   const { t } = useI18n();
   const [copied, setCopied] = useState(false);
 
@@ -191,9 +200,7 @@ function TokenSheet({ row, onClose }: { row: Holding | undefined; onClose: () =>
           </a>
         </div>
 
-        <p className="mt-4 text-center text-[10px] tracking-[0.1em] text-faint uppercase">
-          {t("balance.swapSoon")}
-        </p>
+        <SwapPanel row={row} onSold={onSold} />
       </div>
     </Sheet>
   );
@@ -311,12 +318,9 @@ export function Holdings() {
 
   return (
     <div className="mx-auto w-full max-w-3xl">
-      <div className="mb-3">
-        <h1 className="text-[15px] font-bold tracking-[0.12em] uppercase">
-          {t("page.balance.title")}
-        </h1>
-        <p className="mt-0.5 text-[11px] text-faint">{t("page.balance.subtitle")}</p>
-      </div>
+      {/* Named by the nav it was reached from, so the heading is left for the
+          readers who cannot see that. */}
+      <h1 className="sr-only">{t("page.balance.title")}</h1>
 
       {mounted && address && (
         <Panel
@@ -325,17 +329,16 @@ export function Holdings() {
           meta={<span className="lbl">{truncateAddress(address, 6, 4)}</span>}
         >
           <p className="num text-[30px] leading-none">{usd(total)}</p>
-          <p className="lbl mt-2">{t("balance.indicative")}</p>
         </Panel>
       )}
 
       <Panel label={t("balance.holdings")}>{body()}</Panel>
 
-      <p className="mt-3 text-center text-[10px] tracking-[0.1em] text-faint uppercase">
-        {t("balance.source")}
-      </p>
-
-      <TokenSheet row={opened} onClose={() => setOpened(undefined)} />
+      <TokenSheet
+        row={opened}
+        onClose={() => setOpened(undefined)}
+        onSold={refetch}
+      />
     </div>
   );
 }
