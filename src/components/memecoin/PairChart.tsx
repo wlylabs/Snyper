@@ -66,7 +66,15 @@ export function PairChart({ pair }: { pair: Pair }) {
       },
       rightPriceScale: { borderVisible: false },
       timeScale: { borderVisible: false, timeVisible: true, secondsVisible: false },
-      crosshair: { horzLine: { labelBackgroundColor: down }, vertLine: { labelBackgroundColor: down } },
+      /*
+       * No floating labels on the axes. The crosshair still tracks, and the
+       * scales still carry their own figures — what goes is the box that rode
+       * on top of them, which on a chart this size covered as much as it named.
+       */
+      crosshair: {
+        horzLine: { labelVisible: false },
+        vertLine: { labelVisible: false },
+      },
       handleScale: false,
       handleScroll: false,
       /*
@@ -84,6 +92,10 @@ export function PairChart({ pair }: { pair: Pair }) {
       wickUpColor: up,
       wickDownColor: down,
       borderVisible: false,
+      /* The last price had a label of its own, in the same place and the same
+       * colour, so it goes with them. The dashed line marking it goes too. */
+      lastValueVisible: false,
+      priceLineVisible: false,
       priceFormat: {
         type: "custom",
         minMove: 0,
