@@ -1,6 +1,7 @@
 import { getAddress, isAddress, zeroAddress, type Address } from "viem";
 import type { Token } from "./tokens";
 import { activeVenue } from "./venue";
+import type { TradeVenue } from "./quote";
 
 /**
  * What Snyper charges, and where the charge is allowed to come from.
@@ -97,7 +98,9 @@ export function feePolicy(): FeePolicy {
  * and knows nothing about a bonding curve; SnyperRouter reaches both, so a
  * launchpad trade is only chargeable once one is deployed.
  */
-export function feeChargeable(venue: "v3" | "curve"): boolean {
+export function feeChargeable(venue: TradeVenue): boolean {
+  // v4 is priced but never routed, so there is no trade here to charge for.
+  if (venue === "v4") return false;
   return venue === "v3" || Boolean(feeRouter());
 }
 

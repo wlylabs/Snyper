@@ -563,3 +563,20 @@ export const snyperRouterAbi = [
   { type: "error", name: "TransferFailed", inputs: [] },
   { type: "error", name: "Reentrant", inputs: [] },
 ] as const;
+
+/**
+ * Uniswap v4's PoolManager, as much of it as reading needs.
+ *
+ * `extsload` is the whole interface here: a v4 pool's state lives in the
+ * singleton's own storage rather than in a contract of its own, and this is the
+ * view that hands a word of it back. Nothing else is needed to price a pool.
+ */
+export const poolManagerAbi = [
+  {
+    type: "function",
+    name: "extsload",
+    stateMutability: "view",
+    inputs: [{ name: "slot", type: "bytes32" }],
+    outputs: [{ type: "bytes32" }],
+  },
+] as const;

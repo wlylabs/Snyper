@@ -19,8 +19,13 @@ const { readPonsLaunches, PONS_V1_FACTORY, PONS_V2_FACTORY } = await import(
   "../src/lib/pons.ts"
 );
 const { CHAIN_ID, dexMeta } = await import("../src/lib/chains.ts");
+const { NATIVE } = await import("../src/lib/native.ts");
 const { buildMarketIndex } = await import("../src/lib/marketIndex.ts");
 const { resolveVenue } = await import("../src/lib/venue.ts");
+const { readV4State, v4Currency, findV4Pools, V4_POOL_MANAGER } = await import(
+  "../src/lib/v4.ts"
+);
+const { buildSwap } = await import("../src/lib/swap.ts");
 
 const checks = [];
 function test(name, run) {
@@ -383,6 +388,94 @@ test("an index that will not answer costs the list and nothing else", async () =
   } finally {
     globalThis.fetch = original;
   }
+});
+
+/*
+ * Uniswap v4: the half of this chain the app could not see. A Pons V2 launch
+ * graduates into a v4 pool, and until this existed that was the moment a
+ * position stopped being priced.
+ */
+const V4_INIT_TOPIC =
+  "0xdd466e674ea557f56295e2d0218a125ea4b4f0f6f3307b95f85e6110838d6438";
+
+test("v4 names the chain's coin the way v4 does, not the way the app does", () => {
+  const native = { chainId: CHAIN_ID, address: NATIVE, symbol: "ETH", name: "Ether", decimals: 18, native: true };
+  assert.equal(v4Currency(native), ZERO_ADDRESS, "a v4 pool keys ether as the zero address");
+  const erc20 = { chainId: CHAIN_ID, address: TOKEN_A, symbol: "MEME", name: "Meme", decimals: 18 };
+  assert.equal(v4Currency(erc20), TOKEN_A, "everything else is itself");
+});
+
+test("a pool's state is unpacked out of one storage word", async () => {
+  /* Slot0 packs sqrtPrice in the low 160 bits, then tick, protocol fee and LP
+     fee above it. A negative tick is the case worth pinning: it is a signed
+     24-bit field, and read unsigned it comes back as sixteen million. */
+  const sqrt = 79228162514264337593543950336n; // 2**96
+  const tick = -200;
+  const lpFee = 3000;
+  const packed =
+    sqrt |
+    (BigInt(tick & 0xffffff) << 160n) |
+    (BigInt(lpFee) << 208n);
+
+  const client = {
+    async multicall({ contracts }) {
+      assert.equal(contracts[0].address, V4_POOL_MANAGER);
+      return [
+        { status: "success", result: `0x${packed.toString(16).padStart(64, "0")}` },
+        { status: "success", result: `0x${(4242n).toString(16).padStart(64, "0")}` },
+      ];
+    },
+  };
+
+  const state = await readV4State(client, `0x${"ab".repeat(32)}`);
+  assert.equal(state.sqrtPriceX96, sqrt);
+  assert.equal(state.tick, tick, "a negative tick must not read as 16.7 million");
+  assert.equal(state.lpFee, lpFee);
+  assert.equal(state.liquidity, 4242n);
+});
+
+test("a pool that was initialised but never funded is not a price", async () => {
+  const client = {
+    async multicall() {
+      return [{ status: "success", result: `0x${"0".repeat(64)}` }, { status: "success", result: "0x0" }];
+    },
+  };
+  assert.equal(await readV4State(client, `0x${"cd".repeat(32)}`), undefined);
+});
+
+test("both currencies are searched, because either side may be indexed first", async () => {
+  const asked = [];
+  const client = {
+    async request({ params }) {
+      asked.push(params[0].topics);
+      return [];
+    },
+  };
+  await findV4Pools(client, TOKEN_A);
+  assert.equal(asked.length, 2, "currency0 and currency1 are separate indexed topics");
+  assert.equal(asked[0][0], V4_INIT_TOPIC);
+  assert.ok(asked[0][2]?.endsWith(TOKEN_A.slice(2).toLowerCase()), "asked as currency0");
+  assert.ok(asked[1][3]?.endsWith(TOKEN_A.slice(2).toLowerCase()), "asked as currency1");
+});
+
+test("a v4 quote is refused by the swap builder rather than encoded as v3", () => {
+  /* The read path and the signing path must never be confused: every encoder
+     downstream would happily take this and build a v3 trade against a pool id
+     that is not a pool address. */
+  const token = { chainId: CHAIN_ID, address: TOKEN_A, symbol: "MEME", name: "Meme", decimals: 18 };
+  assert.throws(
+    () =>
+      buildSwap({
+        tokenIn: token,
+        tokenOut: token,
+        amountIn: 1n,
+        amountOutMinimum: 0n,
+        quote: { venue: "v4", fee: 3000, amountIn: 1n, amountOut: 1n, midPrice: 1, executionPrice: 1, priceImpact: 0, gasEstimate: 0n, pool: TOKEN_B },
+        recipient: DEPLOYER,
+        deadlineMinutes: 20,
+      }),
+    /v4/,
+  );
 });
 
 let failed = 0;

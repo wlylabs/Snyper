@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import { formatUnits } from "viem";
 import { useAccount } from "wagmi";
 import { Icon } from "@/components/ui/Icon";
-import { IconButton } from "@/components/ui/IconButton";
 import { Empty, Panel, Skeleton } from "@/components/ui/Panel";
 import { useConnectPrompt } from "@/hooks/useConnectPrompt";
 import { useMounted } from "@/hooks/useMounted";
@@ -77,7 +76,7 @@ export default function AssetsPage() {
     return mergeTokens(chainId, baseTokens(chainId), customTokens, discoveredTokens, touched);
   }, [chainId, snypes, trades, customTokens, discoveredTokens, venueKey]);
 
-  const { data: portfolio, isFetching, refetch } = usePortfolio(chainId, scope);
+  const { data: portfolio, isFetching } = usePortfolio(chainId, scope);
   const holdings = portfolio?.holdings;
   const { data: elsewhere } = useElsewhere();
   /*
@@ -181,15 +180,6 @@ export default function AssetsPage() {
               )}
               <span className="chip">{meta?.label ?? t("common.network")}</span>
             </>
-          }
-          action={
-            <IconButton
-              icon="refresh"
-              act="spin"
-              busy={isFetching}
-              onClick={() => void refetch()}
-              aria-label={t("assets.refresh")}
-            />
           }
           bodyClassName="p-0"
         >

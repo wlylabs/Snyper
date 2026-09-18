@@ -13,6 +13,7 @@ import {
   type CurveState,
 } from "./pons";
 import { routingAddress, type Token } from "./tokens";
+import { v4MidPrice } from "./v4";
 
 export type PoolRef = {
   address: `0x${string}`;
@@ -21,11 +22,16 @@ export type PoolRef = {
 };
 
 /**
- * Where a trade settles. Robinhood Chain carries both: Pons V1 launches and
- * everything else route through Uniswap v3, while a Pons V2 launch trades
- * directly against its own bonding curve until it graduates.
+ * Where a trade settles. Robinhood Chain carries all three: Pons V1 launches
+ * and everything else route through Uniswap v3, a Pons V2 launch trades
+ * directly against its own bonding curve until it graduates, and what it
+ * graduates into is a Uniswap v4 pool.
+ *
+ * Only the first two can be signed. A v4 pool can be read and priced — see
+ * `v4.ts` — but routing one needs the Universal Router and an answer to hooks,
+ * so `quoteExactIn` never returns this venue and `midPrice` may.
  */
-export type TradeVenue = "v3" | "curve";
+export type TradeVenue = "v3" | "curve" | "v4";
 
 export type Quote = {
   venue: TradeVenue;
@@ -243,20 +249,35 @@ export async function midPrice(
   }
 
   const pools = await findPools(client, chainId, inAddress, outAddress);
-  const pool = pools[0];
-  if (!pool) return undefined;
+  const snapshot = pools[0] ? await readPool(client, pools[0], inAddress) : undefined;
 
-  const snapshot = await readPool(client, pool, inAddress);
-  if (!snapshot) return undefined;
+  if (snapshot) {
+    const price = rateFromSqrtPrice(
+      snapshot.sqrtPriceX96,
+      snapshot.inIsToken0,
+      tokenIn.decimals,
+      tokenOut.decimals,
+    );
+    if (Number.isFinite(price) && price > 0) {
+      return { price, pool: pools[0], venue: "v3" };
+    }
+  }
 
-  const price = rateFromSqrtPrice(
-    snapshot.sqrtPriceX96,
-    snapshot.inIsToken0,
-    tokenIn.decimals,
-    tokenOut.decimals,
+  /*
+   * Nothing on a curve and nothing on v3. That is exactly what a Pons V2 launch
+   * looks like the moment it graduates, and it used to be where this returned
+   * nothing — leaving the position unpriced, the portfolio row blank and the
+   * snype watching it stopped, at the point the token had actually succeeded.
+   */
+  const v4 = await v4MidPrice(client, tokenIn, tokenOut, rateFromSqrtPrice).catch(
+    () => undefined,
   );
-  if (!Number.isFinite(price) || price <= 0) return undefined;
-  return { price, pool, venue: "v3" };
+  if (!v4) return undefined;
+  return {
+    price: v4.price,
+    pool: { address: v4.pool.id, fee: v4.pool.fee, liquidity: v4.state.liquidity },
+    venue: "v4",
+  };
 }
 
 function toFloat(amount: bigint, decimals: number): number {
