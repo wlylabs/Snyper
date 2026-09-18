@@ -20,7 +20,7 @@ export const INTL_LOCALE: Record<Locale, string> = {
 const en = {
   "nav.home": "Snyper",
   "nav.balance": "Balance",
-  "nav.discover": "Discover",
+  "nav.memecoin": "Memes",
   "nav.settings": "Settings",
 
   "a11y.home": "Snyper home",
@@ -44,19 +44,17 @@ const en = {
     "The app has been stripped back to its wallet session. Connect a wallet from the header; what this screen does is written next.",
 
   "page.balance.title": "Balance",
-  "page.balance.subtitle": "What this wallet holds on Robinhood Chain",
 
-  "page.discover.title": "Discover",
-  "page.discover.subtitle": "New memecoins on Robinhood Chain",
-  "page.discover.empty": "This screen is not built yet.",
-  "page.discover.hint":
+  "page.memecoin.title": "Memes",
+  "page.memecoin.subtitle": "New memecoins on Robinhood Chain",
+  "page.memecoin.empty": "This screen is not built yet.",
+  "page.memecoin.hint":
     "Where new contracts get found and read. Nothing is scanned until it is written.",
 
   "balance.total": "Portfolio value",
-  "balance.indicative": "Priced by the explorer — indicative",
   "balance.holdings": "Holdings",
-  "balance.more": "Show {count} more",
-  "balance.less": "Show fewer",
+  "balance.more": "{count} under $1",
+  "balance.less": "Hide what is under $1",
   "balance.connect": "No wallet connected.",
   "balance.connectHint":
     "Connect one — from the header or from here — and this screen reads what it holds on Robinhood Chain.",
@@ -67,9 +65,46 @@ const en = {
   "balance.failedHint":
     "Which tokens an address holds is a question only the chain's explorer can answer, and it did not. The balances themselves come off the chain, so what is missing here is the list, not the money.",
   "balance.retry": "Try again",
-  "balance.refresh": "Refresh",
   "balance.unconfirmed": "The chain did not confirm this figure — it is the explorer's.",
-  "balance.source": "Listed by the explorer, counted on the chain",
+  "balance.token": "Token",
+  "balance.contract": "Contract",
+  "balance.name": "Name",
+  "balance.nameAsWritten": "As written by the contract",
+  "balance.amount": "Amount",
+  "balance.worth": "Value",
+  "balance.flagTicker": "Another token here uses this ticker",
+  "balance.flagTickerDetail":
+    "More than one contract in this wallet answers to {symbol}. A ticker is not a name — anyone can deploy a token under any letters they like, and wearing a real one is how a worthless contract gets mistaken for it. The address below is the only thing that says which token this is.",
+  "balance.flagLure": "This name is an advertisement",
+  "balance.flagLureDetail":
+    "The name carries a web address or an instruction. Tokens like this are sent to wallets unasked, and the site they point at exists to empty the wallet that visits it. Nothing real needs you to go anywhere to claim, verify or unfreeze anything.",
+
+  "swap.title": "Sell",
+  "swap.for": "For",
+  "swap.amount": "Amount",
+  "swap.max": "Max",
+  "swap.receive": "You receive",
+  "swap.minimum": "At least",
+  "swap.slippage": "Slippage",
+  "swap.pool": "Pool",
+  "swap.venue": "Uniswap v3 · {fee}% fee",
+  "swap.approve": "Allow {symbol}",
+  "swap.approving": "Waiting for the allowance…",
+  "swap.approveWhy":
+    "A router cannot move a token it has not been allowed to move. This is written for exactly the amount being sold, so nothing is left standing afterwards.",
+  "swap.send": "Sell {symbol}",
+  "swap.sending": "Selling…",
+  "swap.checking": "Checking with the chain…",
+  "swap.done": "Sold",
+  "swap.tooMuch": "More than this wallet holds.",
+  "swap.noMarket": "Nothing on this chain trades this token.",
+  "swap.noMarketHint":
+    "No pool was found for it against either exit, at any fee tier. A token can be held and priced without being sellable here.",
+  "swap.blocked": "The chain refused this trade",
+  "swap.blockedHint":
+    "It was run against the current state before you were asked to sign, and it did not go through. Usually the pool moved — try a wider slippage, or a smaller amount.",
+  "swap.failed": "The transaction did not go through.",
+  "swap.risky": "This token is marked above. Read that before selling into it.",
 
   "settings.title": "Settings",
   "settings.subtitle": "How the app reads on this device",
@@ -140,7 +175,7 @@ export type TKey = keyof typeof en;
 const id: Record<TKey, string> = {
   "nav.home": "Snyper",
   "nav.balance": "Saldo",
-  "nav.discover": "Memecoin",
+  "nav.memecoin": "Memecoin",
   "nav.settings": "Pengaturan",
 
   "a11y.home": "Beranda Snyper",
@@ -163,19 +198,17 @@ const id: Record<TKey, string> = {
     "Aplikasi ini dikosongkan sampai tersisa sesi dompetnya. Hubungkan dompet lewat header; isi layar ini ditulis berikutnya.",
 
   "page.balance.title": "Saldo",
-  "page.balance.subtitle": "Isi dompet ini di Robinhood Chain",
 
-  "page.discover.title": "Memecoin",
-  "page.discover.subtitle": "Memecoin baru di Robinhood Chain",
-  "page.discover.empty": "Layar ini belum dibangun.",
-  "page.discover.hint":
+  "page.memecoin.title": "Memecoin",
+  "page.memecoin.subtitle": "Memecoin baru di Robinhood Chain",
+  "page.memecoin.empty": "Layar ini belum dibangun.",
+  "page.memecoin.hint":
     "Tempat kontrak baru ditemukan dan dibaca. Belum ada yang dipindai sampai ditulis.",
 
   "balance.total": "Nilai portofolio",
-  "balance.indicative": "Harga dari explorer — indikatif",
   "balance.holdings": "Isi dompet",
-  "balance.more": "Tampilkan {count} lagi",
-  "balance.less": "Tampilkan lebih sedikit",
+  "balance.more": "{count} di bawah $1",
+  "balance.less": "Sembunyikan yang di bawah $1",
   "balance.connect": "Belum ada dompet terhubung.",
   "balance.connectHint":
     "Hubungkan satu — lewat header atau dari sini — dan layar ini membaca isinya di Robinhood Chain.",
@@ -186,9 +219,46 @@ const id: Record<TKey, string> = {
   "balance.failedHint":
     "Token apa saja yang dipegang sebuah alamat hanya bisa dijawab explorer chain ini, dan ia tidak menjawab. Saldonya sendiri dibaca dari chain — jadi yang hilang di sini daftarnya, bukan uangnya.",
   "balance.retry": "Coba lagi",
-  "balance.refresh": "Muat ulang",
   "balance.unconfirmed": "Angka ini belum dikonfirmasi chain — ini angka explorer.",
-  "balance.source": "Didaftar explorer, dihitung di chain",
+  "balance.token": "Token",
+  "balance.contract": "Kontrak",
+  "balance.name": "Nama",
+  "balance.nameAsWritten": "Sesuai yang ditulis kontraknya",
+  "balance.amount": "Jumlah",
+  "balance.worth": "Nilai",
+  "balance.flagTicker": "Token lain di sini memakai ticker yang sama",
+  "balance.flagTickerDetail":
+    "Lebih dari satu kontrak di dompet ini mengaku {symbol}. Ticker bukan nama — siapa pun bisa menerbitkan token dengan huruf apa pun, dan memakai ticker yang asli adalah cara kontrak tak berharga disangka yang asli. Alamat di bawah satu-satunya yang menyatakan token ini yang mana.",
+  "balance.flagLure": "Nama ini sebuah iklan",
+  "balance.flagLureDetail":
+    "Namanya membawa alamat web atau perintah. Token seperti ini dikirim ke dompet tanpa diminta, dan situs yang ditunjuknya ada untuk menguras dompet yang datang. Tidak ada hal asli yang menyuruhmu pergi ke mana pun untuk mengklaim, memverifikasi atau membuka blokir apa pun.",
+
+  "swap.title": "Jual",
+  "swap.for": "Jadi",
+  "swap.amount": "Jumlah",
+  "swap.max": "Maks",
+  "swap.receive": "Kamu dapat",
+  "swap.minimum": "Minimal",
+  "swap.slippage": "Slippage",
+  "swap.pool": "Pool",
+  "swap.venue": "Uniswap v3 · biaya {fee}%",
+  "swap.approve": "Izinkan {symbol}",
+  "swap.approving": "Menunggu izinnya…",
+  "swap.approveWhy":
+    "Router tidak bisa memindahkan token yang belum diizinkan. Izin ini ditulis persis sebanyak yang dijual, jadi tidak ada sisa yang tertinggal setelahnya.",
+  "swap.send": "Jual {symbol}",
+  "swap.sending": "Menjual…",
+  "swap.checking": "Memastikan ke chain…",
+  "swap.done": "Terjual",
+  "swap.tooMuch": "Lebih banyak dari isi dompet ini.",
+  "swap.noMarket": "Tidak ada yang memperdagangkan token ini di chain ini.",
+  "swap.noMarketHint":
+    "Tidak ada pool untuk token ini terhadap kedua jalur keluar, di tier biaya mana pun. Sebuah token bisa dipegang dan punya harga tanpa bisa dijual di sini.",
+  "swap.blocked": "Chain menolak transaksi ini",
+  "swap.blockedHint":
+    "Transaksinya dijalankan terhadap keadaan sekarang sebelum kamu diminta tanda tangan, dan tidak tembus. Biasanya pool-nya bergeser — coba slippage lebih lebar, atau jumlah lebih kecil.",
+  "swap.failed": "Transaksinya tidak tembus.",
+  "swap.risky": "Token ini ditandai di atas. Baca dulu sebelum menjual ke dalamnya.",
 
   "settings.title": "Pengaturan",
   "settings.subtitle": "Cara aplikasi ini tampil di perangkatmu",

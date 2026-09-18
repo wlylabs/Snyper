@@ -2,23 +2,32 @@
 
 import { useState } from "react";
 import { Icon } from "@/components/ui/Icon";
-import { Empty, Panel, Skeleton } from "@/components/ui/Panel";
-import { CHAIN_ID, chainMeta } from "@/lib/chains";
+import { Empty, Panel, Row, Skeleton } from "@/components/ui/Panel";
+import { Sheet } from "@/components/ui/Sheet";
+import { CHAIN_ID, chainMeta, explorerAddress } from "@/lib/chains";
 import { formatAmount, formatSignificant, truncateAddress } from "@/lib/format";
 import { useConnectPrompt } from "@/hooks/useConnectPrompt";
 import { useHoldings, type Holding } from "@/hooks/useHoldings";
+import { SwapPanel } from "./SwapPanel";
 import { useI18n } from "@/hooks/useI18n";
 import { useMounted } from "@/hooks/useMounted";
 
 /**
- * How many rows stand before the list folds.
+ * What a holding has to be worth to earn a row.
  *
- * An address on this chain routinely holds two hundred tokens, nearly all of
- * them airdropped and unpriced. They are the reader's, so none of them is
- * hidden — but they are not what the reader opened this screen to see, and a
- * list that opens at two hundred rows buries the four that matter.
+ * A wallet on this chain collects contracts it never asked for — two hundred of
+ * them is ordinary — and listed at the same weight as a real position they bury
+ * it. So the bar is proof: something priced this at a dollar or more. Everything
+ * else folds into one line saying how many, and opens again on a tap. Folded,
+ * never dropped: a holding the reader cannot see is a holding they cannot sell,
+ * and the total still counts every one of them.
+ *
+ * The unpriced fold too. That is a real cost on a chain where two thirds of
+ * what a wallet holds has no price at all, and it was settled the same way the
+ * last time this screen existed: unknown is not worthless, but it is not proof
+ * either, and the tap brings it all back.
  */
-const VISIBLE = 12;
+const DOLLAR = 1;
 
 function usd(value: number | undefined): string {
   return value === undefined ? "—" : `$${formatSignificant(value, 2)}`;
@@ -30,18 +39,26 @@ function HoldingRow({
   amount,
   value,
   unconfirmed,
+  flagged,
+  onClick,
 }: {
   title: string;
   subtitle: string;
   amount: string;
   value: string;
   unconfirmed?: string;
+  flagged?: boolean;
+  onClick?: () => void;
 }) {
-  return (
-    <span className="tile cursor-default">
+  const inner = (
+    <>
       <span className="min-w-0 flex-1">
         <span className="block truncate">{title}</span>
-        <span className="block truncate text-[11px] font-normal text-faint">{subtitle}</span>
+        <span
+          className={`block truncate text-[11px] font-normal ${flagged ? "warn" : "text-faint"}`}
+        >
+          {subtitle}
+        </span>
       </span>
       <span className="shrink-0 text-right">
         <span className="num block text-[12px]">{amount}</span>
@@ -55,7 +72,16 @@ function HoldingRow({
       {unconfirmed && (
         <span className="dot dot-short shrink-0" title={unconfirmed} aria-label={unconfirmed} />
       )}
-    </span>
+    </>
+  );
+
+  if (!onClick) return <span className="tile cursor-default">{inner}</span>;
+
+  return (
+    <button type="button" className="tile" onClick={onClick}>
+      {inner}
+      <Icon name="chevron" size={13} className="-rotate-90 shrink-0 text-faint" />
+    </button>
   );
 }
 
@@ -69,37 +95,126 @@ function Loading() {
   );
 }
 
+/**
+ * One holding, opened.
+ *
+ * The row can only afford a line, and for a token wearing someone else's ticker
+ * a line is not enough — the contract address is the only thing that settles
+ * which token this is, and it belongs where the reader can read all of it and
+ * copy it. This is also where a lure's name is allowed to appear in full, under
+ * a label saying whose words they are, rather than in the place a name goes.
+ */
+function TokenSheet({
+  row,
+  onClose,
+  onSold,
+}: {
+  row: Holding | undefined;
+  onClose: () => void;
+  onSold: () => void;
+}) {
+  const { t } = useI18n();
+  const [copied, setCopied] = useState(false);
+
+  if (!row) return null;
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(row.address);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  return (
+    <Sheet open title={t("balance.token")} onClose={onClose}>
+      <div className="identity">
+        <div>
+          <p className="text-[19px] leading-tight font-bold">{row.symbol}</p>
+          <p className="num mt-1 text-[11px] text-faint">{truncateAddress(row.address, 6, 4)}</p>
+        </div>
+        <div className="mt-1">
+          <p className="num text-[26px] leading-none">{formatAmount(row.amount)}</p>
+          <p className="lbl mt-2">{usd(row.value)}</p>
+        </div>
+      </div>
+
+      <div className="px-3 pb-4">
+        {row.suspicion && (
+          <div className="panel mb-3 flex items-start gap-3 p-3">
+            <Icon name="alert" size={16} className="mt-0.5 warn shrink-0" />
+            <div className="min-w-0">
+              <p className="warn text-[12px] font-semibold">
+                {row.suspicion === "lure" ? t("balance.flagLure") : t("balance.flagTicker")}
+              </p>
+              <p className="mt-1 wrap-any text-[11px] leading-relaxed text-dim">
+                {row.suspicion === "lure"
+                  ? t("balance.flagLureDetail")
+                  : t("balance.flagTickerDetail", { symbol: row.symbol })}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* `Panel` rather than a bare `.panel`: the rows carry no horizontal
+            padding of their own, so without its body they sit flush to the
+            border and long values run into it. */}
+        <Panel>
+          <Row k={t("balance.amount")} v={<span className="num">{formatAmount(row.amount)}</span>} />
+          <Row k={t("balance.worth")} v={<span className="num">{usd(row.value)}</span>} />
+          <Row
+            k={row.suspicion ? t("balance.nameAsWritten") : t("balance.name")}
+            v={row.name || "—"}
+          />
+          <Row
+            k={t("balance.contract")}
+            v={<span className="num">{truncateAddress(row.address, 10, 8)}</span>}
+          />
+        </Panel>
+
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            className="tile justify-center"
+            data-done={copied ? "true" : undefined}
+            onClick={copy}
+          >
+            <Icon
+              key={copied ? "check" : "copy"}
+              name={copied ? "check" : "copy"}
+              size={14}
+              className={`pop ${copied ? "text-accent-text" : "text-dim"}`}
+            />
+            {copied ? t("common.copied") : t("common.copy")}
+          </button>
+          <a
+            href={explorerAddress(CHAIN_ID, row.address)}
+            target="_blank"
+            rel="noreferrer"
+            className="tile justify-center"
+          >
+            <Icon name="external" size={14} className="text-dim" />
+            {t("common.explorer")}
+          </a>
+        </div>
+
+        <SwapPanel row={row} onSold={onSold} />
+      </div>
+    </Sheet>
+  );
+}
+
 export function Holdings() {
   const mounted = useMounted();
   const { t } = useI18n();
   const prompt = useConnectPrompt();
   const [expanded, setExpanded] = useState(false);
-  const { address, holdings, native, nativeValue, total, loading, verifying, error, refetch } =
-    useHoldings();
+  const [opened, setOpened] = useState<Holding>();
+  const { address, holdings, native, nativeValue, total, loading, error, refetch } = useHoldings();
 
   const meta = chainMeta(CHAIN_ID);
-
-  const heading = (
-    <div className="mb-3 flex items-end justify-between gap-3">
-      <div>
-        <h1 className="text-[15px] font-bold tracking-[0.12em] uppercase">
-          {t("page.balance.title")}
-        </h1>
-        <p className="mt-0.5 text-[11px] text-faint">{t("page.balance.subtitle")}</p>
-      </div>
-      {mounted && address && (
-        <button
-          type="button"
-          className="btn btn-sm btn-short"
-          onClick={refetch}
-          aria-label={t("balance.refresh")}
-        >
-          <Icon name="refresh" size={13} className={verifying ? "animate-spin" : undefined} />
-          <span className="hidden sm:inline">{t("balance.refresh")}</span>
-        </button>
-      )}
-    </div>
-  );
 
   const body = () => {
     if (!mounted) return <Loading />;
@@ -138,13 +253,20 @@ export function Holdings() {
       );
     }
 
+    /*
+     * The coin is listed at any size, alone among everything here. Gas comes out
+     * of it, and a reader who cannot see their gas balance has no way to work
+     * out why a transaction will not sign.
+     */
     const hasCoin = native !== undefined && Number(native.formatted) > 0;
+    const listed = holdings.filter((row) => (row.value ?? 0) >= DOLLAR);
+    const folded = holdings.filter((row) => (row.value ?? 0) < DOLLAR);
+
     if (!hasCoin && holdings.length === 0) {
       return <Empty title={t("balance.empty")} hint={t("balance.emptyHint")} />;
     }
 
-    const shown = expanded ? holdings : holdings.slice(0, VISIBLE);
-    const hidden = holdings.length - shown.length;
+    const shown = expanded ? [...listed, ...folded] : listed;
 
     return (
       <div className="flex flex-col gap-1.5">
@@ -157,24 +279,32 @@ export function Holdings() {
           />
         )}
 
-        {shown.map((row: Holding) => (
+        {shown.map((row) => (
           <HoldingRow
             key={row.address}
             title={row.symbol}
-            subtitle={row.name}
+            subtitle={
+              row.suspicion === "lure"
+                ? t("balance.flagLure")
+                : row.suspicion === "ticker"
+                  ? t("balance.flagTicker")
+                  : row.name
+            }
+            flagged={Boolean(row.suspicion)}
             amount={formatAmount(row.amount)}
             value={usd(row.value)}
             unconfirmed={row.confirmed ? undefined : t("balance.unconfirmed")}
+            onClick={() => setOpened(row)}
           />
         ))}
 
-        {(hidden > 0 || expanded) && (
+        {folded.length > 0 && (
           <button
             type="button"
             className="tile justify-center text-dim"
             onClick={() => setExpanded((open) => !open)}
           >
-            {expanded ? t("balance.less") : t("balance.more", { count: hidden })}
+            {expanded ? t("balance.less") : t("balance.more", { count: folded.length })}
             <Icon
               name="chevron"
               size={13}
@@ -188,7 +318,9 @@ export function Holdings() {
 
   return (
     <div className="mx-auto w-full max-w-3xl">
-      {heading}
+      {/* Named by the nav it was reached from, so the heading is left for the
+          readers who cannot see that. */}
+      <h1 className="sr-only">{t("page.balance.title")}</h1>
 
       {mounted && address && (
         <Panel
@@ -197,17 +329,16 @@ export function Holdings() {
           meta={<span className="lbl">{truncateAddress(address, 6, 4)}</span>}
         >
           <p className="num text-[30px] leading-none">{usd(total)}</p>
-          <p className="lbl mt-2">{t("balance.indicative")}</p>
         </Panel>
       )}
 
-      <Panel label={t("balance.holdings")}>
-        {body()}
-      </Panel>
+      <Panel label={t("balance.holdings")}>{body()}</Panel>
 
-      <p className="mt-3 text-center text-[10px] tracking-[0.1em] text-faint uppercase">
-        {t("balance.source")}
-      </p>
+      <TokenSheet
+        row={opened}
+        onClose={() => setOpened(undefined)}
+        onSold={refetch}
+      />
     </div>
   );
 }

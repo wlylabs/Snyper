@@ -17,8 +17,14 @@ export type Holding = {
   symbol: string;
   name: string;
   decimals: number;
-  /** Units held. */
+  /** Units held, for reading. */
   amount: number;
+  /**
+   * Units held, in base units, for spending. Selling everything has to send the
+   * balance the chain holds — a float round-trip through `amount` leaves dust
+   * behind or asks for more than exists, and both of those are a failed trade.
+   */
+  raw: bigint;
   /** USD per unit, when anything prices this token. */
   rate?: number;
   /** `amount * rate`, and undefined when nothing prices it. */
@@ -28,7 +34,15 @@ export type Holding = {
    * refused the call and the index's own number is standing in its place.
    */
   confirmed: boolean;
+  /** Why this row should not be read at face value, when it should not. */
+  suspicion?: Suspicion;
 };
+
+/**
+ * `ticker` — something else in this wallet calls itself the same thing.
+ * `lure` — the name is an advertisement, and usually an address to visit.
+ */
+export type Suspicion = "ticker" | "lure";
 
 /**
  * How many rows are worth a `balanceOf` each.
@@ -81,6 +95,67 @@ function byWorth(a: Holding, b: Holding): number {
   return a.symbol.localeCompare(b.symbol);
 }
 
+/**
+ * A name that is trying to be a link.
+ *
+ * Tokens are airdropped into wallets for one reason: the name is a billboard,
+ * and the wallet is where it gets read. Measured on this chain they run from
+ * "trade on ponsdrop.com" to a contract calling itself ⚠VERIFY whose name is a
+ * paragraph about the reader's assets being frozen pending verification at a
+ * site it helpfully supplies. A balance screen that prints that as the token's
+ * name is carrying the message for them.
+ *
+ * Only a domain or an instruction counts. An earlier, looser version of this
+ * matched the word "rewards" and flagged a memecoin called Trump Rewards My
+ * Portfolio, which is many things but not a phishing site.
+ */
+const LURE =
+  /https?:\/\/|www\.|\b[a-z0-9-]+\.(com|io|xyz|org|net|top|app|co|finance|live|site|info)\b|claim your|verify at|\bairdrop\b/i;
+
+/**
+ * What is wrong with a row, if anything is.
+ *
+ * Two things are worth saying, and both are computed from the wallet's own
+ * list rather than taken on anyone's word.
+ *
+ * A ticker is not a name. Anyone can deploy a contract calling itself whatever
+ * they like, and across two addresses sampled on this chain, thirty tickers
+ * were claimed by more than one contract — thirty-five different contracts
+ * answer to USDG. A reader looking at a row that says USDG cannot tell which
+ * one they are holding, and that is the whole point of deploying it.
+ *
+ * Price is what breaks the tie. Something had to list a token and trade it for
+ * a rate to exist, which no impersonator gets. So a group with exactly one
+ * priced member has one asset and a crowd wearing its ticker; a group with none
+ * has nothing to separate them, and every row in it is marked.
+ *
+ * A lure is checked only on tokens nothing has priced. A token with a market is
+ * not an airdrop, and the check is loose enough that it should not get to
+ * accuse one.
+ */
+function mark(rows: Holding[]): Holding[] {
+  const byTicker = new Map<string, Holding[]>();
+  for (const row of rows) {
+    const key = row.symbol.trim().toLowerCase();
+    const group = byTicker.get(key);
+    if (group) group.push(row);
+    else byTicker.set(key, [row]);
+  }
+
+  return rows.map((row) => {
+    if (row.rate === undefined && LURE.test(`${row.symbol} ${row.name}`)) {
+      return { ...row, suspicion: "lure" as const };
+    }
+
+    const group = byTicker.get(row.symbol.trim().toLowerCase()) ?? [];
+    if (group.length < 2) return row;
+
+    const priced = group.filter((member) => member.rate !== undefined);
+    if (priced.length === 1 && row.rate !== undefined) return row;
+    return { ...row, suspicion: "ticker" as const };
+  });
+}
+
 export function useHoldings() {
   const { address } = useAccount();
 
@@ -90,6 +165,12 @@ export function useHoldings() {
     queryFn: () => fetchTokenBalances(address as string),
     enabled: Boolean(address) && SCAN_CONFIGURED,
     staleTime: 30_000,
+    /*
+     * There is no refresh button on this screen, so coming back to the tab is
+     * the gesture that stands in for one — which is also when a reader is most
+     * likely to have just moved something and want to see it.
+     */
+    refetchOnWindowFocus: true,
   });
 
   const coinPrice = useQuery({
@@ -97,6 +178,7 @@ export function useHoldings() {
     queryFn: fetchCoinPrice,
     enabled: SCAN_CONFIGURED,
     staleTime: 60_000,
+    refetchOnWindowFocus: true,
   });
 
   const native = useBalance({ address, chainId: CHAIN_ID });
@@ -120,7 +202,7 @@ export function useHoldings() {
     contracts,
     allowFailure: true,
     batchSize: ONE_CALL,
-    query: { enabled: contracts.length > 0, staleTime: 15_000 },
+    query: { enabled: contracts.length > 0, staleTime: 15_000, refetchOnWindowFocus: true },
   });
 
   const holdings = useMemo(() => {
@@ -132,7 +214,8 @@ export function useHoldings() {
           : undefined;
 
       const decimals = Number(entry.token.decimals);
-      const amount = Number(formatUnits(onChain ?? BigInt(entry.value), decimals));
+      const raw = onChain ?? BigInt(entry.value);
+      const amount = Number(formatUnits(raw, decimals));
       const rate = entry.token.exchange_rate ? Number(entry.token.exchange_rate) : undefined;
 
       return {
@@ -141,6 +224,7 @@ export function useHoldings() {
         name: entry.token.name ?? "",
         decimals,
         amount,
+        raw,
         rate,
         value: rate === undefined ? undefined : amount * rate,
         confirmed: onChain !== undefined,
@@ -151,7 +235,7 @@ export function useHoldings() {
      * A row the chain has since emptied is dropped rather than shown at zero:
      * the index is a moment behind the chain, and this is where that shows.
      */
-    return rows.filter((row) => row.amount > 0).sort(byWorth);
+    return mark(rows.filter((row) => row.amount > 0).sort(byWorth));
   }, [candidates, confirmed.data]);
 
   const nativeValue =
