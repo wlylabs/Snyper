@@ -73,6 +73,10 @@ function signed(change: number): string {
  * not report has not been shown to clear anything, so it fails every grade
  * above `all` — undefined is not small, it is unknown, and the reason to set a
  * floor is to stop reading rows that have not been shown to be worth reading.
+ *
+ * Liquidity is in the floor and not only in the ratio. Left to the ratio alone
+ * it let a pool holding fifty dollars through: a tenth of a thousand-dollar
+ * market cap is a hundred, and a hundred dollars of depth is not a market.
  */
 function keep(pair: Pair, band: Band, grade: Grade): boolean {
   if (pair.marketCap !== undefined && pair.marketCap > CEILING) return false;
@@ -81,7 +85,7 @@ function keep(pair: Pair, band: Band, grade: Grade): boolean {
 
   const { marketCap, fdv, volume, liquidity } = pair;
   if (marketCap === undefined || fdv === undefined) return false;
-  if (marketCap < FLOOR || fdv < FLOOR || volume < FLOOR) return false;
+  if (marketCap < FLOOR || fdv < FLOOR || volume < FLOOR || liquidity < FLOOR) return false;
   if (grade === "floor") return true;
 
   return liquidity >= marketCap * HEALTHY_LIQUIDITY && fdv <= marketCap * HEALTHY_DILUTION;

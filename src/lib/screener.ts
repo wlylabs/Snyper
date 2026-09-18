@@ -160,5 +160,12 @@ export const HEALTHY_DILUTION = 2;
 /** How hard the list is filtered, in one control. */
 export type Grade = "all" | "floor" | "healthy";
 
-/** The reader's bar, applied to the market cap, the volume and the FDV alike. */
+/**
+ * The reader's bar, applied to all four figures alike.
+ *
+ * Liquidity included. It was left out at first on the grounds that the healthy
+ * ratio already covered it, which was wrong twice over: the ratio does not
+ * apply at the `floor` grade at all, and at the smallest market caps it clears
+ * at a hundred dollars of depth, which is not a market anybody can leave.
+ */
 export const FLOOR = 1_000;
