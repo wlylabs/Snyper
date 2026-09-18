@@ -7,7 +7,7 @@ import { Icon } from "@/components/ui/Icon";
 import { IconButton } from "@/components/ui/IconButton";
 import { Sheet } from "@/components/ui/Sheet";
 import { formatCompactMoney } from "@/lib/currency";
-import { truncateAddress } from "@/lib/format";
+import { formatAmount, truncateAddress } from "@/lib/format";
 import { memeSignal } from "@/lib/memecoin";
 import type { PonsLaunch } from "@/lib/pons";
 import { readToken, searchTokens, type Token } from "@/lib/tokens";
@@ -288,7 +288,17 @@ function DiscoverRow({
   onSelect: (token: DiscoverToken) => void;
 }) {
   const { t } = useI18n();
-  const { volume24hUsd, fdvUsd } = token.market;
+  const { liquidityUsd, depth, depthSymbol } = token.market;
+
+  /* Depth in dollars where the chain's own dollar could price the pool's quote
+     asset, and in that asset where it could not. Never nothing: depth is what
+     this row was selected by, so it is the one figure that has to be there. */
+  const depthLabel =
+    liquidityUsd !== undefined
+      ? formatCompactMoney(liquidityUsd, money)
+      : depth !== undefined
+        ? `${formatAmount(depth, 3)}${depthSymbol ? ` ${depthSymbol}` : ""}`
+        : "—";
 
   return (
     <div className="flex items-center border-b border-line pr-2">
@@ -305,24 +315,14 @@ function DiscoverRow({
           </span>
           <span className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5">
             <Stat
-              label={t("token.discoverVolume")}
-              value={formatCompactMoney(volume24hUsd, money)}
-              hint={t("token.discoverVolumeHint")}
+              label={t("token.discoverDepth")}
+              value={depthLabel}
+              hint={t("token.discoverDepthHint")}
             />
-            <Stat
-              /* The feed reports a circulating cap when it can work one out;
-                 where it cannot, the figure is diluted and says so rather than
-                 passing itself off as the smaller number. */
-              label={token.diluted ? t("token.discoverFdv") : t("token.discoverMc")}
-              value={formatCompactMoney(token.marketCapUsd, money)}
-              hint={
-                token.diluted ? t("token.discoverFdvHint") : t("token.discoverMcHint")
-              }
-            />
-            {!token.diluted && fdvUsd !== undefined && (
+            {token.fdvUsd !== undefined && (
               <Stat
                 label={t("token.discoverFdv")}
-                value={formatCompactMoney(fdvUsd, money)}
+                value={formatCompactMoney(token.fdvUsd, money)}
                 hint={t("token.discoverFdvHint")}
               />
             )}

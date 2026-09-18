@@ -167,7 +167,7 @@ const Q96 = 2n ** 96n;
 const SCALE = 10n ** 18n;
 
 /** Converts a pool's sqrtPriceX96 into a decimal-adjusted tokenOut/tokenIn rate. */
-function rateFromSqrtPrice(
+export function rateFromSqrtPrice(
   sqrtPriceX96: bigint,
   inIsToken0: boolean,
   decimalsIn: number,

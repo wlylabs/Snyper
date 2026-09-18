@@ -19,7 +19,8 @@ const { readPonsLaunches, PONS_V1_FACTORY, PONS_V2_FACTORY } = await import(
   "../src/lib/pons.ts"
 );
 const { CHAIN_ID, dexMeta } = await import("../src/lib/chains.ts");
-const { CHAIN_SLUG } = await import("../src/lib/tokenFeed.ts");
+const { buildMarketIndex } = await import("../src/lib/marketIndex.ts");
+const { resolveVenue } = await import("../src/lib/venue.ts");
 
 const checks = [];
 function test(name, run) {
@@ -186,128 +187,199 @@ test("the launchpad confirms its own mints and disowns everything else", async (
   assert.equal(found.get(TOKEN_B.toLowerCase()), undefined);
 });
 
-/** A DexScreener pair, shaped the way the documented search response is. */
-function pair({ base, quote, liquidity, volume = liquidity * 2, chain = CHAIN_SLUG }) {
+/*
+ * The market index: the chain's own answer to "what trades here".
+ *
+ * These stub the chain rather than an indexer, because that is what the index
+ * now reads. What is under test is the filtering — a pool standing empty is the
+ * eighty percent case on this chain, and every one of them that slips through
+ * is a dead row in front of a reader.
+ */
+const VENUE = resolveVenue(undefined, undefined);
+const WRAPPED = VENUE.wrapped;
+const STABLE = VENUE.stable;
+
+const poolFor = (token) => `0x${token.slice(2, 6)}${"0".repeat(36)}`;
+const ZERO_ADDRESS = `0x${"0".repeat(40)}`;
+
+
+/** A PoolCreated log, shaped the way viem decodes one. */
+function poolLog({ token, quote = WRAPPED, fee = 10_000, block = 900n }) {
+  const [token0, token1] =
+    token.toLowerCase() < quote.toLowerCase() ? [token, quote] : [quote, token];
   return {
-    chainId: chain,
-    baseToken: { address: base, symbol: "MEME", name: "Meme Token" },
-    quoteToken: { address: quote, symbol: "WETH", name: "Wrapped Ether" },
-    priceUsd: "0.5",
-    liquidity: { usd: liquidity },
-    volume: { h24: volume },
-    priceChange: { h24: 12.5 },
-    fdv: liquidity * 10,
+    address: VENUE.factory,
+    blockNumber: block,
+    args: { token0, token1, fee, tickSpacing: 200, pool: poolFor(token) },
   };
 }
 
-async function withFetch(pairs, run) {
-  const original = globalThis.fetch;
-  globalThis.fetch = async () => ({
-    ok: true,
-    json: async () => ({ pairs }),
-  });
-  try {
-    return await run();
-  } finally {
-    globalThis.fetch = original;
-  }
+/**
+ * The sqrt price a pool would carry for a given rate.
+ *
+ * `sqrtPriceX96` is token1 per token0 in raw units, so the decimals of both
+ * sides are baked into it: a coin with eighteen of them quoted in a dollar with
+ * six sits at 1e-12 raw when it is worth exactly one dollar. Writing 2**96 and
+ * calling it "a price of one" is how a fixture ends up asserting that ether
+ * costs a trillion dollars.
+ */
+function sqrtPriceFor(rate, decimalsToken, decimalsQuote) {
+  const raw = rate / 10 ** (decimalsToken - decimalsQuote);
+  return BigInt(Math.floor(Math.sqrt(raw) * 2 ** 96));
 }
 
-test("the market read keeps the far side of each pair and drops the seed", async () => {
-  const wrapped = dexMeta(CHAIN_ID).wrapped;
-  const tokens = await withFetch(
-    [pair({ base: TOKEN_A, quote: wrapped, liquidity: 5_000 })],
-    () => readMarketTokens([wrapped]),
+/**
+ * A chain that answers with the given pool balances. Pools price at one unit
+ * for one unless `prices` says otherwise, keyed by pool address.
+ */
+function chainWith(logs, balances, prices = {}) {
+  return {
+    async getBlockNumber() {
+      return 40_000_000n;
+    },
+    async getLogs() {
+      return logs;
+    },
+    async multicall({ contracts }) {
+      return contracts.map((call) => {
+        if (call.functionName === "balanceOf") {
+          const pool = String(call.args[0]).toLowerCase();
+          return { status: "success", result: balances[pool] ?? 0n };
+        }
+        if (call.functionName === "slot0") {
+          const pool = String(call.address).toLowerCase();
+          const sqrt = prices[pool] ?? sqrtPriceFor(1, 18, 18);
+          return { status: "success", result: [sqrt, 0, 0, 0, 0, 0, true] };
+        }
+        if (call.functionName === "token0") {
+          const pool = String(call.address).toLowerCase();
+          const log = logs.find((entry) => entry.args.pool.toLowerCase() === pool);
+          return { status: "success", result: log.args.token0 };
+        }
+        if (call.functionName === "decimals") {
+          return { status: "success", result: 18 };
+        }
+        if (call.functionName === "getPool") {
+          /* The coin/dollar pool is resolved from the factory rather than
+             found in the scan, because on a live chain it predates any window
+             worth scanning. */
+          const [a, b] = call.args;
+          const pair = [String(a).toLowerCase(), String(b).toLowerCase()].sort().join();
+          const want = [WRAPPED.toLowerCase(), String(STABLE).toLowerCase()].sort().join();
+          return {
+            status: "success",
+            result: pair === want ? poolFor(WRAPPED) : ZERO_ADDRESS,
+          };
+        }
+        return { status: "success", result: 0n };
+      });
+    },
+  };
+}
+
+test("the index drops every pool standing empty", async () => {
+  const client = chainWith(
+    [poolLog({ token: TOKEN_A }), poolLog({ token: TOKEN_B })],
+    { [poolFor(TOKEN_A).toLowerCase()]: 5n * 10n ** 18n },
   );
 
+  const index = await buildMarketIndex(client, VENUE);
   assert.deepEqual(
-    tokens.map((token) => token.address.toLowerCase()),
+    index.markets.map((m) => m.address.toLowerCase()),
     [TOKEN_A.toLowerCase()],
-    "the wrapped native is already in the app's list and must not come back",
+    "a pool with nothing in it is not a market",
   );
-  assert.equal(tokens[0].liquidityUsd, 5_000);
-  assert.equal(tokens[0].change24h, 0.125, "a percent from the feed is a fraction here");
+  assert.equal(index.scanned, 2);
+  assert.equal(index.empty, 1, "the reader is told how much noise was dropped");
 });
 
-test("the market read ignores pairs from another chain", async () => {
-  const wrapped = dexMeta(CHAIN_ID).wrapped;
-  const tokens = await withFetch(
-    [pair({ base: TOKEN_A, quote: wrapped, liquidity: 9_999, chain: "ethereum" })],
-    () => readMarketTokens([wrapped]),
+test("the index ignores pools between two tokens it cannot fund a trade with", async () => {
+  const client = chainWith(
+    [poolLog({ token: TOKEN_A, quote: TOKEN_B })],
+    { [poolFor(TOKEN_A).toLowerCase()]: 9n * 10n ** 18n },
   );
 
-  assert.deepEqual(tokens, [], "an address is not unique across chains");
+  const index = await buildMarketIndex(client, VENUE);
+  assert.deepEqual(index.markets, [], "neither side is an asset the app holds");
+  assert.equal(index.scanned, 0);
 });
 
-test("the market read keeps the deepest pair for a token", async () => {
-  const wrapped = dexMeta(CHAIN_ID).wrapped;
-  const tokens = await withFetch(
-    [
-      pair({ base: TOKEN_A, quote: wrapped, liquidity: 100 }),
-      pair({ base: TOKEN_A, quote: wrapped, liquidity: 8_000 }),
-    ],
-    () => readMarketTokens([wrapped]),
+test("the index ranks by depth and keeps one row per token", async () => {
+  /* The same token pooled at two fee tiers: the deeper pool is the one a trade
+     would route through, and the shallow one must not become a second row. */
+  const SHALLOW_POOL = `0xaaaa${"0".repeat(36)}`;
+  const shallow = { ...poolLog({ token: TOKEN_A, fee: 500 }) };
+  shallow.args = { ...shallow.args, pool: SHALLOW_POOL };
+  const deep = poolLog({ token: TOKEN_A, fee: 10_000 });
+
+  const client = chainWith(
+    [shallow, deep, poolLog({ token: TOKEN_B, fee: 3_000 })],
+    {
+      [SHALLOW_POOL]: 1n * 10n ** 18n,
+      [poolFor(TOKEN_A).toLowerCase()]: 50n * 10n ** 18n,
+      [poolFor(TOKEN_B).toLowerCase()]: 20n * 10n ** 18n,
+    },
   );
 
-  assert.equal(tokens.length, 1);
-  assert.equal(tokens[0].liquidityUsd, 8_000, "the shallow pair must not win");
-});
-
-test("the market read ranks by what changed hands, not by what sits in the pool", async () => {
-  const wrapped = dexMeta(CHAIN_ID).wrapped;
-  const tokens = await withFetch(
-    [
-      // Deep but barely traded: a launch can mint itself any amount of depth.
-      pair({ base: TOKEN_A, quote: wrapped, liquidity: 90_000, volume: 200 }),
-      pair({ base: TOKEN_B, quote: wrapped, liquidity: 4_000, volume: 60_000 }),
-    ],
-    () => readMarketTokens([wrapped]),
-  );
-
+  const index = await buildMarketIndex(client, VENUE);
   assert.deepEqual(
-    tokens.map((token) => token.address.toLowerCase()),
-    [TOKEN_B.toLowerCase(), TOKEN_A.toLowerCase()],
+    index.markets.map((m) => m.address.toLowerCase()),
+    [TOKEN_A.toLowerCase(), TOKEN_B.toLowerCase()],
+    "deepest first",
   );
+  assert.equal(index.markets.length, 2, "one row per token, not one per pool");
+  assert.equal(index.markets[0].fee, 10_000, "and it is the deeper pool's row");
+});
+
+test("depth in the chain's dollar is comparable with depth in its coin", async () => {
+  if (!STABLE) return;
+  /* A coin trades at one dollar in this fixture, so a pool holding 10 of the
+     coin and one holding 10 dollars have to rank together rather than by the
+     raw integer, which differs by twelve decimal places between the two. */
+  const client = chainWith(
+    [
+      poolLog({ token: WRAPPED, quote: STABLE, fee: 500 }),
+      poolLog({ token: TOKEN_A, quote: WRAPPED }),
+      poolLog({ token: TOKEN_B, quote: STABLE }),
+    ],
+    {
+      [poolFor(WRAPPED).toLowerCase()]: 1_000n * 10n ** 6n,
+      [poolFor(TOKEN_A).toLowerCase()]: 10n * 10n ** 18n,
+      [poolFor(TOKEN_B).toLowerCase()]: 400n * 10n ** 6n,
+    },
+    { [poolFor(WRAPPED).toLowerCase()]: sqrtPriceFor(1, 18, 6) },
+  );
+
+  const index = await buildMarketIndex(client, VENUE);
+  const rows = index.markets.filter((m) => m.address.toLowerCase() !== WRAPPED.toLowerCase());
+  assert.deepEqual(
+    rows.map((m) => m.address.toLowerCase()),
+    [TOKEN_B.toLowerCase(), TOKEN_A.toLowerCase()],
+    "400 dollars outranks 10 coins at a dollar each",
+  );
+  assert.ok(rows[0].depthUsd > rows[1].depthUsd);
 });
 
 /*
- * The gate that decides what gets offered. Each of these contracts is real and
- * reachable by pasting its address; none of them is a row worth putting in
- * front of someone who is browsing.
+ * The gate that decides what gets offered. Measured over eleven days on chain
+ * 4663, eighty percent of the pools opened against wrapped native held nothing
+ * or dust — each one a row a reader would have to work out was dead.
  */
-test("a token is offered only with a pool, a day's volume and a cap", () => {
-  const whole = { liquidityUsd: 5_000, volume24hUsd: 900, marketCapUsd: 40_000 };
-  assert.equal(tradeable(whole), true);
-
-  assert.equal(
-    tradeable({ ...whole, liquidityUsd: undefined }),
-    false,
-    "no pool means it cannot be bought",
-  );
-  assert.equal(
-    tradeable({ ...whole, volume24hUsd: 0 }),
-    false,
-    "a pool nobody has traded in a day is a pool nobody wants",
-  );
-  assert.equal(
-    tradeable({ ...whole, marketCapUsd: undefined, fdvUsd: undefined }),
-    false,
-    "no cap means nothing says what buying it would be buying into",
-  );
-  assert.equal(
-    tradeable({ ...whole, marketCapUsd: undefined, fdvUsd: 120_000 }),
-    true,
-    "a diluted cap is still a cap",
-  );
+test("a token is offered only where something is standing in the pool", () => {
+  assert.equal(tradeable({ liquidityUsd: 5_000 }), true);
+  assert.equal(tradeable({ depth: 2.5 }), true, "depth counts even without a dollar");
+  assert.equal(tradeable({}), false, "an empty pool is not a market");
+  assert.equal(tradeable({ liquidityUsd: 0, depth: 0 }), false);
 });
 
-test("a feed that will not answer costs the list and nothing else", async () => {
+test("an index that will not answer costs the list and nothing else", async () => {
   const original = globalThis.fetch;
   globalThis.fetch = async () => {
     throw new Error("blocked by the reader's network");
   };
   try {
-    assert.deepEqual(await readMarketTokens([dexMeta(CHAIN_ID).wrapped]), []);
+    const reading = await readMarketTokens([{ address: WRAPPED, symbol: "WETH" }]);
+    assert.deepEqual(reading.tokens, []);
   } finally {
     globalThis.fetch = original;
   }

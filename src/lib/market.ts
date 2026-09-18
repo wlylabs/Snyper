@@ -1,74 +1,66 @@
 import { getAddress, isAddress } from "viem";
-import { CHAIN_SLUG, FEED_ENABLED } from "./tokenFeed";
+import type { IndexedMarket, MarketIndex } from "./marketIndex";
 
 /**
- * What actually trades on this chain, asked of an indexer.
+ * What actually trades on this chain, read from the chain itself.
  *
- * `tokenFeed.ts` asks the same indexer the narrow question — what are these
- * addresses worth — because pricing only ever concerns tokens the app already
- * knows. This asks the wide one, which is the question a reader opening an
- * empty picker is really asking: what is there? Nothing on chain can answer
- * that. A pool exists for every traded token, but finding pools means scanning
- * the factory's whole history, and the answer would still be a list of pools
- * with no sense of which ones anyone trades.
+ * This used to ask DexScreener, sideways: it has no endpoint that lists a
+ * chain, so the chain's own wrapped native and dollar were used as search terms
+ * and whatever came back was the market. That worked only for as long as the
+ * indexer carried chain 4663 at all — a slug this app could never confirm — and
+ * the picker was empty the moment it did not.
  *
- * DexScreener has no endpoint that lists a chain, so the chain is reached
- * sideways: its search matches token addresses, and every pool here is paired
- * against the chain's wrapped native or its dollar. Searching for those two
- * addresses therefore returns the pairs they sit in — which is to say, the
- * chain's market. The far side of each pair is a token worth offering.
+ * The factory answers the same question first hand. `marketIndex.ts` does the
+ * reading and explains what the measurements said; this is the client's side of
+ * it, which is one fetch of an index somebody else already built.
  */
 
-const SEARCH = "https://api.dexscreener.com/latest/dex/search?q=";
+const INDEX = "/api/market";
 const TIMEOUT = 8000;
 
 /** Tokens carried back from one pass. Beyond this the picker is a phone book. */
 const MAX_TOKENS = 120;
 
 /**
- * What the indexer says about a token that is not yet in the app's list.
+ * What the chain says about a token that is not yet in the app's list.
  *
- * Deliberately not a `Token`: the feed carries no decimals, and decimals are
- * not a display detail — they decide what an amount means. So this stays a
- * market reading until the chain has confirmed the token's identity, and the
- * two are joined in `useDiscoverTokens`.
+ * Deliberately not a `Token`: decimals decide what an amount means, and the
+ * index reads them off the pool's pricing rather than off the token's own
+ * record, so identity stays the contract's to confirm in `useDiscoverTokens`.
+ *
+ * Volume and price change are absent, and not by oversight. Both need swap
+ * history, and this chain's endpoint caps one log query at ten thousand results
+ * — which a single hour of swaps across the chain already exceeds. A figure
+ * that cannot be read is better missing than estimated.
  */
 export type MarketToken = {
   address: `0x${string}`;
-  /** Ticker as the indexer has it. The contract remains the authority. */
-  symbol?: string;
-  name?: string;
-  priceUsd?: number;
-  /** Dollars in the deepest pair. What the reading is worth is worth this. */
+  /** Dollars standing in the deepest pool. What every other figure rests on. */
   liquidityUsd?: number;
-  volume24hUsd?: number;
-  marketCapUsd?: number;
-  fdvUsd?: number;
-  /** Fraction, 0.01 = 1%, over the last day. */
-  change24h?: number;
-  /** When the deepest pair was created, in milliseconds. */
-  pairCreatedAt?: number;
+  /** Depth in the asset the pool is quoted against, for when no dollar exists. */
+  depth?: number;
+  depthSymbol?: string;
+  priceUsd?: number;
+  /** Fee tier of the pool the depth was measured in. */
+  fee?: number;
+  pool?: `0x${string}`;
 };
 
-type SearchToken = { address?: string; symbol?: string; name?: string };
-
-type SearchPair = {
-  chainId?: string;
-  baseToken?: SearchToken;
-  quoteToken?: SearchToken;
-  priceUsd?: string;
-  liquidity?: { usd?: number };
-  volume?: { h24?: number };
-  marketCap?: number;
-  fdv?: number;
-  priceChange?: { h24?: number };
-  pairCreatedAt?: number;
+/** How the index that produced these rows was doing. */
+export type MarketMeta = {
+  /** Pools the factory has opened against a fundable asset. */
+  scanned: number;
+  /** How many of those held nothing — the noise the index exists to drop. */
+  empty: number;
+  /** True when the scan's block budget ran out before its window was covered. */
+  partial: boolean;
+  builtAt: number;
 };
 
-function positive(value: unknown): number | undefined {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
-}
+export type MarketReading = {
+  tokens: MarketToken[];
+  meta?: MarketMeta;
+};
 
 function address(value: string | undefined): `0x${string}` | undefined {
   if (!value || !isAddress(value)) return undefined;
@@ -79,118 +71,96 @@ function address(value: string | undefined): `0x${string}` | undefined {
   }
 }
 
-/** One search, or nothing. A miss here is a shorter list, never an error. */
-async function search(query: string): Promise<SearchPair[]> {
-  try {
-    const response = await fetch(`${SEARCH}${encodeURIComponent(query)}`, {
-      signal: AbortSignal.timeout(TIMEOUT),
-      headers: { accept: "application/json" },
-    });
-    if (!response.ok) return [];
-    const body = (await response.json()) as { pairs?: SearchPair[] | null };
-    return Array.isArray(body.pairs) ? body.pairs : [];
-  } catch {
-    // Offline, rate limited, blocked by the reader's network, or a slug this
-    // indexer has never heard of: all of them mean the same nothing.
-    return [];
-  }
-}
-
-/**
- * Folds a pair into what is known about the token on its far side. The deepest
- * pair wins, exactly as in pricing: a token quoted from its shallowest pool is
- * quoted from the pool that agrees with the least money.
- */
-function fold(
-  found: Map<string, MarketToken>,
-  token: SearchToken | undefined,
-  pair: SearchPair,
-): void {
-  const parsed = address(token?.address);
-  if (!parsed) return;
-
-  const key = parsed.toLowerCase();
-  const liquidity = positive(pair.liquidity?.usd) ?? 0;
-  const held = found.get(key);
-  if (held && (held.liquidityUsd ?? 0) >= liquidity) return;
-
-  const change = pair.priceChange?.h24;
-  found.set(key, {
-    address: parsed,
-    symbol: token?.symbol?.trim() || undefined,
-    name: token?.name?.trim() || undefined,
-    priceUsd: positive(pair.priceUsd),
-    liquidityUsd: liquidity > 0 ? liquidity : undefined,
-    volume24hUsd: positive(pair.volume?.h24),
-    marketCapUsd: positive(pair.marketCap),
-    fdvUsd: positive(pair.fdv),
-    change24h:
-      typeof change === "number" && Number.isFinite(change) ? change / 100 : undefined,
-    pairCreatedAt: positive(pair.pairCreatedAt),
-  });
+function positive(value: unknown): number | undefined {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }
 
 /**
  * Whether a reading describes a market at all.
  *
- * Depth says the token can be bought, volume says somebody did, and a cap says
- * what buying it would be buying into. A chain like this one mints far more
- * contracts than anybody trades, and a feed carries readings for plenty that
- * have one of the three and are dead on the others — a pool minted at launch
- * and never traded, a pair with a day of volume and no supply the feed can
- * price. Offering those is not a fuller picker, it is a phone book with a
- * handful of real entries buried in it, and each dead row costs the reader the
- * time it takes to work out that it is dead.
+ * On this chain that is one question: is there anything in the pool. Measured
+ * over eleven days, eighty percent of the pools opened against wrapped native
+ * held nothing or dust, and every one of them would otherwise be a row the
+ * reader has to work out is dead. Depth is also the only figure here that was
+ * read rather than inferred, which is the other reason it is the gate.
  *
  * Nothing is hidden by this: an address still imports by hand. It is the
  * difference between what the app offers and what the app allows.
  */
 export function tradeable(market: MarketToken): boolean {
-  const cap = market.marketCapUsd ?? market.fdvUsd;
-  return (
-    (market.liquidityUsd ?? 0) > 0 && (market.volume24hUsd ?? 0) > 0 && (cap ?? 0) > 0
-  );
+  return (market.liquidityUsd ?? 0) > 0 || (market.depth ?? 0) > 0;
+}
+
+function toToken(entry: IndexedMarket, symbols: Map<string, string>): MarketToken | undefined {
+  const parsed = address(entry.address);
+  if (!parsed) return undefined;
+
+  const decimals = Number(entry.depthDecimals);
+  let depth: number | undefined;
+  try {
+    depth = Number(BigInt(entry.depth)) / 10 ** (Number.isFinite(decimals) ? decimals : 18);
+  } catch {
+    depth = undefined;
+  }
+
+  return {
+    address: parsed,
+    liquidityUsd: positive(entry.depthUsd),
+    depth: positive(depth),
+    depthSymbol: symbols.get(entry.quote.toLowerCase()),
+    priceUsd: positive(entry.priceUsd),
+    fee: Number.isFinite(Number(entry.fee)) ? Number(entry.fee) : undefined,
+    pool: address(entry.pool),
+  };
 }
 
 /**
- * The chain's traded tokens, busiest first.
+ * The chain's traded tokens, deepest first.
  *
- * `seeds` are the addresses every pool on the chain is paired against — the
- * wrapped native and the dollar — and they are both the search terms and the
- * tokens excluded from the result, since the app already carries them. Only
- * pairs on the configured chain count: an address is not unique across chains,
- * so a pair from somewhere else describes a different token that merely shares
- * an address.
+ * `seeds` are the assets every pool here is quoted against — the wrapped native
+ * and the dollar. They are excluded from the result, since the app already
+ * carries them, and their symbols label the depth of any pool the dollar could
+ * not value.
  */
 export async function readMarketTokens(
-  seeds: readonly `0x${string}`[],
-): Promise<MarketToken[]> {
-  if (!FEED_ENABLED || seeds.length === 0) return [];
+  seeds: readonly { address: `0x${string}`; symbol: string }[],
+): Promise<MarketReading> {
+  const symbols = new Map(seeds.map((seed) => [seed.address.toLowerCase(), seed.symbol]));
+  const skip = new Set(seeds.map((seed) => seed.address.toLowerCase()));
 
-  const skip = new Set(seeds.map((seed) => seed.toLowerCase()));
-  const results = await Promise.all(seeds.map((seed) => search(seed)));
-
-  const found = new Map<string, MarketToken>();
-  for (const pairs of results) {
-    for (const pair of pairs) {
-      if (pair.chainId !== CHAIN_SLUG) continue;
-      fold(found, pair.baseToken, pair);
-      fold(found, pair.quoteToken, pair);
-    }
+  let index: MarketIndex;
+  try {
+    const response = await fetch(INDEX, {
+      signal: AbortSignal.timeout(TIMEOUT),
+      headers: { accept: "application/json" },
+    });
+    if (!response.ok) return { tokens: [] };
+    index = (await response.json()) as MarketIndex;
+  } catch {
+    // The route is down, the scan failed, or this build has no server behind
+    // it. All of them mean the same nothing, and the picker says so.
+    return { tokens: [] };
   }
-  for (const seed of skip) found.delete(seed);
 
-  /*
-   * Ranked by what changed hands today, not by what sits in the pool. Depth is
-   * a standing offer and a launch can mint itself any amount of it; volume is
-   * the part somebody had to pay for, which is why a scanner for this kind of
-   * token leads with it and why depth only breaks the ties.
-   */
-  return [...found.values()]
-    .sort((a, b) => {
-      const volume = (b.volume24hUsd ?? 0) - (a.volume24hUsd ?? 0);
-      if (volume !== 0) return volume;
-      return (b.liquidityUsd ?? 0) - (a.liquidityUsd ?? 0);
-    })
-    .slice(0, MAX_TOKENS);
+  if (!Array.isArray(index?.markets)) return { tokens: [] };
+
+  const tokens: MarketToken[] = [];
+  for (const entry of index.markets) {
+    const token = toToken(entry, symbols);
+    if (!token || skip.has(token.address.toLowerCase())) continue;
+    tokens.push(token);
+  }
+
+  /* The index already ranked these by what the pool holds, valued in dollars
+     wherever the chain's own dollar could price the quote asset. */
+  return {
+    tokens: tokens.slice(0, MAX_TOKENS),
+    meta: {
+      scanned: Number(index.scanned) || 0,
+      empty: Number(index.empty) || 0,
+      partial: Boolean(index.partial),
+      builtAt: Number(index.builtAt) || Date.now(),
+    },
+  };
 }

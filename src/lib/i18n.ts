@@ -89,19 +89,17 @@ const en = {
    */
   "token.discovered": "Found on chain",
   "token.discoveredCount": "{count} not in your list",
-  "token.discovering": "Reading the chain and the market feed…",
+  "token.discovering": "Reading the chain…",
   "token.discoverNote":
-    "Tokens with a pool and a day's trading behind them, from the market feed, with the Pons launchpad asked which of them it minted. Nothing here is a curated list, and no one has vetted these contracts.",
+    "Every pool this chain's factory has opened against one of its own assets, ranked by what is actually standing in it, with the Pons launchpad asked which of these it minted. Read from the chain, not from an indexer. Nothing here is a curated list, and no one has vetted these contracts.",
   "token.discoverChainOnly":
-    "The market feed answered with nothing, so there is nothing to offer beyond the assets above. Paste a contract address to import one by hand.",
+    "The chain scan answered with nothing, so there is nothing to offer beyond the assets above. Paste a contract address to import one by hand.",
   "token.discoverFiltered":
-    "{count} more had no pool, no trading, or no cap to report, and are not offered; paste an address to reach one anyway.",
-  "token.discoverVolume": "VOL",
-  "token.discoverVolumeHint": "Traded over the last 24 hours, from the market feed",
-  "token.discoverMc": "MC",
-  "token.discoverMcHint": "Market cap — circulating supply at the market price",
+    "{count} more pools were standing empty and are not offered; paste an address to reach one anyway.",
+  "token.discoverDepth": "DEPTH",
+  "token.discoverDepthHint": "What is standing in the deepest pool — how much can be bought before the price moves",
   "token.discoverFdv": "FDV",
-  "token.discoverFdvHint": "Fully diluted — total supply at the market price",
+  "token.discoverFdvHint": "Fully diluted — total supply at the pool price",
   "token.copyAddress": "Copy contract address {address}",
 
   "swap.execute": "Execute",
@@ -530,19 +528,17 @@ const id: Record<TKey, string> = {
 
   "token.discovered": "Ditemukan di chain",
   "token.discoveredCount": "{count} belum ada di daftarmu",
-  "token.discovering": "Membaca chain dan feed pasar…",
+  "token.discovering": "Membaca chain…",
   "token.discoverNote":
-    "Token yang punya pool dan perdagangan sehari terakhir, menurut feed pasar, lalu launchpad Pons ditanya mana yang dia cetak. Tidak ada daftar kurasi di sini, dan tidak ada yang memverifikasi kontrak-kontrak ini.",
+    "Semua pool yang pernah dibuka factory chain ini terhadap asetnya sendiri, diperingkat dari isi pool-nya, lalu launchpad Pons ditanya mana yang dia cetak. Dibaca dari chain, bukan dari indexer. Tidak ada daftar kurasi di sini, dan tidak ada yang memverifikasi kontrak-kontrak ini.",
   "token.discoverChainOnly":
-    "Feed pasar tidak menjawab, jadi tidak ada yang bisa ditawarkan selain aset di atas. Tempel alamat kontrak untuk mengimpor sendiri.",
+    "Pemindaian chain tidak menemukan apa pun, jadi tidak ada yang bisa ditawarkan selain aset di atas. Tempel alamat kontrak untuk mengimpor sendiri.",
   "token.discoverFiltered":
-    "{count} lainnya tidak punya pool, tidak diperdagangkan, atau tidak punya kapitalisasi, jadi tidak ditawarkan; tempel alamatnya kalau tetap mau.",
-  "token.discoverVolume": "VOL",
-  "token.discoverVolumeHint": "Diperdagangkan dalam 24 jam terakhir, menurut feed pasar",
-  "token.discoverMc": "MC",
-  "token.discoverMcHint": "Kapitalisasi pasar — suplai beredar dikali harga pasar",
+    "{count} pool lainnya berdiri kosong dan tidak ditawarkan; tempel alamatnya kalau tetap mau.",
+  "token.discoverDepth": "ISI POOL",
+  "token.discoverDepthHint": "Yang benar-benar ada di pool terdalam — seberapa banyak bisa dibeli sebelum harganya bergerak",
   "token.discoverFdv": "FDV",
-  "token.discoverFdvHint": "Terdilusi penuh — total suplai dikali harga pasar",
+  "token.discoverFdvHint": "Terdilusi penuh — total suplai dikali harga pool",
   "token.copyAddress": "Salin alamat kontrak {address}",
 
   "swap.execute": "Eksekusi",
