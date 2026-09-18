@@ -6,7 +6,7 @@ import { Empty, Panel, Row, Skeleton } from "@/components/ui/Panel";
 import { Segmented } from "@/components/ui/Segmented";
 import { Sheet } from "@/components/ui/Sheet";
 import { CHAIN_ID, explorerAddress } from "@/lib/chains";
-import { formatSignificant, truncateAddress } from "@/lib/format";
+import { formatCompact, truncateAddress } from "@/lib/format";
 import type { Sort } from "@/lib/screener";
 import { useScreener, type Pair } from "@/hooks/useScreener";
 import { useI18n } from "@/hooks/useI18n";
@@ -23,8 +23,8 @@ function age(minutes: number | undefined): string {
 }
 
 /** Everything on this screen is dollars — see the fold in `useScreener`. */
-function usd(value: number): string {
-  return `$${formatSignificant(value, 2)}`;
+function usd(value: number | undefined): string {
+  return value === undefined ? "—" : `$${formatCompact(value)}`;
 }
 
 function signed(change: number): string {
@@ -63,13 +63,15 @@ function PairSheet({ pair, onClose }: { pair: Pair | undefined; onClose: () => v
           <p className="num mt-1 text-[11px] text-faint">{truncateAddress(pair.token, 6, 4)}</p>
         </div>
         <div className="mt-1">
-          <p className="num text-[26px] leading-none">{usd(pair.price)}</p>
+          <p className="num text-[26px] leading-none">{usd(pair.marketCap)}</p>
+          <p className="lbl mt-1">{t("memecoin.mcap")}</p>
           <p className={`lbl mt-2 ${pair.change >= 0 ? "long" : "short"}`}>{signed(pair.change)}</p>
         </div>
       </div>
 
       <div className="px-3 pb-4">
         <Panel>
+          <Row k={t("memecoin.fdv")} v={<span className="num">{usd(pair.fdv)}</span>} />
           <Row
             k={t("memecoin.volume")}
             v={<span className="num">{usd(pair.volume)}</span>}
@@ -162,12 +164,18 @@ export function Screener() {
                   <span className="chip chip-xs chip-live ml-1.5">{t("memecoin.fresh")}</span>
                 )}
               </span>
-              <span className="num block truncate text-[11px] font-normal text-faint">
-                {usd(pair.volume)} · {pair.swaps} · {age(pair.age)}
+              <span className="block truncate text-[11px] font-normal text-faint">
+                <span className="lbl">{t("memecoin.volShort")}</span>{" "}
+                <span className="num">{usd(pair.volume)}</span>
+                {" · "}
+                <span className="lbl">{t("memecoin.liqShort")}</span>{" "}
+                <span className="num">{usd(pair.liquidity)}</span>
+                {" · "}
+                <span className="num">{age(pair.age)}</span>
               </span>
             </span>
             <span className="shrink-0 text-right">
-              <span className="num block text-[12px]">{usd(pair.price)}</span>
+              <span className="num block text-[12px]">{usd(pair.marketCap)}</span>
               <span
                 className={`num block text-[11px] font-normal ${pair.change >= 0 ? "long" : "short"}`}
               >

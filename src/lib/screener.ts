@@ -83,5 +83,19 @@ export function isEquity(name: string): boolean {
   return name.includes(EQUITY);
 }
 
+/**
+ * Where supply goes to stop counting.
+ *
+ * Neither address has a key, so anything sent to one is out of circulation for
+ * good. Subtracting them is the difference between a market cap and a fully
+ * diluted one on a chain where burning supply is half the pitch — and it is the
+ * only part of "circulating" that can be read off the chain rather than taken
+ * on somebody's word.
+ */
+export const BURNED = [
+  "0x0000000000000000000000000000000000000000",
+  "0x000000000000000000000000000000000000dEaD",
+] as const;
+
 /** How the list is ordered, which is the only question this screen asks. */
 export type Sort = "volume" | "new" | "movers";

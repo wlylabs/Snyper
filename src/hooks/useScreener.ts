@@ -6,6 +6,7 @@ import { usePublicClient } from "wagmi";
 import { CHAIN_ID } from "@/lib/chains";
 import { VENUE, factoryAbi } from "@/lib/venue";
 import {
+  BURNED,
   CREATED_WINDOW,
   DEPTH,
   REFERENCE_FEE,
@@ -25,8 +26,17 @@ export type Pair = {
   name: string;
   quote: string;
   fee: number;
-  /** US dollars per unit, as the pool prices it right now. */
-  price: number;
+  /**
+   * Everything the token is worth at the price the pool is quoting: supply that
+   * is still reachable, and then supply outright.
+   *
+   * Undefined when the contract would not say what it has issued. A token that
+   * has rugged is worth nothing and reads as zero, and a token that refused the
+   * question is not — writing both as zero would make the screen certain about
+   * the one thing it had failed to find out.
+   */
+  marketCap?: number;
+  fdv?: number;
   /** Percent, across the window. */
   change: number;
   /** US dollars that changed hands in the window. */
@@ -48,6 +58,9 @@ type Tally = {
 
 /** One `eth_call` per multicall, however many reads go into it. */
 const ONE_CALL = 0;
+
+/** Reads per row in the detail call: see the contracts it assembles. */
+const READS = 7;
 
 /**
  * Everything trading on this chain, ranked.
@@ -186,15 +199,25 @@ async function read(client: PublicClient): Promise<Pair[]> {
           ]
         : []),
       ...candidates.flatMap((entry) => [
-      { address: entry.token, abi: erc20Abi, functionName: "symbol" } as const,
-      { address: entry.token, abi: erc20Abi, functionName: "decimals" } as const,
-      { address: entry.token, abi: erc20Abi, functionName: "name" } as const,
-      {
-        address: entry.quoteToken,
-        abi: erc20Abi,
-        functionName: "balanceOf",
-        args: [entry.pool],
-      } as const,
+        { address: entry.token, abi: erc20Abi, functionName: "symbol" } as const,
+        { address: entry.token, abi: erc20Abi, functionName: "decimals" } as const,
+        { address: entry.token, abi: erc20Abi, functionName: "name" } as const,
+        {
+          address: entry.quoteToken,
+          abi: erc20Abi,
+          functionName: "balanceOf",
+          args: [entry.pool],
+        } as const,
+        { address: entry.token, abi: erc20Abi, functionName: "totalSupply" } as const,
+        ...BURNED.map(
+          (grave) =>
+            ({
+              address: entry.token,
+              abi: erc20Abi,
+              functionName: "balanceOf",
+              args: [grave],
+            }) as const,
+        ),
       ]),
     ],
   });
@@ -215,11 +238,13 @@ async function read(client: PublicClient): Promise<Pair[]> {
   const inUsd = (symbol: string) => (symbol === "USDG" ? 1 : (ethUsd ?? 0));
 
   const rows = candidates.map((entry, index) => {
-    const at = detailOffset + index * 4;
+    const at = detailOffset + index * READS;
     const symbol = details[at];
     const decimals = details[at + 1];
     const named = details[at + 2];
     const resting = details[at + 3];
+    const supply = details[at + 4];
+    const graves = [details[at + 5], details[at + 6]];
     const quote = quoteFor(entry.quoteToken)!;
     const baseDecimals =
       decimals?.status === "success" ? Number(decimals.result) : 18;
@@ -234,6 +259,14 @@ async function read(client: PublicClient): Promise<Pair[]> {
     const rate = inUsd(quote.symbol);
     const price = orient(entry.tally.last) * rate;
     const opened = orient(entry.tally.first) * rate;
+
+    const whole = (value: unknown) =>
+      typeof value === "bigint" ? Number(value) / 10 ** baseDecimals : 0;
+    const issued = supply?.status === "success" ? whole(supply.result) : undefined;
+    const buried = graves.reduce(
+      (sum, grave) => sum + (grave?.status === "success" ? whole(grave.result) : 0),
+      0,
+    );
     const volumeRaw = entry.baseIsToken0 ? entry.tally.amount1 : entry.tally.amount0;
 
     return {
@@ -246,7 +279,8 @@ async function read(client: PublicClient): Promise<Pair[]> {
           : "—",
       quote: quote.symbol,
       fee: entry.fee,
-      price,
+      marketCap: issued === undefined ? undefined : Math.max(issued - buried, 0) * price,
+      fdv: issued === undefined ? undefined : issued * price,
       change: opened > 0 ? (price / opened - 1) * 100 : 0,
       volume: (Number(volumeRaw) / 10 ** quote.decimals) * rate,
       swaps: entry.tally.swaps,
