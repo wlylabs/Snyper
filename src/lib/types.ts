@@ -137,8 +137,6 @@ export type Settings = {
   theme: "dark" | "light";
   /** Auto execution still needs a wallet signature; this gates dispatch. */
   autoDispatch: boolean;
-  /** Tip added on top of the base fee, in gwei. 0 leaves it to the wallet. */
-  priorityFeeGwei: number;
   /** Swaps above this much price impact are refused outright. 0 disables. */
   maxImpactBps: number;
 };

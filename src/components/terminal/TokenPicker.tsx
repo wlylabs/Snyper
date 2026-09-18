@@ -7,7 +7,7 @@ import { Icon } from "@/components/ui/Icon";
 import { IconButton } from "@/components/ui/IconButton";
 import { Sheet } from "@/components/ui/Sheet";
 import { formatCompactMoney } from "@/lib/currency";
-import { truncateAddress } from "@/lib/format";
+import { formatAmount, truncateAddress } from "@/lib/format";
 import { memeSignal } from "@/lib/memecoin";
 import type { PonsLaunch } from "@/lib/pons";
 import { readToken, searchTokens, type Token } from "@/lib/tokens";
@@ -266,10 +266,15 @@ type Money = Parameters<typeof formatCompactMoney>[1];
  *
  * A holding answers "what do I have": an amount, what it is worth, how it moved
  * since yesterday. A row here answers a different question — whether this is a
- * thing at all — and the three figures that answer it are the day's volume, the
- * cap, and the fully diluted cap beside it. Price is deliberately absent: it is
- * the cap divided by a supply each launch picks arbitrarily, so two tokens at
- * the same price are not comparable and two at the same cap are.
+ * thing at all — and what answers it is what changed hands, what is standing in
+ * the pool behind it, and what the whole token is worth. Price is deliberately
+ * absent: it is the cap divided by a supply each launch picks arbitrarily, so
+ * two tokens at the same price are not comparable and two at the same cap are.
+ *
+ * A row that trades on Uniswap v4 carries no pool figure and says so, because
+ * its money sits in a singleton shared with every other v4 pool and none of it
+ * belongs to this one. It also cannot be swapped from here, which the row has
+ * to admit before the reader taps it rather than after.
  *
  * The contract address gets its own button rather than a line of text. It is
  * the thing a reader takes somewhere else — an explorer, a chart, a group chat
@@ -288,7 +293,17 @@ function DiscoverRow({
   onSelect: (token: DiscoverToken) => void;
 }) {
   const { t } = useI18n();
-  const { volume24hUsd, fdvUsd } = token.market;
+  const { liquidityUsd, volumeUsd, volume, volumeSymbol, venue } = token.market;
+
+  /* Volume in dollars where the chain's own dollar could price the pool's quote
+     asset, and in that asset where it could not. Never nothing: it is what this
+     row was ranked by, so it is the one figure that has to be there. */
+  const volumeLabel =
+    volumeUsd !== undefined
+      ? formatCompactMoney(volumeUsd, money)
+      : volume !== undefined
+        ? `${formatAmount(volume, 3)}${volumeSymbol ? ` ${volumeSymbol}` : ""}`
+        : "—";
 
   return (
     <div className="flex items-center border-b border-line pr-2">
@@ -302,27 +317,29 @@ function DiscoverRow({
           <span className="flex min-w-0 max-w-full items-center gap-1.5">
             <span className="truncate text-[12px] text-dim">{token.name}</span>
             <TokenTags token={token} listed={listed} launch={token.launch} />
+            {venue === "v4" && (
+              <span className="chip chip-xs" title={t("token.discoverV4Hint")}>
+                {t("token.discoverV4")}
+              </span>
+            )}
           </span>
           <span className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5">
             <Stat
               label={t("token.discoverVolume")}
-              value={formatCompactMoney(volume24hUsd, money)}
+              value={volumeLabel}
               hint={t("token.discoverVolumeHint")}
             />
-            <Stat
-              /* The feed reports a circulating cap when it can work one out;
-                 where it cannot, the figure is diluted and says so rather than
-                 passing itself off as the smaller number. */
-              label={token.diluted ? t("token.discoverFdv") : t("token.discoverMc")}
-              value={formatCompactMoney(token.marketCapUsd, money)}
-              hint={
-                token.diluted ? t("token.discoverFdvHint") : t("token.discoverMcHint")
-              }
-            />
-            {!token.diluted && fdvUsd !== undefined && (
+            {liquidityUsd !== undefined && (
+              <Stat
+                label={t("token.discoverDepth")}
+                value={formatCompactMoney(liquidityUsd, money)}
+                hint={t("token.discoverDepthHint")}
+              />
+            )}
+            {token.fdvUsd !== undefined && (
               <Stat
                 label={t("token.discoverFdv")}
-                value={formatCompactMoney(fdvUsd, money)}
+                value={formatCompactMoney(token.fdvUsd, money)}
                 hint={t("token.discoverFdvHint")}
               />
             )}

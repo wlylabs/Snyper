@@ -6,11 +6,9 @@ import {
   ContractFunctionRevertedError,
   ExecutionRevertedError,
   InsufficientFundsError,
-  parseGwei,
 } from "viem";
 import { useAccount, useConfig, useWriteContract } from "wagmi";
 import {
-  getPublicClient,
   readContract,
   simulateContract,
   waitForTransactionReceipt,
@@ -53,36 +51,6 @@ export type ExecuteArgs = {
 
 export type ExecutePhase = "idle" | "approving" | "signing" | "pending";
 
-export type FeeOverrides = {
-  maxFeePerGas?: bigint;
-  maxPriorityFeePerGas?: bigint;
-};
-
-/**
- * Turns the configured tip into a full 1559 pair. Wallets reject a priority fee
- * sent without a ceiling to sit under, so the base fee of the latest block is
- * doubled to leave room for it. A chain with no base fee is left to the wallet.
- */
-async function feeOverrides(
-  config: ReturnType<typeof useConfig>,
-  chainId: number,
-  priorityFeeGwei: number,
-): Promise<FeeOverrides> {
-  if (!(priorityFeeGwei > 0)) return {};
-  try {
-    const client = getPublicClient(config, { chainId });
-    if (!client) return {};
-    const block = await client.getBlock({ blockTag: "latest" });
-    const base = block.baseFeePerGas;
-    if (base === null || base === undefined) return {};
-    const tip = parseGwei(priorityFeeGwei.toString());
-    return { maxPriorityFeePerGas: tip, maxFeePerGas: base * 2n + tip };
-  } catch {
-    // A fee read that fails is not worth failing the trade over.
-    return {};
-  }
-}
-
 /**
  * Whether a failed call is the chain refusing the transaction, as opposed to
  * the node failing to answer. Only the first kind is worth stopping a trade
@@ -106,7 +74,6 @@ export function useExecutor() {
   const { writeContractAsync } = useWriteContract();
   const pushTrade = useAppStore((state) => state.pushTrade);
   const updateTrade = useAppStore((state) => state.updateTrade);
-  const priorityFeeGwei = useAppStore((state) => state.settings.priorityFeeGwei);
   const maxImpactBps = useAppStore((state) => state.settings.maxImpactBps);
   const toast = useToast();
   const { t } = useI18n();
@@ -136,7 +103,6 @@ export function useExecutor() {
       }
 
       const amountOutMinimum = applySlippage(quote.amountOut, slippageBps);
-      const fees = await feeOverrides(config, tokenIn.chainId, priorityFeeGwei);
 
       // Only a pool route can carry a fee leg at all; a curve is encoded the
       // same way it always was, and the ledger below records the zero.
@@ -179,7 +145,6 @@ export function useExecutor() {
               functionName: "approve",
               args: [plan.target, value],
               chainId: tokenIn.chainId,
-              ...fees,
             });
             pushTrade({
               id: hash,
@@ -273,7 +238,6 @@ export function useExecutor() {
         args: request.args,
         value: request.value,
         chainId: tokenIn.chainId,
-        ...fees,
       });
 
       pushTrade({
@@ -323,7 +287,6 @@ export function useExecutor() {
       chainId,
       config,
       maxImpactBps,
-      priorityFeeGwei,
       pushTrade,
       t,
       toast,

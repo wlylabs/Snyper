@@ -1,4 +1,3 @@
-import type { PublicClient } from "viem";
 import { CHAIN_META } from "./chains";
 
 /**
@@ -9,9 +8,8 @@ import { CHAIN_META } from "./chains";
  * of results it will answer with, and neither cap is advertised — the request
  * simply fails. So a scan cannot be one call over the whole window; it has to
  * be chunked, and the chunk has to shrink whenever the endpoint says no. That
- * logic was written once for the wallet scan and is now shared with the
- * launchpad index, because both want the same thing: as far back as the request
- * budget reaches, and an honest answer about where they stopped.
+ * logic lives here, written once for the wallet scan: as far back as the
+ * request budget reaches, and an honest answer about where it stopped.
  */
 
 /** Requests one walk may spend before it reports what it managed to cover. */
@@ -80,13 +78,4 @@ export function blockWindow(chainId: number, days: number): bigint {
   const blockSeconds = blockMs ? blockMs / 1000 : 12;
   const blocks = Math.round((days * 24 * 60 * 60) / Math.max(0.05, blockSeconds));
   return BigInt(Math.min(2_000_000, Math.max(50_000, blocks)));
-}
-
-/** The chain head, or nothing when the endpoint will not say. */
-export async function chainHead(client: PublicClient): Promise<bigint | undefined> {
-  try {
-    return await client.getBlockNumber();
-  } catch {
-    return undefined;
-  }
 }

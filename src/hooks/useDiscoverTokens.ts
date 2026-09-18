@@ -4,7 +4,13 @@ import { useQuery } from "@tanstack/react-query";
 import type { PublicClient } from "viem";
 import { usePublicClient } from "wagmi";
 import { erc20Abi } from "@/lib/abi";
-import { readMarketTokens, tradeable, type MarketToken } from "@/lib/market";
+import {
+  readMarketTokens,
+  tradeable,
+  type MarketMeta,
+  type MarketReading,
+  type MarketToken,
+} from "@/lib/market";
 import { readPonsLaunches, type PonsLaunch } from "@/lib/pons";
 import { baseTokens, type Token } from "@/lib/tokens";
 import { useAppStore } from "@/store/useAppStore";
@@ -25,10 +31,12 @@ import { useAppStore } from "@/store/useAppStore";
 export type DiscoverToken = Token & {
   /** Always present: a token with no market reading is not offered at all. */
   market: MarketToken;
-  /** What the whole token is worth, circulating where the feed knows it. */
-  marketCapUsd: number;
-  /** True when the cap above is fully diluted rather than circulating. */
-  diluted: boolean;
+  /**
+   * Price times total supply. Always fully diluted: circulating supply is not
+   * a fact the chain holds, so the honest figure is the one every token's own
+   * record can back. Absent where the pool could not be priced in dollars.
+   */
+  fdvUsd?: number;
   /** The launchpad's own record, when it minted this token. */
   launch?: PonsLaunch;
   totalSupply?: bigint;
@@ -36,10 +44,12 @@ export type DiscoverToken = Token & {
 
 export type DiscoverResult = {
   tokens: DiscoverToken[];
-  /** Contracts the feed knew of but that had no pool, no volume, or no cap. */
+  /** Pools that traded but could not be named, so were not offered. */
   rejected: number;
-  /** True when the feed answered with nothing, so there is nothing to offer. */
+  /** True when the index answered with nothing, so there is nothing to offer. */
   marketEmpty: boolean;
+  /** How the index that produced these rows was doing. */
+  meta?: MarketMeta;
 };
 
 /** Identities confirmed in one multicall, which is one round trip. */
@@ -120,18 +130,23 @@ export function useDiscoverTokens(chainId: number | undefined) {
       if (!chainId || !client) return EMPTY;
 
       const base = baseTokens(chainId);
-      /* The pair token every pool on this chain is quoted against, which is
-         what the feed is searched by and what it must not hand back. */
-      const seeds = base.filter((token) => !token.native).map((token) => token.address);
+      /* The assets every pool on this chain is quoted against, which label the
+         depth of a pool the dollar could not value and must not come back as
+         rows of their own. */
+      const seeds = base
+        .filter((token) => !token.native)
+        .map((token) => ({ address: token.address, symbol: token.symbol }));
       const known = new Set(base.map((token) => token.address.toLowerCase()));
 
-      const market = await readMarketTokens(seeds).catch((): MarketToken[] => []);
+      const reading = await readMarketTokens(seeds).catch(
+        (): MarketReading => ({ tokens: [] }),
+      );
+      const market = reading.tokens;
       if (market.length === 0) return EMPTY;
 
       const offered = market.filter(
         (token) => !known.has(token.address.toLowerCase()) && tradeable(token),
       );
-      const rejected = market.length - offered.length;
       const candidates = offered.slice(0, MAX_RESOLVE);
       const addresses = candidates.map((token) => token.address);
 
@@ -149,20 +164,32 @@ export function useDiscoverTokens(chainId: number | undefined) {
         const key = entry.address.toLowerCase();
         const identity = identities.get(key);
         if (!identity) continue;
-        const circulating = entry.marketCapUsd;
-        const cap = circulating ?? entry.fdvUsd;
-        if (cap === undefined) continue;
+        /* Fully diluted value, worked out here because this is the first place
+           that holds both halves of it: the index priced the pool, and the
+           contract just said how much of itself exists. */
+        const supply =
+          identity.totalSupply === undefined
+            ? undefined
+            : Number(identity.totalSupply) / 10 ** identity.decimals;
+        const fdvUsd =
+          entry.priceUsd !== undefined && supply !== undefined && supply > 0
+            ? entry.priceUsd * supply
+            : undefined;
         tokens.push({
           ...identity,
           market: entry,
-          marketCapUsd: cap,
-          diluted: circulating === undefined,
+          ...(fdvUsd === undefined ? {} : { fdvUsd }),
           launch: launches.get(key),
         });
       }
 
       /* `readMarketTokens` already ranked these, and nothing above reorders. */
-      return { tokens, rejected, marketEmpty: false };
+      return {
+        tokens,
+        rejected: reading.meta?.unnamed ?? 0,
+        marketEmpty: false,
+        ...(reading.meta ? { meta: reading.meta } : {}),
+      };
     },
   });
 }

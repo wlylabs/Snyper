@@ -138,14 +138,6 @@ export default function SettingsPage() {
             onChange={(value) => setSettings({ tickSeconds: value })}
           />
           <NumberField
-            label={t("settings.priorityFee")}
-            hint={t("settings.priorityFeeHint")}
-            value={settings.priorityFeeGwei}
-            min={0}
-            max={500}
-            onChange={(value) => setSettings({ priorityFeeGwei: value })}
-          />
-          <NumberField
             label={t("settings.maxImpact")}
             hint={t("settings.impactHint")}
             value={settings.maxImpactBps}

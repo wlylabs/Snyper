@@ -235,6 +235,17 @@ export const v3PoolAbi = [
     inputs: [],
     outputs: [{ type: "address" }],
   },
+  {
+    // Both sides are needed to say what a pool trades. Only `token0` was here
+    // while the only caller priced a pair it already knew; the market index
+    // asks pools it knows nothing about, and every `token1` call against an ABI
+    // without it fails silently — which read as "no v3 pool traded here".
+    type: "function",
+    name: "token1",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "address" }],
+  },
 ] as const;
 
 /**
@@ -562,4 +573,21 @@ export const snyperRouterAbi = [
   },
   { type: "error", name: "TransferFailed", inputs: [] },
   { type: "error", name: "Reentrant", inputs: [] },
+] as const;
+
+/**
+ * Uniswap v4's PoolManager, as much of it as reading needs.
+ *
+ * `extsload` is the whole interface here: a v4 pool's state lives in the
+ * singleton's own storage rather than in a contract of its own, and this is the
+ * view that hands a word of it back. Nothing else is needed to price a pool.
+ */
+export const poolManagerAbi = [
+  {
+    type: "function",
+    name: "extsload",
+    stateMutability: "view",
+    inputs: [{ name: "slot", type: "bytes32" }],
+    outputs: [{ type: "bytes32" }],
+  },
 ] as const;

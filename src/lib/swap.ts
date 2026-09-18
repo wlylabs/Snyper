@@ -69,6 +69,18 @@ export function buildSwap(params: {
   feeOnInput?: boolean;
 }): SwapPlan {
   /*
+   * A venue this app can price but not sign. `midPrice` reaches Uniswap v4 so
+   * that a graduated launch still values a position, and nothing encodes a
+   * trade against one — a v4 swap goes through the Universal Router and has to
+   * reckon with the pool's hook. Refusing here is what keeps that read path
+   * from ever being mistaken for a route: every encoder below would otherwise
+   * take the quote and build a v3 trade against a pool that does not exist.
+   */
+  if (params.quote.venue === "v4") {
+    throw new Error("Uniswap v4 pools are priced here but cannot be traded yet");
+  }
+
+  /*
    * A trade that owes nothing goes straight to its venue, whatever is deployed.
    * Sending a free trade through an extra contract would cost the reader gas to
    * collect nothing, and a snype's entry — and every exit that lost money — is
