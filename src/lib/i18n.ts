@@ -21,6 +21,7 @@ const en = {
   "nav.home": "Snyper",
   "nav.balance": "Balance",
   "nav.discover": "Discover",
+  "nav.settings": "Settings",
 
   "a11y.home": "Snyper home",
   "a11y.primaryNav": "Primary",
@@ -57,6 +58,21 @@ const en = {
   "page.discover.empty": "This screen is not built yet.",
   "page.discover.hint":
     "Where new contracts get found and read. Nothing is scanned until it is written.",
+
+  "settings.title": "Settings",
+  "settings.subtitle": "How the app reads on this device",
+  "settings.appearance": "Appearance",
+  "settings.theme": "Theme",
+  "settings.themeHint": "Applied instantly and remembered on this device.",
+  "settings.dark": "Dark",
+  "settings.light": "Light",
+  "settings.language": "Language",
+  "settings.languageHint": "Interface text, number and date formatting.",
+  "settings.localData": "Local data",
+  "settings.localDataNote":
+    "All this app stores in your browser is a language and a theme. No keys, no addresses, nothing read off the chain — connecting a wallet is a session Privy holds, and it is dropped from the account sheet, not from here.",
+  "settings.reset": "Reset preferences",
+  "settings.resetDone": "Preferences reset",
 
   "install.action": "Install app",
   "install.androidHint":
@@ -118,6 +134,7 @@ const id: Record<TKey, string> = {
   "nav.home": "Snyper",
   "nav.balance": "Saldo",
   "nav.discover": "Memecoin",
+  "nav.settings": "Setelan",
 
   "a11y.home": "Beranda Snyper",
   "a11y.primaryNav": "Navigasi utama",
@@ -153,6 +170,21 @@ const id: Record<TKey, string> = {
   "page.discover.empty": "Layar ini belum dibangun.",
   "page.discover.hint":
     "Tempat kontrak baru ditemukan dan dibaca. Belum ada yang dipindai sampai ditulis.",
+
+  "settings.title": "Setelan",
+  "settings.subtitle": "Cara aplikasi ini tampil di perangkatmu",
+  "settings.appearance": "Tampilan",
+  "settings.theme": "Tema",
+  "settings.themeHint": "Langsung diterapkan dan diingat di perangkat ini.",
+  "settings.dark": "Gelap",
+  "settings.light": "Terang",
+  "settings.language": "Bahasa",
+  "settings.languageHint": "Teks antarmuka, format angka, dan tanggal.",
+  "settings.localData": "Data lokal",
+  "settings.localDataNote":
+    "Yang disimpan aplikasi ini di browser-mu cuma bahasa dan tema. Tidak ada kunci, tidak ada alamat, tidak ada apa pun dari chain — koneksi dompet adalah sesi yang dipegang Privy, dan diputus dari lembar akun, bukan dari sini.",
+  "settings.reset": "Setel ulang preferensi",
+  "settings.resetDone": "Preferensi disetel ulang",
 
   "install.action": "Pasang aplikasi",
   "install.androidHint":
