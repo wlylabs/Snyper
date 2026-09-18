@@ -1,15 +1,11 @@
 "use client";
 
-import { PrivyProvider } from "@privy-io/react-auth";
-import { WagmiProvider } from "@privy-io/wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { WagmiProvider as BareWagmiProvider } from "wagmi";
+import { useEffect, useState, type ComponentType, type ReactNode } from "react";
+import { WagmiProvider } from "wagmi";
 import { config } from "@/lib/wagmi";
-import { PRIVY_APP_ID, PRIVY_CLIENT_ID, PRIVY_CONFIGURED, privyConfig } from "@/lib/privy";
+import { PRIVY_CONFIGURED } from "@/lib/privy";
 import { ToastProvider } from "@/components/ui/Toast";
-import { ConnectPromptProvider } from "@/hooks/useConnectPrompt";
-import { ActiveWalletSync } from "@/components/wallet/ActiveWalletSync";
 import { useAppStore } from "@/store/useAppStore";
 import { setNumberLocale } from "@/lib/format";
 import { INTL_LOCALE, detectLocale } from "@/lib/i18n";
@@ -66,70 +62,66 @@ function ServiceWorker() {
   return null;
 }
 
+type SessionProvider = ComponentType<{ children: ReactNode }>;
+
 /**
- * Whether the reader is pointing at this with a finger, which is what decides
- * how the wallet list ends — see `pairingEntry` in `lib/privy`.
+ * The wallet session, held off the first paint.
  *
- * Read after mount rather than during render, because there is no pointer on
- * the server and a guess would hand Privy one wallet list and then swap it for
- * another a frame later. The desktop answer is the safe one to start from: the
- * QR it chooses pairs any phone wallet, where a list of deep links on a machine
- * that has no wallet apps installed pairs none of them.
- */
-function useCoarsePointer(): boolean {
-  const [coarse, setCoarse] = useState(false);
-
-  useEffect(() => {
-    const query = window.matchMedia?.("(pointer: coarse)");
-    if (!query) return;
-    setCoarse(query.matches);
-    // A tablet with a keyboard folded on and off changes this mid-session.
-    const follow = (event: MediaQueryListEvent) => setCoarse(event.matches);
-    query.addEventListener("change", follow);
-    return () => query.removeEventListener("change", follow);
-  }, []);
-
-  return coarse;
-}
-
-/**
- * Privy owns the wallet session, so its provider wraps wagmi rather than the
- * other way round. Without an app id there is nothing to wrap: the app still
- * renders and still reads the chain, and the connect control says why nothing
- * can be connected.
+ * Privy's SDK is the largest thing this app ships by a wide margin — the
+ * connectors alone carry WalletConnect, the Coinbase SDK, Solana and a funding
+ * provider, none of which a Robinhood Chain terminal asks for. Imported
+ * statically it lands in the bundle the browser has to finish parsing before a
+ * single tab responds, so a reader waits on a wallet they may not be about to
+ * connect before they can so much as switch screens.
+ *
+ * So it is fetched after the shell is up, and bare wagmi stands in the meantime.
+ * That is not a degraded state: the chain is read through the app's own
+ * transports, so the block height ticks and every read works exactly as it will
+ * afterwards. What is missing is only the session — and nobody has one a
+ * hundred milliseconds into a cold load anyway.
+ *
+ * Swapping the provider rebuilds everything under it once, which is why
+ * `useMounted` remembers the document rather than the mount: without that, the
+ * header would fall back to placeholders on the way through.
  */
 function WalletProviders({ children }: { children: ReactNode }) {
-  const theme = useAppStore((state) => state.settings.theme);
-  const locale = useAppStore((state) => state.settings.locale);
-  const touch = useCoarsePointer();
+  const [Session, setSession] = useState<SessionProvider | null>(null);
 
-  /*
-   * Theme, language and pointer are read here rather than inside the modal, so
-   * a reader who changes any of them finds Privy already changed with them.
-   *
-   * Held across renders because the config carries the brand lockup as a live
-   * element: rebuilding it on every store write — a theme toggle, a locale, a
-   * hydration — would hand Privy a new logo and a new appearance object each
-   * time and have it re-render the modal's chrome for nothing.
-   */
-  const appearance = useMemo(() => privyConfig(theme, locale, touch), [theme, locale, touch]);
+  useEffect(() => {
+    if (!PRIVY_CONFIGURED) return;
+    let live = true;
+    void import("@/components/wallet/WalletSession")
+      .then((module) => {
+        // `setState` calls a function argument, so the component goes in as one.
+        if (live) setSession(() => module.WalletSession);
+      })
+      .catch(() => {
+        /*
+         * The chunk did not arrive. The header keeps the placeholder it already
+         * had, which is where it also sits when Privy's own API cannot be
+         * reached — from the reader's side the two are the same outage, and the
+         * rest of the app carries on reading the chain either way.
+         */
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
 
-  if (!PRIVY_CONFIGURED) {
-    return <BareWagmiProvider config={config}>{children}</BareWagmiProvider>;
+  if (!Session) {
+    /*
+     * `reconnectOnMount` is off to match what Privy's own wagmi provider passes.
+     * There are no connectors registered on this config until Privy registers
+     * one, so there is nothing here to reconnect to.
+     */
+    return (
+      <WagmiProvider config={config} reconnectOnMount={false}>
+        {children}
+      </WagmiProvider>
+    );
   }
 
-  return (
-    <PrivyProvider
-      appId={PRIVY_APP_ID}
-      {...(PRIVY_CLIENT_ID ? { clientId: PRIVY_CLIENT_ID } : {})}
-      config={appearance}
-    >
-      <WagmiProvider config={config}>
-        <ActiveWalletSync />
-        <ConnectPromptProvider>{children}</ConnectPromptProvider>
-      </WagmiProvider>
-    </PrivyProvider>
-  );
+  return <Session>{children}</Session>;
 }
 
 export function Providers({ children }: { children: ReactNode }) {
@@ -146,16 +138,19 @@ export function Providers({ children }: { children: ReactNode }) {
       }),
   );
 
+  /*
+   * Everything that does not need a wallet sits above the wallet, so that the
+   * swap below it leaves them alone: the query cache keeps what it has read,
+   * toasts stay on screen, and the theme and locale are never reapplied.
+   */
   return (
     <QueryClientProvider client={queryClient}>
-      <WalletProviders>
-        <ToastProvider>
-          <ThemeSync />
-          <LocaleSync />
-          <ServiceWorker />
-          {children}
-        </ToastProvider>
-      </WalletProviders>
+      <ToastProvider>
+        <ThemeSync />
+        <LocaleSync />
+        <ServiceWorker />
+        <WalletProviders>{children}</WalletProviders>
+      </ToastProvider>
     </QueryClientProvider>
   );
 }

@@ -1,7 +1,6 @@
 "use client";
 
-import { createContext, useContext, useMemo, type ReactNode } from "react";
-import { usePrivy } from "@privy-io/react-auth";
+import { createContext, useContext } from "react";
 
 /**
  * One way in, from anywhere.
@@ -12,23 +11,21 @@ import { usePrivy } from "@privy-io/react-auth";
  * should be none. This carries Privy's login modal down to whatever control
  * needs it.
  *
- * It is a context rather than a hook over `usePrivy` because `usePrivy` throws
- * outside a `PrivyProvider`, and a build with no app id has no provider to be
- * inside. Panels ask for the prompt; if the build cannot offer one they get
- * `undefined` and keep whatever they already said.
+ * The provider is not in this file. It needs `usePrivy`, and this file is read
+ * by the header, which is on the critical path of every page — a Privy import
+ * here would pull the whole SDK back into the first bundle the browser has to
+ * parse. It lives in `components/wallet/WalletSession` instead, which is the
+ * chunk the SDK arrives on.
  */
-const ConnectPromptContext = createContext<(() => void) | undefined>(undefined);
+export const ConnectPromptContext = createContext<(() => void) | undefined>(undefined);
 
-/** Mounted inside `PrivyProvider`; there is nothing to publish outside one. */
-export function ConnectPromptProvider({ children }: { children: ReactNode }) {
-  const { login } = usePrivy();
-  const prompt = useMemo(() => () => login(), [login]);
-  return (
-    <ConnectPromptContext.Provider value={prompt}>{children}</ConnectPromptContext.Provider>
-  );
-}
-
-/** Opens Privy's login modal, or `undefined` when this build has no Privy. */
+/**
+ * Opens Privy's login modal, or `undefined` when there is nothing to open.
+ *
+ * Undefined covers two cases a caller treats the same way: a build with no app
+ * id, and a wallet session that has not finished loading yet. Either way there
+ * is no modal to offer, so panels keep whatever they already said.
+ */
 export function useConnectPrompt(): (() => void) | undefined {
   return useContext(ConnectPromptContext);
 }
