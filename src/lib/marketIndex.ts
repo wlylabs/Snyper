@@ -3,30 +3,37 @@ import { getAddress, parseAbiItem, zeroAddress } from "viem";
 import { erc20Abi, v3FactoryAbi, v3PoolAbi } from "./abi";
 import { scanBack } from "./logscan";
 import { rateFromSqrtPrice } from "./quote";
+import { scanSwaps, type TradedPool } from "./swapScan";
+import { indexV4PoolKeys, type V4Pool } from "./v4";
 import type { Venue } from "./venue";
 
 /**
  * What trades on this chain, asked of the chain.
  *
  * The question a reader opening an empty picker is really asking is "what is
- * there", and until now it was put to DexScreener — an indexer whose slug for
- * chain 4663 was never confirmed, and which the whole picker goes dark without.
- * The factory can answer it instead: every pool it ever opened is an event it
- * emitted, and what stands in that pool is a balance anyone can read.
+ * there", and it used to be put to DexScreener — an indexer whose slug for
+ * chain 4663 was never confirmed, and which the whole picker went dark without.
+ * Both venues answer it first hand, out of their own swap logs.
  *
- * Measured against the chain on 2026-09-18, over the 11.6 days that one scan
- * reaches: 5,754 pools opened, about 497 a day. Of the 3,403 quoted against
- * wrapped native, 2,737 — eighty percent — held nothing or dust, and 88 held a
- * tenth of a coin or more. Ten pools held 83% of all the depth there was.
+ * Ranking is by what changed hands, not by what is standing in the pool. The
+ * first version of this ranked by depth, which worked while Uniswap v3 was the
+ * only venue the app could see: a pool's depth is its own balance, and 3,403 of
+ * them read back in one pass. Uniswap v4 ended that. Its pools share one
+ * singleton, so no balance belongs to any of them, and the obvious substitute —
+ * active liquidity as a virtual reserve — measured a median of 604 times the
+ * money actually in a v3 pool, and 477 billion times it at the extreme. Two
+ * different units cannot be sorted into one list.
  *
- * So depth is not one column among several here, it is the whole filter. It is
- * also, deliberately, the only one: a pool's depth is a balance, and 3,403 of
- * them read back in one pass with nothing failing. Volume would be the better
- * ranking — depth is a standing offer a launch can mint itself, volume is the
- * part somebody had to pay for — but it cannot be had from this endpoint. Swap
- * logs for a single hour across the whole chain exceed its ten thousand result
- * cap, and narrowing to sixty pools still times the query out. Ranking by what
- * can be read honestly beats ranking by what would have to be invented.
+ * Volume is what both venues report identically, and it was the better ranking
+ * anyway: depth is an offer a launch can mint itself, volume is the part
+ * somebody had to pay for. Depth survives as a figure shown beside a v3 row,
+ * where it still means what it says, and is simply absent on a v4 row rather
+ * than filled in with something that is not it.
+ *
+ * Measured on chain while this was written: v3 carries about one swap a block
+ * across 369 pools, v4 about two across 1,136 — so most of what actually trades
+ * here was invisible until v4 was included, and the v3 factory's 497 new pools
+ * a day were never the larger half.
  */
 
 const POOL_CREATED = parseAbiItem(
@@ -34,11 +41,10 @@ const POOL_CREATED = parseAbiItem(
 );
 
 /**
- * Blocks one index covers. At a hundred milliseconds a block this is about
- * eleven days, which carried 4,620 pools against a fundable asset when it was
- * measured — including every one of the ten deepest on the chain. Reaching
- * further was tried and is not free: thirty million blocks found 14,157 pools
- * and spent three and a half minutes on them.
+ * How far back pool identities are collected. Ranking only looks at the last
+ * half hour of trading (see `swapScan.ts`), but a pool that traded in it may
+ * have been opened long before, so this window is the one that decides which
+ * of those pools can be named at all.
  */
 const WINDOW_BLOCKS = 10_000_000n;
 
@@ -63,24 +69,62 @@ const CALL_CHUNK = 200;
 /** Pools carried into the priced pass, and rows handed back. */
 const MAX_PRICED = 150;
 
+/**
+ * Base pause before a retry, since what is being retried is a rate limit. Each
+ * further attempt squares the multiplier: 1.5s, 6s, 13.5s.
+ */
+const RETRY_PAUSE_MS = 1_500;
+
+/** Let the endpoint breathe between the heavy phases of one build. */
+const PHASE_PAUSE_MS = 2_000;
+
+/**
+ * v3 pools carried into naming, busiest first.
+ *
+ * Naming a v3 pool means asking it for both its currencies, and a thousand of
+ * them is two thousand calls arriving right behind two log scans — which the
+ * public endpoint answers by refusing all of them. Refused reads look exactly
+ * like "no v3 pool traded", and that is what the index reported: not one v3 row
+ * in a hundred and fifty, on a chain where v3 pools hold hundreds of thousands
+ * of dollars.
+ *
+ * Swap count is the pre-filter because it is the only thing known before the
+ * pair is: the quote side cannot be picked, and raw amounts on the two sides
+ * are in different decimals. A pool with few swaps but one enormous trade can
+ * be missed this way, which is the honest cost of naming what can be named.
+ */
+const MAX_V3_NAMED = 300;
+
+function breathe(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, PHASE_PAUSE_MS));
+}
+
 export type IndexedMarket = {
   address: `0x${string}`;
-  /** The deepest pool this token trades in, and the one every figure is from. */
+  /** Which venue the trading happened on. Only v3 can also be traded here. */
+  venue: "v3" | "v4";
+  /** Pool address on v3; pool id on v4, which has no address of its own. */
   pool: `0x${string}`;
   fee: number;
-  /** Asset the pool is quoted against: wrapped native or the chain's dollar. */
+  /** Asset the pool is quoted against: wrapped native, the dollar, or the coin. */
   quote: `0x${string}`;
-  /** Quote units standing in the pool, as a decimal string so JSON carries it. */
-  depth: string;
-  depthDecimals: number;
-  /** Depth in dollars, where the quote asset could be valued. */
+  /** Quote units traded over the window, as a decimal string so JSON carries it. */
+  volume: string;
+  volumeDecimals: number;
+  /** Volume in dollars, where the quote asset could be valued. */
+  volumeUsd?: number;
+  swaps: number;
+  /**
+   * Quote units standing in the pool. Only ever set on a v3 row: a v4 pool's
+   * money sits in a singleton with everyone else's, so there is no balance to
+   * read, and no substitute for it that means the same thing.
+   */
+  depth?: string;
   depthUsd?: number;
   /** One token in quote units. */
   price?: number;
   priceUsd?: number;
   decimals?: number;
-  /** Block the pool was opened in. */
-  createdBlock: string;
 };
 
 type PoolRow = {
@@ -195,15 +239,29 @@ async function chunkedMulticall(
     return stillFailed;
   };
 
-  const first = await pass(
+  /*
+   * Retries get smaller and slower, several times over.
+   *
+   * What fails here is almost never the call — it is the endpoint declining to
+   * answer any more for a while, after the log scans ahead of this have used up
+   * its patience. Retrying at once, at the same size, spends the second chance
+   * on the same limit: a whole pass of 933 pool reads came back empty that way,
+   * and read as "no v3 pool traded" rather than as a failure. So each pass waits
+   * longer and asks for less, and the route this runs behind is cached, so the
+   * minute it can cost is a minute no reader waits for.
+   */
+  let outstanding = await pass(
     calls.map((_, index) => index),
     CALL_CHUNK,
   );
-  // Half the batch on the way back: the failures seen on this chain were
-  // transient rather than structural, and a smaller ask is what clears both.
-  const second = first.length > 0 ? await pass(first, Math.ceil(CALL_CHUNK / 4)) : [];
 
-  return { answers, failed: second.length };
+  for (const attempt of [1, 2, 3]) {
+    if (outstanding.length === 0) break;
+    await new Promise((resolve) => setTimeout(resolve, RETRY_PAUSE_MS * attempt * attempt));
+    outstanding = await pass(outstanding, Math.max(25, Math.ceil(CALL_CHUNK / 2 ** attempt)));
+  }
+
+  return { answers, failed: outstanding.length };
 }
 
 /** What each pool actually holds of the asset it is quoted against. */
@@ -350,110 +408,256 @@ async function pricePools(
 
 export type MarketIndex = {
   markets: IndexedMarket[];
-  /** Pools the factory has opened against a fundable asset, within the window. */
-  scanned: number;
-  /** How many of those held nothing. The noise this index exists to drop. */
-  empty: number;
-  /** True when the block budget ran out before the window was covered. */
+  /** Pools that traded in the window, on both venues. */
+  traded: number;
+  /** How many of those could not be named, so could not be offered. */
+  unnamed: number;
+  /** True when a scan's block budget ran out before its window was covered. */
   partial: boolean;
-  /**
-   * Pools whose depth could not be read even after a retry. These are counted
-   * as empty, so a number above zero means the index is missing rows rather
-   * than that the chain is quiet.
-   */
-  unread: number;
   builtAt: number;
 };
 
+/** A traded pool once its two sides are known. */
+type NamedPool = {
+  venue: "v3" | "v4";
+  pool: `0x${string}`;
+  token: `0x${string}`;
+  quote: `0x${string}`;
+  fee: number;
+  /** Quote-side amount traded, already picked from the right side of the pair. */
+  volume: bigint;
+  swaps: number;
+  sqrtPriceX96: bigint;
+  /** True when the token is currency0/token0, which decides how price reads. */
+  tokenIsFirst: boolean;
+};
+
+/** Names every v3 pool that traded, by asking each pool for its own pair. */
+async function nameV3Pools(
+  client: PublicClient,
+  traded: readonly TradedPool[],
+  money: ReadonlySet<string>,
+): Promise<NamedPool[]> {
+  if (traded.length === 0) return [];
+  const { answers } = await chunkedMulticall(
+    client,
+    traded.flatMap((row) => [
+      { address: row.key as `0x${string}`, abi: v3PoolAbi, functionName: "token0" },
+      { address: row.key as `0x${string}`, abi: v3PoolAbi, functionName: "token1" },
+    ]),
+  );
+
+  const named: NamedPool[] = [];
+  traded.forEach((row, index) => {
+    const zero = answers[index * 2];
+    const one = answers[index * 2 + 1];
+    if (!zero?.ok || !one?.ok) return;
+    const token0 = getAddress(zero.value as string);
+    const token1 = getAddress(one.value as string);
+    const quoteIsFirst = money.has(token0.toLowerCase());
+    // Exactly one side must be an asset a trade here could be funded with.
+    if (quoteIsFirst === money.has(token1.toLowerCase())) return;
+    named.push({
+      venue: "v3",
+      pool: getAddress(row.key),
+      token: quoteIsFirst ? token1 : token0,
+      quote: quoteIsFirst ? token0 : token1,
+      fee: 0,
+      volume: quoteIsFirst ? row.amount0 : row.amount1,
+      swaps: row.swaps,
+      sqrtPriceX96: row.sqrtPriceX96,
+      tokenIsFirst: !quoteIsFirst,
+    });
+  });
+  return named;
+}
+
+/** Names every v4 pool that traded, from the pool-key index built off Initialize. */
+function nameV4Pools(
+  traded: readonly TradedPool[],
+  keys: ReadonlyMap<string, V4Pool>,
+  money: ReadonlySet<string>,
+): NamedPool[] {
+  const named: NamedPool[] = [];
+  for (const row of traded) {
+    const key = keys.get(row.key);
+    if (!key) continue;
+    const quoteIsFirst = money.has(key.currency0.toLowerCase());
+    if (quoteIsFirst === money.has(key.currency1.toLowerCase())) continue;
+    named.push({
+      venue: "v4",
+      pool: key.id,
+      token: quoteIsFirst ? key.currency1 : key.currency0,
+      quote: quoteIsFirst ? key.currency0 : key.currency1,
+      fee: key.fee,
+      volume: quoteIsFirst ? row.amount0 : row.amount1,
+      swaps: row.swaps,
+      sqrtPriceX96: row.sqrtPriceX96,
+      tokenIsFirst: !quoteIsFirst,
+    });
+  }
+  return named;
+}
+
 /**
- * Builds the index. One scan of the factory, one balance per pool, then prices
- * for the deepest survivors only — the last pass is the expensive one, so it
- * runs after depth has already thrown most of the chain away.
+ * Builds the index.
+ *
+ * One swap scan says what traded; naming says what each of those pools trades;
+ * ranking is by the quote side of that volume, valued in dollars so a pool
+ * quoted in the coin and one quoted in the dollar can be compared. Only the
+ * rows that survive all of it are read any further — decimals, and on v3 the
+ * pool's own depth — because that last pass is the expensive one.
  */
 export async function buildMarketIndex(
   client: PublicClient,
   venue: Venue,
 ): Promise<MarketIndex> {
   const head = await client.getBlockNumber();
-  const { pools, partial } = await collectPools(client, venue, head);
-  const { depth, unread } = await readDepth(client, pools);
+  const money = new Set(
+    [venue.wrapped, venue.stable, zeroAddress]
+      .filter(Boolean)
+      .map((a) => (a as string).toLowerCase()),
+  );
 
-  /* Ordering waits for `coinUsd` below: raw units are not comparable across
-     assets, and a dollar with six decimals sorted against a coin with eighteen
-     puts every coin pool on the chain above every dollar one. */
-  const live = pools.filter((row) => (depth.get(row.pool.toLowerCase()) ?? 0n) > 0n);
+  const scan = await scanSwaps(client, head);
+  const traded = [...scan.pools.values()];
 
+  /*
+   * v3 is named first, and not by accident. Naming a v3 pool is a handful of
+   * multicalls; building the v4 key map is tens of thousands of logs. Run the
+   * other way round, the map exhausts the endpoint's patience and every v3 read
+   * behind it comes back rate-limited — which reads as "no v3 pool traded"
+   * rather than as a failure, and cost the index every v3 row it had.
+   */
+  await breathe();
+  const namedV3 = await nameV3Pools(
+    client,
+    traded
+      .filter((row) => row.venue === "v3")
+      .sort((a, b) => b.swaps - a.swaps)
+      .slice(0, MAX_V3_NAMED),
+    money,
+  );
+
+  await breathe();
+  const v4Keys = await indexV4PoolKeys(
+    client,
+    [venue.wrapped, venue.stable, zeroAddress].filter(Boolean) as `0x${string}`[],
+    head,
+    WINDOW_BLOCKS,
+  );
+
+  const named = [
+    ...namedV3,
+    ...nameV4Pools(traded.filter((row) => row.venue === "v4"), v4Keys.keys, money),
+  ];
+
+  await breathe();
   const coinUsd = await nativeUsd(client, venue);
 
-  /* One row per token: a token pooled at several fee tiers is the deepest of
-     them, which is the pool a trade would actually route through. */
-  const best = new Map<string, PoolRow>();
-  for (const row of live) {
+  /* One row per token: a token traded in several pools is the busiest of them,
+     which is the pool its price is worth reading from. */
+  const best = new Map<string, NamedPool>();
+  for (const row of named) {
     const key = row.token.toLowerCase();
     const held = best.get(key);
-    if (!held) {
+    if (!held || valued(row, venue, coinUsd) > valued(held, venue, coinUsd)) {
       best.set(key, row);
-      continue;
     }
-    const a = valued(depth.get(row.pool.toLowerCase()) ?? 0n, row, venue, coinUsd);
-    const b = valued(depth.get(held.pool.toLowerCase()) ?? 0n, held, venue, coinUsd);
-    if (a > b) best.set(key, row);
   }
 
   const ranked = [...best.values()]
-    .sort(
-      (a, b) =>
-        valued(depth.get(b.pool.toLowerCase()) ?? 0n, b, venue, coinUsd) -
-        valued(depth.get(a.pool.toLowerCase()) ?? 0n, a, venue, coinUsd),
-    )
+    .filter((row) => row.volume > 0n)
+    .sort((a, b) => valued(b, venue, coinUsd) - valued(a, venue, coinUsd))
     .slice(0, MAX_PRICED);
 
-  const prices = await pricePools(client, ranked, venue);
+  // Decimals decide what every amount means, and depth is only readable on v3.
+  const v3Rows = ranked.filter((row) => row.venue === "v3");
+  const [{ answers: decimals }, depth] = await Promise.all([
+    chunkedMulticall(
+      client,
+      ranked.map((row) => ({
+        address: row.token,
+        abi: erc20Abi,
+        functionName: "decimals",
+      })),
+    ),
+    readDepth(
+      client,
+      v3Rows.map((row) => ({
+        pool: row.pool,
+        token: row.token,
+        quote: row.quote,
+        fee: row.fee,
+        block: 0n,
+      })),
+    ),
+  ]);
 
-  const markets: IndexedMarket[] = ranked.map((row) => {
-    const raw = depth.get(row.pool.toLowerCase()) ?? 0n;
-    const decimals = quoteDecimals(venue, row.quote);
-    const price = prices.get(row.pool.toLowerCase());
-    const usd = usdRate(row, venue, coinUsd);
-    return {
+  const markets: IndexedMarket[] = [];
+  ranked.forEach((row, index) => {
+    const answer = decimals[index];
+    if (!answer?.ok) return;
+    const tokenDecimals = Number(answer.value);
+    if (!Number.isFinite(tokenDecimals)) return;
+
+    const quoteDp = quoteDecimals(venue, row.quote);
+    const usd = usdRate(row.quote, venue, coinUsd);
+    const price = rateFromSqrtPrice(
+      row.sqrtPriceX96,
+      row.tokenIsFirst,
+      tokenDecimals,
+      quoteDp,
+    );
+    const priced = Number.isFinite(price) && price > 0 ? price : undefined;
+    const rawDepth = depth.depth.get(row.pool.toLowerCase());
+
+    markets.push({
       address: row.token,
+      venue: row.venue,
       pool: row.pool,
       fee: row.fee,
       quote: row.quote,
-      depth: raw.toString(),
-      depthDecimals: decimals,
+      volume: row.volume.toString(),
+      volumeDecimals: quoteDp,
       ...(usd === undefined
         ? {}
-        : { depthUsd: (Number(raw) / 10 ** decimals) * usd }),
-      ...(price === undefined ? {} : { price }),
-      ...(price === undefined || usd === undefined ? {} : { priceUsd: price * usd }),
-      createdBlock: row.block.toString(),
-    };
+        : { volumeUsd: (Number(row.volume) / 10 ** quoteDp) * usd }),
+      swaps: row.swaps,
+      ...(rawDepth === undefined
+        ? {}
+        : {
+            depth: rawDepth.toString(),
+            ...(usd === undefined
+              ? {}
+              : { depthUsd: (Number(rawDepth) / 10 ** quoteDp) * usd }),
+          }),
+      ...(priced === undefined ? {} : { price: priced }),
+      ...(priced === undefined || usd === undefined ? {} : { priceUsd: priced * usd }),
+      decimals: tokenDecimals,
+    });
   });
 
   return {
     markets,
-    scanned: pools.length,
-    empty: pools.length - live.length,
-    partial,
-    unread,
+    traded: traded.length,
+    unnamed: traded.length - named.length,
+    partial: scan.partial || v4Keys.partial,
     builtAt: Date.now(),
   };
 }
 
 /** What one unit of a pool's quote asset is worth in dollars, if anything. */
-function usdRate(row: PoolRow, venue: Venue, coinUsd: number | undefined): number | undefined {
-  if (row.quote.toLowerCase() === venue.stable?.toLowerCase()) return 1;
-  return coinUsd;
-}
-
-/** Depth in dollars where that can be worked out, and in its own asset where it cannot. */
-function valued(
-  raw: bigint,
-  row: PoolRow,
+function usdRate(
+  quote: `0x${string}`,
   venue: Venue,
   coinUsd: number | undefined,
-): number {
-  const amount = Number(raw) / 10 ** quoteDecimals(venue, row.quote);
-  return amount * (usdRate(row, venue, coinUsd) ?? 1);
+): number | undefined {
+  return quote.toLowerCase() === venue.stable?.toLowerCase() ? 1 : coinUsd;
+}
+
+/** Volume in dollars where that can be worked out, and in its own asset where it cannot. */
+function valued(row: NamedPool, venue: Venue, coinUsd: number | undefined): number {
+  const amount = Number(row.volume) / 10 ** quoteDecimals(venue, row.quote);
+  return amount * (usdRate(row.quote, venue, coinUsd) ?? 1);
 }

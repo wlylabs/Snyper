@@ -20,9 +20,10 @@ const { readPonsLaunches, PONS_V1_FACTORY, PONS_V2_FACTORY } = await import(
 );
 const { CHAIN_ID, dexMeta } = await import("../src/lib/chains.ts");
 const { NATIVE } = await import("../src/lib/native.ts");
+const { encodeAbiParameters } = await import("viem");
 const { buildMarketIndex } = await import("../src/lib/marketIndex.ts");
 const { resolveVenue } = await import("../src/lib/venue.ts");
-const { readV4State, v4Currency, findV4Pools, V4_POOL_MANAGER } = await import(
+const { readV4State, v4Currency, findV4Pools, V4_POOL_MANAGER, resetV4KeyCache } = await import(
   "../src/lib/v4.ts"
 );
 const { buildSwap } = await import("../src/lib/swap.ts");
@@ -195,28 +196,27 @@ test("the launchpad confirms its own mints and disowns everything else", async (
 /*
  * The market index: the chain's own answer to "what trades here".
  *
- * These stub the chain rather than an indexer, because that is what the index
- * now reads. What is under test is the filtering — a pool standing empty is the
- * eighty percent case on this chain, and every one of them that slips through
- * is a dead row in front of a reader.
+ * Ranking is by what changed hands, on both venues. Depth was the first
+ * version's metric and could not survive v4 — a v4 pool's money sits in a
+ * singleton with every other pool's, and the nearest substitute measured a
+ * median of 604 times the money actually in a v3 pool.
  */
 const VENUE = resolveVenue(undefined, undefined);
 const WRAPPED = VENUE.wrapped;
 const STABLE = VENUE.stable;
+const V4_POOL_A = `0x${"a1".repeat(32)}`;
 
 const poolFor = (token) => `0x${token.slice(2, 6)}${"0".repeat(36)}`;
 const ZERO_ADDRESS = `0x${"0".repeat(40)}`;
 
+/** A v3 Swap log, as viem decodes one: the pool is the emitter. */
+function v3Swap({ pool, amount0, amount1, sqrt = sqrtPriceFor(1, 18, 18) }) {
+  return { address: pool, args: { amount0, amount1, sqrtPriceX96: sqrt, liquidity: 1n } };
+}
 
-/** A PoolCreated log, shaped the way viem decodes one. */
-function poolLog({ token, quote = WRAPPED, fee = 10_000, block = 900n }) {
-  const [token0, token1] =
-    token.toLowerCase() < quote.toLowerCase() ? [token, quote] : [quote, token];
-  return {
-    address: VENUE.factory,
-    blockNumber: block,
-    args: { token0, token1, fee, tickSpacing: 200, pool: poolFor(token) },
-  };
+/** A v4 Swap log. The pool is the first topic; the singleton is the emitter. */
+function v4Swap({ id, amount0, amount1, sqrt = sqrtPriceFor(1, 18, 18) }) {
+  return { topics: [null, id], args: { amount0, amount1, sqrtPriceX96: sqrt, liquidity: 1n } };
 }
 
 /**
@@ -234,47 +234,68 @@ function sqrtPriceFor(rate, decimalsToken, decimalsQuote) {
 }
 
 /**
- * A chain that answers with the given pool balances. Pools price at one unit
- * for one unless `prices` says otherwise, keyed by pool address.
+ * A chain that answers with the given swaps and pool pairs. `v4Keys` stands in
+ * for the Initialize index that maps a v4 pool id back to its currencies.
  */
-function chainWith(logs, balances, prices = {}) {
+function chainWith({ v3Swaps = [], v4Swaps = [], pairs = {}, v4Keys = [], balances = {} }) {
+  /* The pool-key map is deliberately kept between calls in production, so each
+     fixture has to start from an empty one or it inherits the last test's. */
+  resetV4KeyCache();
+  const drained = new Set();
   return {
     async getBlockNumber() {
       return 40_000_000n;
     },
-    async getLogs() {
-      return logs;
+    /* Logs belong to one block range and are returned once. A mock that hands
+       the same array back for every chunk would have `scanBack` count each swap
+       as many times as it asks, which looks exactly like a volume bug. */
+    async getLogs({ address }) {
+      const bucket = address ? "v4" : "v3";
+      if (drained.has(bucket)) return [];
+      drained.add(bucket);
+      return address ? v4Swaps : v3Swaps;
+    },
+    async request({ params }) {
+      // The Initialize index, filtered by an indexed money currency.
+      const wanted = (params[0].topics[2] ?? params[0].topics[3] ?? "").toLowerCase();
+      return v4Keys
+        .filter((k) =>
+          [k.currency0, k.currency1].some((c) => wanted.endsWith(c.slice(2).toLowerCase())),
+        )
+        .map((k) => ({
+          topics: [
+            "0xdd466e674ea557f56295e2d0218a125ea4b4f0f6f3307b95f85e6110838d6438",
+            k.id,
+            `0x${"0".repeat(24)}${k.currency0.slice(2)}`,
+            `0x${"0".repeat(24)}${k.currency1.slice(2)}`,
+          ],
+          /* The unindexed half of Initialize, encoded the way the chain sends
+             it — a fixture that hands back empty data tests nothing but the
+             decoder's catch block. */
+          data: encodeAbiParameters(
+            [{ type: "uint24" }, { type: "int24" }, { type: "address" }, { type: "uint160" }, { type: "int24" }],
+            [k.fee, k.tickSpacing, k.hooks, sqrtPriceFor(1, 18, 18), 0],
+          ),
+        }));
     },
     async multicall({ contracts }) {
       return contracts.map((call) => {
-        if (call.functionName === "balanceOf") {
-          const pool = String(call.args[0]).toLowerCase();
-          return { status: "success", result: balances[pool] ?? 0n };
-        }
-        if (call.functionName === "slot0") {
-          const pool = String(call.address).toLowerCase();
-          const sqrt = prices[pool] ?? sqrtPriceFor(1, 18, 18);
-          return { status: "success", result: [sqrt, 0, 0, 0, 0, 0, true] };
-        }
+        const at = String(call.address).toLowerCase();
         if (call.functionName === "token0") {
-          const pool = String(call.address).toLowerCase();
-          const log = logs.find((entry) => entry.args.pool.toLowerCase() === pool);
-          return { status: "success", result: log.args.token0 };
+          return { status: "success", result: pairs[at]?.[0] ?? ZERO_ADDRESS };
         }
-        if (call.functionName === "decimals") {
-          return { status: "success", result: 18 };
+        if (call.functionName === "token1") {
+          return { status: "success", result: pairs[at]?.[1] ?? ZERO_ADDRESS };
+        }
+        if (call.functionName === "decimals") return { status: "success", result: 18 };
+        if (call.functionName === "balanceOf") {
+          return { status: "success", result: balances[String(call.args[0]).toLowerCase()] ?? 0n };
         }
         if (call.functionName === "getPool") {
-          /* The coin/dollar pool is resolved from the factory rather than
-             found in the scan, because on a live chain it predates any window
-             worth scanning. */
           const [a, b] = call.args;
           const pair = [String(a).toLowerCase(), String(b).toLowerCase()].sort().join();
           const want = [WRAPPED.toLowerCase(), String(STABLE).toLowerCase()].sort().join();
-          return {
-            status: "success",
-            result: pair === want ? poolFor(WRAPPED) : ZERO_ADDRESS,
-          };
+          return { status: "success", result: pair === want ? poolFor(WRAPPED) : ZERO_ADDRESS };
         }
         return { status: "success", result: 0n };
       });
@@ -282,99 +303,89 @@ function chainWith(logs, balances, prices = {}) {
   };
 }
 
-test("the index drops every pool standing empty", async () => {
-  const client = chainWith(
-    [poolLog({ token: TOKEN_A }), poolLog({ token: TOKEN_B })],
-    { [poolFor(TOKEN_A).toLowerCase()]: 5n * 10n ** 18n },
-  );
-
+test("a pool that only traded between two unknown tokens is not a market", async () => {
+  const pool = poolFor(TOKEN_A);
+  const client = chainWith({
+    v3Swaps: [v3Swap({ pool, amount0: 5n * 10n ** 18n, amount1: -1n })],
+    pairs: { [pool.toLowerCase()]: [TOKEN_A, TOKEN_B] },
+  });
   const index = await buildMarketIndex(client, VENUE);
-  assert.deepEqual(
-    index.markets.map((m) => m.address.toLowerCase()),
-    [TOKEN_A.toLowerCase()],
-    "a pool with nothing in it is not a market",
-  );
-  assert.equal(index.scanned, 2);
-  assert.equal(index.empty, 1, "the reader is told how much noise was dropped");
+  assert.deepEqual(index.markets, [], "neither side is an asset a trade could be funded with");
+  assert.equal(index.traded, 1);
+  assert.equal(index.unnamed, 1, "the reader is told what could not be offered");
 });
 
-test("the index ignores pools between two tokens it cannot fund a trade with", async () => {
-  const client = chainWith(
-    [poolLog({ token: TOKEN_A, quote: TOKEN_B })],
-    { [poolFor(TOKEN_A).toLowerCase()]: 9n * 10n ** 18n },
-  );
-
-  const index = await buildMarketIndex(client, VENUE);
-  assert.deepEqual(index.markets, [], "neither side is an asset the app holds");
-  assert.equal(index.scanned, 0);
-});
-
-test("the index ranks by depth and keeps one row per token", async () => {
-  /* The same token pooled at two fee tiers: the deeper pool is the one a trade
-     would route through, and the shallow one must not become a second row. */
-  const SHALLOW_POOL = `0xaaaa${"0".repeat(36)}`;
-  const shallow = { ...poolLog({ token: TOKEN_A, fee: 500 }) };
-  shallow.args = { ...shallow.args, pool: SHALLOW_POOL };
-  const deep = poolLog({ token: TOKEN_A, fee: 10_000 });
-
-  const client = chainWith(
-    [shallow, deep, poolLog({ token: TOKEN_B, fee: 3_000 })],
-    {
-      [SHALLOW_POOL]: 1n * 10n ** 18n,
-      [poolFor(TOKEN_A).toLowerCase()]: 50n * 10n ** 18n,
-      [poolFor(TOKEN_B).toLowerCase()]: 20n * 10n ** 18n,
-    },
-  );
-
-  const index = await buildMarketIndex(client, VENUE);
-  assert.deepEqual(
-    index.markets.map((m) => m.address.toLowerCase()),
-    [TOKEN_A.toLowerCase(), TOKEN_B.toLowerCase()],
-    "deepest first",
-  );
-  assert.equal(index.markets.length, 2, "one row per token, not one per pool");
-  assert.equal(index.markets[0].fee, 10_000, "and it is the deeper pool's row");
-});
-
-test("depth in the chain's dollar is comparable with depth in its coin", async () => {
-  if (!STABLE) return;
-  /* A coin trades at one dollar in this fixture, so a pool holding 10 of the
-     coin and one holding 10 dollars have to rank together rather than by the
-     raw integer, which differs by twelve decimal places between the two. */
-  const client = chainWith(
-    [
-      poolLog({ token: WRAPPED, quote: STABLE, fee: 500 }),
-      poolLog({ token: TOKEN_A, quote: WRAPPED }),
-      poolLog({ token: TOKEN_B, quote: STABLE }),
+test("volume is counted on the quote side, whichever side that is", async () => {
+  /* TOKEN_A sits above the wrapped native and TOKEN_B below it, so the two
+     pools order their pair differently and the quote lands on opposite sides.
+     Counting the wrong one would rank a token by its own supply. */
+  const poolA = poolFor(TOKEN_A);
+  const poolB = poolFor(TOKEN_B);
+  const client = chainWith({
+    v3Swaps: [
+      v3Swap({ pool: poolA, amount0: 999n * 10n ** 18n, amount1: 2n * 10n ** 18n }),
+      v3Swap({ pool: poolB, amount0: 7n * 10n ** 18n, amount1: 999n * 10n ** 18n }),
     ],
-    {
-      [poolFor(WRAPPED).toLowerCase()]: 1_000n * 10n ** 6n,
-      [poolFor(TOKEN_A).toLowerCase()]: 10n * 10n ** 18n,
-      [poolFor(TOKEN_B).toLowerCase()]: 400n * 10n ** 6n,
+    pairs: {
+      [poolA.toLowerCase()]: [TOKEN_A, WRAPPED],
+      [poolB.toLowerCase()]: [WRAPPED, TOKEN_B],
     },
-    { [poolFor(WRAPPED).toLowerCase()]: sqrtPriceFor(1, 18, 6) },
-  );
-
+  });
   const index = await buildMarketIndex(client, VENUE);
-  const rows = index.markets.filter((m) => m.address.toLowerCase() !== WRAPPED.toLowerCase());
+  const byToken = new Map(index.markets.map((m) => [m.address.toLowerCase(), m]));
+  assert.equal(byToken.get(TOKEN_A.toLowerCase()).volume, (2n * 10n ** 18n).toString());
+  assert.equal(byToken.get(TOKEN_B.toLowerCase()).volume, (7n * 10n ** 18n).toString());
+});
+
+test("v4 pools are indexed beside v3 ones and ranked together", async () => {
+  const poolA = poolFor(TOKEN_A);
+  const client = chainWith({
+    v3Swaps: [v3Swap({ pool: poolA, amount0: 1n * 10n ** 18n, amount1: 1n * 10n ** 18n })],
+    v4Swaps: [v4Swap({ id: V4_POOL_A, amount0: 9n * 10n ** 18n, amount1: 9n * 10n ** 18n })],
+    pairs: { [poolA.toLowerCase()]: [TOKEN_A, WRAPPED] },
+    v4Keys: [{ id: V4_POOL_A, currency0: TOKEN_B, currency1: WRAPPED, fee: 8388608, tickSpacing: 60, hooks: ZERO_ADDRESS }],
+  });
+  const index = await buildMarketIndex(client, VENUE);
   assert.deepEqual(
-    rows.map((m) => m.address.toLowerCase()),
+    index.markets.map((m) => m.address.toLowerCase()),
     [TOKEN_B.toLowerCase(), TOKEN_A.toLowerCase()],
-    "400 dollars outranks 10 coins at a dollar each",
+    "the busier v4 pool outranks the quieter v3 one",
   );
-  assert.ok(rows[0].depthUsd > rows[1].depthUsd);
+  assert.equal(index.markets[0].venue, "v4");
+  assert.equal(index.markets[1].venue, "v3");
+});
+
+test("a v4 row carries no pool figure, because no balance belongs to it", async () => {
+  const client = chainWith({
+    v4Swaps: [v4Swap({ id: V4_POOL_A, amount0: 4n * 10n ** 18n, amount1: 4n * 10n ** 18n })],
+    v4Keys: [{ id: V4_POOL_A, currency0: TOKEN_B, currency1: WRAPPED, fee: 3000, tickSpacing: 60, hooks: ZERO_ADDRESS }],
+    balances: { [V4_POOL_A.toLowerCase()]: 10n ** 18n },
+  });
+  const index = await buildMarketIndex(client, VENUE);
+  assert.equal(index.markets.length, 1);
+  assert.equal(index.markets[0].depth, undefined, "a v4 pool's money is not its own");
+  assert.equal(index.markets[0].depthUsd, undefined);
+});
+
+test("a v4 pool that traded but cannot be named is dropped, not guessed at", async () => {
+  const client = chainWith({
+    v4Swaps: [v4Swap({ id: V4_POOL_A, amount0: 4n * 10n ** 18n, amount1: 4n * 10n ** 18n })],
+    v4Keys: [],
+  });
+  const index = await buildMarketIndex(client, VENUE);
+  assert.deepEqual(index.markets, []);
+  assert.equal(index.unnamed, 1);
 });
 
 /*
- * The gate that decides what gets offered. Measured over eleven days on chain
- * 4663, eighty percent of the pools opened against wrapped native held nothing
- * or dust — each one a row a reader would have to work out was dead.
+ * The gate that decides what gets offered. The index only carries pools that
+ * traded, so this is what keeps a row nobody paid for out of the picker.
  */
-test("a token is offered only where something is standing in the pool", () => {
-  assert.equal(tradeable({ liquidityUsd: 5_000 }), true);
-  assert.equal(tradeable({ depth: 2.5 }), true, "depth counts even without a dollar");
-  assert.equal(tradeable({}), false, "an empty pool is not a market");
-  assert.equal(tradeable({ liquidityUsd: 0, depth: 0 }), false);
+test("a token is offered only where something actually changed hands", () => {
+  assert.equal(tradeable({ volumeUsd: 5_000 }), true);
+  assert.equal(tradeable({ volume: 2.5 }), true, "volume counts even without a dollar");
+  assert.equal(tradeable({}), false);
+  assert.equal(tradeable({ volumeUsd: 0, volume: 0 }), false);
 });
 
 test("an index that will not answer costs the list and nothing else", async () => {

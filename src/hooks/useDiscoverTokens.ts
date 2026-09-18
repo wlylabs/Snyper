@@ -44,7 +44,7 @@ export type DiscoverToken = Token & {
 
 export type DiscoverResult = {
   tokens: DiscoverToken[];
-  /** Pools the index found standing empty — the noise it dropped. */
+  /** Pools that traded but could not be named, so were not offered. */
   rejected: number;
   /** True when the index answered with nothing, so there is nothing to offer. */
   marketEmpty: boolean;
@@ -186,7 +186,7 @@ export function useDiscoverTokens(chainId: number | undefined) {
       /* `readMarketTokens` already ranked these, and nothing above reorders. */
       return {
         tokens,
-        rejected: reading.meta?.empty ?? 0,
+        rejected: reading.meta?.unnamed ?? 0,
         marketEmpty: false,
         ...(reading.meta ? { meta: reading.meta } : {}),
       };

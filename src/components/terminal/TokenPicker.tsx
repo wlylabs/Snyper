@@ -266,10 +266,15 @@ type Money = Parameters<typeof formatCompactMoney>[1];
  *
  * A holding answers "what do I have": an amount, what it is worth, how it moved
  * since yesterday. A row here answers a different question — whether this is a
- * thing at all — and the three figures that answer it are the day's volume, the
- * cap, and the fully diluted cap beside it. Price is deliberately absent: it is
- * the cap divided by a supply each launch picks arbitrarily, so two tokens at
- * the same price are not comparable and two at the same cap are.
+ * thing at all — and what answers it is what changed hands, what is standing in
+ * the pool behind it, and what the whole token is worth. Price is deliberately
+ * absent: it is the cap divided by a supply each launch picks arbitrarily, so
+ * two tokens at the same price are not comparable and two at the same cap are.
+ *
+ * A row that trades on Uniswap v4 carries no pool figure and says so, because
+ * its money sits in a singleton shared with every other v4 pool and none of it
+ * belongs to this one. It also cannot be swapped from here, which the row has
+ * to admit before the reader taps it rather than after.
  *
  * The contract address gets its own button rather than a line of text. It is
  * the thing a reader takes somewhere else — an explorer, a chart, a group chat
@@ -288,16 +293,16 @@ function DiscoverRow({
   onSelect: (token: DiscoverToken) => void;
 }) {
   const { t } = useI18n();
-  const { liquidityUsd, depth, depthSymbol } = token.market;
+  const { liquidityUsd, volumeUsd, volume, volumeSymbol, venue } = token.market;
 
-  /* Depth in dollars where the chain's own dollar could price the pool's quote
-     asset, and in that asset where it could not. Never nothing: depth is what
-     this row was selected by, so it is the one figure that has to be there. */
-  const depthLabel =
-    liquidityUsd !== undefined
-      ? formatCompactMoney(liquidityUsd, money)
-      : depth !== undefined
-        ? `${formatAmount(depth, 3)}${depthSymbol ? ` ${depthSymbol}` : ""}`
+  /* Volume in dollars where the chain's own dollar could price the pool's quote
+     asset, and in that asset where it could not. Never nothing: it is what this
+     row was ranked by, so it is the one figure that has to be there. */
+  const volumeLabel =
+    volumeUsd !== undefined
+      ? formatCompactMoney(volumeUsd, money)
+      : volume !== undefined
+        ? `${formatAmount(volume, 3)}${volumeSymbol ? ` ${volumeSymbol}` : ""}`
         : "—";
 
   return (
@@ -312,13 +317,25 @@ function DiscoverRow({
           <span className="flex min-w-0 max-w-full items-center gap-1.5">
             <span className="truncate text-[12px] text-dim">{token.name}</span>
             <TokenTags token={token} listed={listed} launch={token.launch} />
+            {venue === "v4" && (
+              <span className="chip chip-xs" title={t("token.discoverV4Hint")}>
+                {t("token.discoverV4")}
+              </span>
+            )}
           </span>
           <span className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5">
             <Stat
-              label={t("token.discoverDepth")}
-              value={depthLabel}
-              hint={t("token.discoverDepthHint")}
+              label={t("token.discoverVolume")}
+              value={volumeLabel}
+              hint={t("token.discoverVolumeHint")}
             />
+            {liquidityUsd !== undefined && (
+              <Stat
+                label={t("token.discoverDepth")}
+                value={formatCompactMoney(liquidityUsd, money)}
+                hint={t("token.discoverDepthHint")}
+              />
+            )}
             {token.fdvUsd !== undefined && (
               <Stat
                 label={t("token.discoverFdv")}

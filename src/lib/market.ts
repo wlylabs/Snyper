@@ -28,30 +28,38 @@ const MAX_TOKENS = 120;
  * index reads them off the pool's pricing rather than off the token's own
  * record, so identity stays the contract's to confirm in `useDiscoverTokens`.
  *
- * Volume and price change are absent, and not by oversight. Both need swap
- * history, and this chain's endpoint caps one log query at ten thousand results
- * — which a single hour of swaps across the chain already exceeds. A figure
- * that cannot be read is better missing than estimated.
+ * Price change over a day is absent, and not by oversight: it needs a day of
+ * swap history, and this chain's endpoint caps one log query at ten thousand
+ * results. A figure that cannot be read is better missing than estimated.
  */
 export type MarketToken = {
   address: `0x${string}`;
-  /** Dollars standing in the deepest pool. What every other figure rests on. */
+  /** Which venue this trades on. Only v3 can also be traded from here. */
+  venue?: "v3" | "v4";
+  /** Dollars that changed hands over the window. What the ranking rests on. */
+  volumeUsd?: number;
+  /** Volume in the asset the pool is quoted against, for when no dollar exists. */
+  volume?: number;
+  volumeSymbol?: string;
+  swaps?: number;
+  /**
+   * Dollars standing in the pool. Only ever present on a v3 row: a v4 pool's
+   * money is pooled in a singleton with every other pool's, so there is no
+   * balance belonging to it and nothing honest to put here.
+   */
   liquidityUsd?: number;
-  /** Depth in the asset the pool is quoted against, for when no dollar exists. */
-  depth?: number;
-  depthSymbol?: string;
   priceUsd?: number;
-  /** Fee tier of the pool the depth was measured in. */
+  /** Fee tier, or v4's dynamic-fee flag. */
   fee?: number;
   pool?: `0x${string}`;
 };
 
 /** How the index that produced these rows was doing. */
 export type MarketMeta = {
-  /** Pools the factory has opened against a fundable asset. */
-  scanned: number;
-  /** How many of those held nothing — the noise the index exists to drop. */
-  empty: number;
+  /** Pools that traded in the window, across both venues. */
+  traded: number;
+  /** How many of those could not be named, so could not be offered. */
+  unnamed: number;
   /** True when the scan's block budget ran out before its window was covered. */
   partial: boolean;
   builtAt: number;
@@ -79,49 +87,54 @@ function positive(value: unknown): number | undefined {
 /**
  * Whether a reading describes a market at all.
  *
- * On this chain that is one question: is there anything in the pool. Measured
- * over eleven days, eighty percent of the pools opened against wrapped native
- * held nothing or dust, and every one of them would otherwise be a row the
- * reader has to work out is dead. Depth is also the only figure here that was
- * read rather than inferred, which is the other reason it is the gate.
+ * The index only carries pools that traded, so this is close to a formality —
+ * but a row with no volume on either measure is one nobody paid for, and the
+ * chain opens five hundred pools a day that nobody ever will.
  *
  * Nothing is hidden by this: an address still imports by hand. It is the
  * difference between what the app offers and what the app allows.
  */
 export function tradeable(market: MarketToken): boolean {
-  return (market.liquidityUsd ?? 0) > 0 || (market.depth ?? 0) > 0;
+  return (market.volumeUsd ?? 0) > 0 || (market.volume ?? 0) > 0;
 }
 
 function toToken(entry: IndexedMarket, symbols: Map<string, string>): MarketToken | undefined {
   const parsed = address(entry.address);
   if (!parsed) return undefined;
 
-  const decimals = Number(entry.depthDecimals);
-  let depth: number | undefined;
-  try {
-    depth = Number(BigInt(entry.depth)) / 10 ** (Number.isFinite(decimals) ? decimals : 18);
-  } catch {
-    depth = undefined;
-  }
+  const decimals = Number(entry.volumeDecimals);
+  const scale = 10 ** (Number.isFinite(decimals) ? decimals : 18);
+  const amount = (raw: string | undefined): number | undefined => {
+    if (raw === undefined) return undefined;
+    try {
+      return Number(BigInt(raw)) / scale;
+    } catch {
+      return undefined;
+    }
+  };
 
   return {
     address: parsed,
+    venue: entry.venue === "v4" ? "v4" : "v3",
+    volumeUsd: positive(entry.volumeUsd),
+    volume: positive(amount(entry.volume)),
+    volumeSymbol: symbols.get(entry.quote.toLowerCase()),
+    swaps: positive(entry.swaps),
     liquidityUsd: positive(entry.depthUsd),
-    depth: positive(depth),
-    depthSymbol: symbols.get(entry.quote.toLowerCase()),
     priceUsd: positive(entry.priceUsd),
     fee: Number.isFinite(Number(entry.fee)) ? Number(entry.fee) : undefined,
     pool: address(entry.pool),
   };
 }
 
+
 /**
- * The chain's traded tokens, deepest first.
+ * The chain's traded tokens, busiest first.
  *
- * `seeds` are the assets every pool here is quoted against — the wrapped native
- * and the dollar. They are excluded from the result, since the app already
- * carries them, and their symbols label the depth of any pool the dollar could
- * not value.
+ * `seeds` are the assets every pool here is quoted against — the wrapped
+ * native, the dollar and the coin itself. They are excluded from the result,
+ * since the app already carries them, and their symbols label the volume of any
+ * pool the dollar could not value.
  */
 export async function readMarketTokens(
   seeds: readonly { address: `0x${string}`; symbol: string }[],
@@ -152,13 +165,13 @@ export async function readMarketTokens(
     tokens.push(token);
   }
 
-  /* The index already ranked these by what the pool holds, valued in dollars
+  /* The index already ranked these by what changed hands, valued in dollars
      wherever the chain's own dollar could price the quote asset. */
   return {
     tokens: tokens.slice(0, MAX_TOKENS),
     meta: {
-      scanned: Number(index.scanned) || 0,
-      empty: Number(index.empty) || 0,
+      traded: Number(index.traded) || 0,
+      unnamed: Number(index.unnamed) || 0,
       partial: Boolean(index.partial),
       builtAt: Number(index.builtAt) || Date.now(),
     },

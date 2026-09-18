@@ -91,13 +91,18 @@ const en = {
   "token.discoveredCount": "{count} not in your list",
   "token.discovering": "Reading the chain…",
   "token.discoverNote":
-    "Every pool this chain's factory has opened against one of its own assets, ranked by what is actually standing in it, with the Pons launchpad asked which of these it minted. Read from the chain, not from an indexer. Nothing here is a curated list, and no one has vetted these contracts.",
+    "Every pool that has traded here lately on Uniswap v3 or v4, ranked by what changed hands, with the Pons launchpad asked which of these it minted. Read from the chain's own swap logs, not from an indexer. Nothing here is a curated list, and no one has vetted these contracts.",
   "token.discoverChainOnly":
     "The chain scan answered with nothing, so there is nothing to offer beyond the assets above. Paste a contract address to import one by hand.",
   "token.discoverFiltered":
-    "{count} more pools were standing empty and are not offered; paste an address to reach one anyway.",
-  "token.discoverDepth": "DEPTH",
-  "token.discoverDepthHint": "What is standing in the deepest pool — how much can be bought before the price moves",
+    "{count} more pools traded but could not be named, so they are not offered; paste an address to reach one anyway.",
+  "token.discoverVolume": "VOL",
+  "token.discoverVolumeHint": "Traded over the last half hour, read from the pools' own swap logs",
+  "token.discoverDepth": "POOL",
+  "token.discoverDepthHint": "What is standing in the pool — how much can be bought before the price moves",
+  "token.discoverV4": "v4",
+  "token.discoverV4Hint":
+    "Trades on Uniswap v4, which this app can price but not yet route. Its pool holds no balance of its own, so there is no pool figure to show.",
   "token.discoverFdv": "FDV",
   "token.discoverFdvHint": "Fully diluted — total supply at the pool price",
   "token.copyAddress": "Copy contract address {address}",
@@ -529,13 +534,18 @@ const id: Record<TKey, string> = {
   "token.discoveredCount": "{count} belum ada di daftarmu",
   "token.discovering": "Membaca chain…",
   "token.discoverNote":
-    "Semua pool yang pernah dibuka factory chain ini terhadap asetnya sendiri, diperingkat dari isi pool-nya, lalu launchpad Pons ditanya mana yang dia cetak. Dibaca dari chain, bukan dari indexer. Tidak ada daftar kurasi di sini, dan tidak ada yang memverifikasi kontrak-kontrak ini.",
+    "Semua pool yang belakangan ini diperdagangkan di Uniswap v3 atau v4, diperingkat dari nilai yang berpindah tangan, lalu launchpad Pons ditanya mana yang dia cetak. Dibaca dari log swap chain-nya sendiri, bukan dari indexer. Tidak ada daftar kurasi di sini, dan tidak ada yang memverifikasi kontrak-kontrak ini.",
   "token.discoverChainOnly":
     "Pemindaian chain tidak menemukan apa pun, jadi tidak ada yang bisa ditawarkan selain aset di atas. Tempel alamat kontrak untuk mengimpor sendiri.",
   "token.discoverFiltered":
-    "{count} pool lainnya berdiri kosong dan tidak ditawarkan; tempel alamatnya kalau tetap mau.",
+    "{count} pool lain ikut diperdagangkan tapi tidak bisa dikenali, jadi tidak ditawarkan; tempel alamatnya kalau tetap mau.",
+  "token.discoverVolume": "VOL",
+  "token.discoverVolumeHint": "Diperdagangkan dalam setengah jam terakhir, dibaca dari log swap pool itu sendiri",
   "token.discoverDepth": "ISI POOL",
-  "token.discoverDepthHint": "Yang benar-benar ada di pool terdalam — seberapa banyak bisa dibeli sebelum harganya bergerak",
+  "token.discoverDepthHint": "Yang benar-benar ada di pool — seberapa banyak bisa dibeli sebelum harganya bergerak",
+  "token.discoverV4": "v4",
+  "token.discoverV4Hint":
+    "Diperdagangkan di Uniswap v4, yang bisa dihargai aplikasi ini tapi belum bisa dirutekan. Pool-nya tidak menyimpan saldo sendiri, jadi tidak ada angka isi pool yang bisa ditampilkan.",
   "token.discoverFdv": "FDV",
   "token.discoverFdvHint": "Terdilusi penuh — total suplai dikali harga pool",
   "token.copyAddress": "Salin alamat kontrak {address}",

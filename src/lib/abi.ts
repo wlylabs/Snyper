@@ -235,6 +235,17 @@ export const v3PoolAbi = [
     inputs: [],
     outputs: [{ type: "address" }],
   },
+  {
+    // Both sides are needed to say what a pool trades. Only `token0` was here
+    // while the only caller priced a pair it already knew; the market index
+    // asks pools it knows nothing about, and every `token1` call against an ABI
+    // without it fails silently — which read as "no v3 pool traded here".
+    type: "function",
+    name: "token1",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "address" }],
+  },
 ] as const;
 
 /**

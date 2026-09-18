@@ -12,6 +12,7 @@ import { poolManagerAbi } from "./abi";
 import { NATIVE } from "./native";
 import type { Token } from "./tokens";
 import { dexMeta } from "./chains";
+import { scanBack } from "./logscan";
 
 /**
  * Reading Uniswap v4 on Robinhood Chain.
@@ -300,4 +301,111 @@ export async function v4MidPrice(
     if (!best || state.liquidity > best.state.liquidity) best = { pool, state, price };
   }
   return best;
+}
+
+/**
+ * Every v4 pool quoted against one of the chain's own assets, keyed by pool id.
+ *
+ * A swap log names its pool by id and nothing else — not its currencies, not
+ * its fee — so an index built from swaps cannot say what any of them trades
+ * until something maps the id back to a pool key. Asking per pool is not an
+ * option: the id is indexed, but resolving eight hundred of them in parallel
+ * returned nothing and took forty seconds, and there are thousands.
+ *
+ * So the map is built from the other end. Both currencies are indexed on
+ * `Initialize`, so one filtered scan per asset per side collects every pool
+ * that could ever be funded from this app, and the swap scan is matched against
+ * it. Pools older than the window are missed rather than guessed at, which the
+ * caller reports.
+ */
+/**
+ * The map, kept between calls.
+ *
+ * Pool keys are append-only: a pool is initialised once and its currencies
+ * never change, so nothing already in here can go stale. Rebuilding it from
+ * scratch every time cost twenty-five seconds and tens of thousands of logs,
+ * and spent enough of the endpoint's patience that reads queued behind it came
+ * back rate-limited. After the first pass only the blocks since the last one
+ * are scanned.
+ */
+const keyCache = {
+  keys: new Map<string, V4Pool>(),
+  /** Head the cache was last brought up to, or zero when it is empty. */
+  head: 0n,
+};
+
+export function resetV4KeyCache(): void {
+  keyCache.keys = new Map();
+  keyCache.head = 0n;
+}
+
+export async function indexV4PoolKeys(
+  client: PublicClient,
+  money: readonly `0x${string}`[],
+  head: bigint,
+  windowBlocks: bigint,
+): Promise<{ keys: Map<string, V4Pool>; partial: boolean }> {
+  /* First pass covers the window; every one after it covers only what is new,
+     which is a few thousand blocks rather than ten million. */
+  const span = keyCache.head > 0n && head > keyCache.head ? head - keyCache.head : windowBlocks;
+  if (keyCache.head > 0n && head <= keyCache.head) {
+    return { keys: keyCache.keys, partial: false };
+  }
+
+  const filters: (string | null)[][] = [];
+  for (const asset of money) {
+    const padded = `0x${asset.toLowerCase().replace(/^0x/, "").padStart(64, "0")}`;
+    filters.push([INITIALIZE_TOPIC, null, padded]);
+    filters.push([INITIALIZE_TOPIC, null, null, padded]);
+  }
+
+  let partial = false;
+  for (const topics of filters) {
+    const result = await scanBack(
+      head,
+      span,
+      async (range) => {
+        const logs = (await client.request({
+          method: "eth_getLogs",
+          params: [
+            {
+              address: V4_POOL_MANAGER,
+              topics,
+              fromBlock: toHex(range.fromBlock),
+              toBlock: toHex(range.toBlock),
+            },
+          ],
+        } as never)) as { topics: string[]; data: `0x${string}` }[];
+
+        for (const log of logs) {
+          const id = log.topics[1];
+          if (!id || keyCache.keys.has(id.toLowerCase())) continue;
+          try {
+            const { args } = decodeEventLog({
+              abi: [INITIALIZE],
+              data: log.data,
+              topics: log.topics as [`0x${string}`, ...`0x${string}`[]],
+            });
+            keyCache.keys.set(id.toLowerCase(), {
+              id: id as `0x${string}`,
+              currency0: topicAddress(log.topics[2]),
+              currency1: topicAddress(log.topics[3]),
+              fee: Number(args.fee),
+              tickSpacing: Number(args.tickSpacing),
+              hooks: getAddress(args.hooks),
+            });
+          } catch {
+            // Not this event.
+          }
+        }
+      },
+      // The ceiling is on results, and a busy asset opens pools fast, so the
+      // chunk starts well below the whole window and shrinks from there.
+      { maxRequests: 8, maxChunk: 4_000_000n, minChunk: 250_000n },
+    ).catch(() => ({ partial: true }));
+    if (result.partial) partial = true;
+  }
+
+  keyCache.head = head;
+  return { keys: keyCache.keys, partial };
 }
