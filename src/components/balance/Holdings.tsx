@@ -220,7 +220,6 @@ function TokenSheet({
           <Icon name="hide" size={14} className="text-dim" />
           <span className="flex-1">{row.hidden ? t("balance.unhide") : t("balance.hide")}</span>
         </button>
-        <p className="mt-2 text-[11px] leading-relaxed text-faint">{t("balance.hideHint")}</p>
       </div>
     </Sheet>
   );

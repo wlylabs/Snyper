@@ -203,9 +203,6 @@ export function SwapPanel({ row, onSold }: { row: Holding; onSold: () => void })
 
       {failure && <p className="warn mt-2 text-[11px]">{t("swap.failed")}</p>}
 
-      {route && !thin && (
-        <p className="mt-3 text-[11px] leading-relaxed text-faint">{t("swap.slippageAuto")}</p>
-      )}
 
 
       <button
