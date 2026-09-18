@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { BlankPage } from "@/components/shell/BlankPage";
 
-export const metadata: Metadata = { title: "Discover" };
+export const metadata: Metadata = { title: "Memes" };
 
 export default function DiscoverPage() {
   return (

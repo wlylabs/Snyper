@@ -20,7 +20,7 @@ export const INTL_LOCALE: Record<Locale, string> = {
 const en = {
   "nav.home": "Snyper",
   "nav.balance": "Balance",
-  "nav.discover": "Discover",
+  "nav.discover": "Memes",
   "nav.settings": "Settings",
 
   "a11y.home": "Snyper home",
@@ -45,7 +45,7 @@ const en = {
 
   "page.balance.title": "Balance",
 
-  "page.discover.title": "Discover",
+  "page.discover.title": "Memes",
   "page.discover.subtitle": "New memecoins on Robinhood Chain",
   "page.discover.empty": "This screen is not built yet.",
   "page.discover.hint":
