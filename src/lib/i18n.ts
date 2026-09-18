@@ -46,10 +46,6 @@ const en = {
   "page.balance.title": "Balance",
 
   "page.memecoin.title": "Memes",
-  "page.memecoin.subtitle": "New memecoins on Robinhood Chain",
-  "page.memecoin.empty": "This screen is not built yet.",
-  "page.memecoin.hint":
-    "Where new contracts get found and read. Nothing is scanned until it is written.",
 
   "balance.total": "Portfolio value",
   "balance.holdings": "Holdings",
@@ -112,6 +108,29 @@ const en = {
   "balance.unhide": "List it again",
   "balance.hidden": "{count} hidden",
   "balance.hiddenLess": "Put the hidden ones away",
+  "memecoin.live": "Trading now · 5m",
+  "memecoin.sortHot": "Busiest",
+  "memecoin.sortNew": "Newest",
+  "memecoin.sortMovers": "Movers",
+  "memecoin.fresh": "NEW",
+  "memecoin.pair": "Pair",
+  "memecoin.volume": "Volume",
+  "memecoin.liquidity": "Liquidity",
+  "memecoin.trades": "Trades",
+  "memecoin.age": "Age",
+  "memecoin.pool": "Pool fee",
+  "memecoin.token": "Token",
+  "memecoin.empty": "Nothing has traded in the last five minutes.",
+  "memecoin.emptyHint":
+    "This reads the chain rather than a list, so an empty screen means an empty five minutes. It fills again on its own.",
+  "memecoin.failed": "The chain did not answer.",
+  "memecoin.failedHint":
+    "Every pair here is built from swap events read straight off chain 4663, and that read did not come back.",
+
+  "faq.window.q": "Why does the memes screen only cover five minutes?",
+  "faq.window.a":
+    "Because that is what the chain will hand over in one question. Chain 4663 settles a block every hundred milliseconds and puts about four thousand swaps in five minutes, which is close to the most the public endpoint returns at once — ask for fifteen and it refuses. Narrowing to a handful of pools buys no more reach. So the column says 5m, because five minutes is what there is, and a screen labelled 24h would be inventing the other twenty-three.",
+
   "settings.faq": "Questions",
 
   "faq.numbers.q": "Where do these balances come from?",
@@ -233,10 +252,6 @@ const id: Record<TKey, string> = {
   "page.balance.title": "Saldo",
 
   "page.memecoin.title": "Memecoin",
-  "page.memecoin.subtitle": "Memecoin baru di Robinhood Chain",
-  "page.memecoin.empty": "Layar ini belum dibangun.",
-  "page.memecoin.hint":
-    "Tempat kontrak baru ditemukan dan dibaca. Belum ada yang dipindai sampai ditulis.",
 
   "balance.total": "Nilai portofolio",
   "balance.holdings": "Isi dompet",
@@ -299,6 +314,29 @@ const id: Record<TKey, string> = {
   "balance.unhide": "Tampilkan lagi",
   "balance.hidden": "{count} disembunyikan",
   "balance.hiddenLess": "Simpan lagi yang disembunyikan",
+  "memecoin.live": "Sedang jalan · 5m",
+  "memecoin.sortHot": "Tersibuk",
+  "memecoin.sortNew": "Terbaru",
+  "memecoin.sortMovers": "Bergerak",
+  "memecoin.fresh": "BARU",
+  "memecoin.pair": "Pair",
+  "memecoin.volume": "Volume",
+  "memecoin.liquidity": "Likuiditas",
+  "memecoin.trades": "Transaksi",
+  "memecoin.age": "Umur",
+  "memecoin.pool": "Biaya pool",
+  "memecoin.token": "Token",
+  "memecoin.empty": "Tidak ada yang diperdagangkan dalam lima menit terakhir.",
+  "memecoin.emptyHint":
+    "Layar ini membaca chain, bukan sebuah daftar, jadi layar kosong berarti lima menit yang kosong. Ia akan terisi lagi dengan sendirinya.",
+  "memecoin.failed": "Chain tidak menjawab.",
+  "memecoin.failedHint":
+    "Setiap pair di sini dibangun dari event swap yang dibaca langsung dari chain 4663, dan bacaan itu tidak kembali.",
+
+  "faq.window.q": "Kenapa layar memes cuma mencakup lima menit?",
+  "faq.window.a":
+    "Karena itu yang diberikan chain dalam satu pertanyaan. Chain 4663 menutup blok tiap seratus milidetik dan menampung sekitar empat ribu swap dalam lima menit — mendekati batas yang dikembalikan endpoint publik sekali jalan; minta lima belas menit dan ia menolak. Mempersempit ke segelintir pool pun tidak menambah jangkauan. Jadi kolomnya tertulis 5m, karena lima menit itulah yang ada, dan layar berlabel 24 jam akan mengarang dua puluh tiga jam sisanya.",
+
   "settings.faq": "Pertanyaan",
 
   "faq.numbers.q": "Angka saldo ini datang dari mana?",
