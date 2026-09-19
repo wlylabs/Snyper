@@ -58,6 +58,27 @@ export function HoldButton({
   // has to drain the same as a release on it — otherwise the fill freezes.
   useEffect(() => stop, [stop]);
 
+  /*
+   * The release, watched on the window as well as on the button.
+   *
+   * `setPointerCapture` is what normally guarantees the release comes back
+   * here, and it is not a guarantee: it throws if the pointer has already gone,
+   * and a browser that hands the gesture to something else takes the capture
+   * with it. Either way the button would be left holding a fill that nothing
+   * drains, and the next press — already refused, because a frame is still
+   * scheduled — would do nothing at all. That is a disconnect button that has
+   * quietly stopped working. The window sees every release, so it is asked too.
+   */
+  useEffect(() => {
+    if (!holding) return;
+    window.addEventListener("pointerup", stop);
+    window.addEventListener("pointercancel", stop);
+    return () => {
+      window.removeEventListener("pointerup", stop);
+      window.removeEventListener("pointercancel", stop);
+    };
+  }, [holding, stop]);
+
   const start = () => {
     if (frame.current !== undefined) return;
     haptic("tap");
@@ -88,12 +109,27 @@ export function HoldButton({
       style={{ "--hold": 0 } as CSSProperties}
       onPointerDown={(event) => {
         if (event.button !== 0) return;
-        event.currentTarget.setPointerCapture(event.pointerId);
+        try {
+          event.currentTarget.setPointerCapture(event.pointerId);
+        } catch {
+          /* The window listener above covers the release either way. */
+        }
         start();
       }}
       onPointerUp={stop}
       onPointerCancel={stop}
-      onPointerLeave={stop}
+      /*
+       * A captured pointer keeps reporting to this button wherever the finger
+       * travels, so a leave while it is held is the capture being handed back on
+       * the way up — which the release has already drained. Cancelling on it
+       * instead is what made the hold fail on a phone: the press itself nudges
+       * the button a pixel under the finger, the leave fires, and a reader who
+       * never moved watches the fill reset. Uncaptured, a leave is a real exit.
+       */
+      onPointerLeave={(event) => {
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) return;
+        stop();
+      }}
       onKeyDown={(event) => {
         if (event.repeat) return;
         if (event.key === "Enter" || event.key === " ") {

@@ -51,10 +51,26 @@ function useCoarsePointer(): boolean {
   return coarse;
 }
 
-/** Publishes Privy's login modal to anything below that needs an address. */
+/**
+ * Publishes Privy's connect modal to anything below that needs an address.
+ *
+ * Which modal depends on what the session is already holding, and getting that
+ * wrong is silent. Privy's `login` refuses outright for a reader who is signed
+ * in — it writes a line to the console and returns — so a session that has
+ * authenticated without producing an address had a Connect button on every
+ * empty panel that did precisely nothing when pressed. `connectWallet` is the
+ * call that fits that reader: they are signed in, what they are missing is a
+ * wallet, and this is Privy's screen for attaching one.
+ */
 function ConnectPromptProvider({ children }: { children: ReactNode }) {
-  const { login } = usePrivy();
-  const prompt = useMemo(() => () => login(), [login]);
+  const { authenticated, login, connectWallet } = usePrivy();
+  const prompt = useMemo(
+    () => () => {
+      if (authenticated) connectWallet();
+      else login();
+    },
+    [authenticated, login, connectWallet],
+  );
 
   return (
     <ConnectPromptContext.Provider value={prompt}>{children}</ConnectPromptContext.Provider>
