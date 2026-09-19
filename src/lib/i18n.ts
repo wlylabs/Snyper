@@ -211,6 +211,14 @@ const en = {
   "settings.language": "Language",
   "settings.languageHint": "Interface text, number and date formatting.",
 
+  "settings.referral": "Referral",
+  "settings.referralTitle": "Trade with me on Fomo",
+  "settings.referralBadge": "10% off",
+  "settings.referralHint":
+    "Open Fomo through this link and 10% comes off the fees you pay there. It changes nothing here — no wallet is touched, nothing is signed, and Snyper takes no part in what you trade over there.",
+  "settings.referralOpen": "Open Fomo",
+  "settings.referralCopy": "Copy invite",
+
   "install.action": "Install app",
   "install.androidHint":
     "Open your browser menu and choose Install app or Add to Home screen.",
@@ -491,6 +499,14 @@ const id: Record<TKey, string> = {
   "settings.light": "Terang",
   "settings.language": "Bahasa",
   "settings.languageHint": "Teks antarmuka, format angka, dan tanggal.",
+
+  "settings.referral": "Referral",
+  "settings.referralTitle": "Trading bareng di Fomo",
+  "settings.referralBadge": "Hemat 10%",
+  "settings.referralHint":
+    "Buka Fomo lewat tautan ini dan biaya yang kamu bayar di sana berkurang 10%. Di sini tidak ada yang berubah — tidak ada dompet yang disentuh, tidak ada yang ditandatangani, dan Snyper tidak ikut campur dalam transaksimu di sana.",
+  "settings.referralOpen": "Buka Fomo",
+  "settings.referralCopy": "Salin ajakan",
 
   "install.action": "Pasang aplikasi",
   "install.androidHint":
