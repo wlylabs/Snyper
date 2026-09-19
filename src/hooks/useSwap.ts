@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
-import { erc20Abi } from "viem";
+import { encodeFunctionData, erc20Abi } from "viem";
 import {
   useAccount,
   useReadContract,
@@ -13,7 +13,10 @@ import {
 import { CHAIN_ID } from "@/lib/chains";
 import {
   EXITS,
+  FEE_BIPS,
   FEE_TIERS,
+  ROUTER_SELF,
+  TREASURY,
   VENUE,
   floorFor,
   quoterAbi,
@@ -212,26 +215,57 @@ export function useSwapAction({
 
   const floor = route ? floorFor(route.amountOut, slippageBps) : 0n;
 
+  /*
+   * The sale and the app's cut, in one transaction.
+   *
+   * The swap is told to deliver into the router rather than into the wallet —
+   * `ROUTER_SELF` is the router's own sentinel for that — and the sweep that
+   * follows splits what landed: the cut to the treasury, the rest to the
+   * reader. It is the router's own fee mechanism, so there is no contract of
+   * this app's in the path and nothing to audit that Uniswap has not already
+   * deployed. The deployed bytecode refuses anything over one percent, which is
+   * a ceiling this app cannot raise.
+   *
+   * The floor is checked on the way out of the pool, before the split, so it is
+   * a gross figure; what the reader is guaranteed is that figure less the cut,
+   * which is what the panels above print.
+   */
+  const calls = useMemo(() => {
+    if (!token || !route || !address) return undefined;
+    const sale = (recipient: `0x${string}`) =>
+      encodeFunctionData({
+        abi: routerAbi,
+        functionName: "exactInputSingle",
+        args: [
+          {
+            tokenIn: token,
+            tokenOut: route.exit.address,
+            fee: route.fee,
+            recipient,
+            amountIn,
+            amountOutMinimum: floor,
+            sqrtPriceLimitX96: 0n,
+          },
+        ],
+      });
+    if (FEE_BIPS === 0) return [sale(address)];
+    return [
+      sale(ROUTER_SELF),
+      encodeFunctionData({
+        abi: routerAbi,
+        functionName: "sweepTokenWithFee",
+        args: [route.exit.address, floor, address, BigInt(FEE_BIPS), TREASURY],
+      }),
+    ];
+  }, [token, route, address, amountIn, floor]);
+
   const simulation = useSimulateContract({
     address: VENUE.router,
     abi: routerAbi,
-    functionName: "exactInputSingle",
-    args:
-      token && route && address
-        ? [
-            {
-              tokenIn: token,
-              tokenOut: route.exit.address,
-              fee: route.fee,
-              recipient: address,
-              amountIn,
-              amountOutMinimum: floor,
-              sqrtPriceLimitX96: 0n,
-            },
-          ]
-        : undefined,
+    functionName: "multicall",
+    args: calls ? [calls] : undefined,
     chainId: CHAIN_ID,
-    query: { enabled: Boolean(token && route && address && approved) },
+    query: { enabled: Boolean(calls && approved) },
   });
 
   const swap = useWriteContract();

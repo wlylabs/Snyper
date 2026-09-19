@@ -11,9 +11,12 @@ import {
   useWriteContract,
 } from "wagmi";
 import { CHAIN_ID } from "@/lib/chains";
+import { encodeFunctionData } from "viem";
 import {
+  TREASURY,
   VENUE,
   buyPath,
+  feeOn,
   floorFor,
   quoterAbi,
   routerAbi,
@@ -21,6 +24,7 @@ import {
   slippageCapped,
   snipeSlippageFor,
 } from "@/lib/venue";
+import { REFERENCE_FEE } from "@/lib/screener";
 import type { Pair } from "./useScreener";
 
 /** One `eth_call` per multicall, however many reads go into it. */
@@ -94,6 +98,14 @@ export type Shot = {
  * two different ways.
  */
 export function useShot(pair: Pair | undefined, stake: bigint) {
+  /*
+   * Everything below is quoted on what is left after the app's cut, never on
+   * the gross stake. The figure on screen is then the figure that arrives, and
+   * the fee is not a surprise subtracted from it afterwards — which is the only
+   * way to charge for something without the screen starting to lie.
+   */
+  const net = stake - feeOn(stake);
+
   const road = useMemo(
     () =>
       pair
@@ -106,7 +118,7 @@ export function useShot(pair: Pair | undefined, stake: bigint) {
   );
 
   const contracts = useMemo(() => {
-    if (!road || stake <= 0n) return [];
+    if (!road || net <= 0n) return [];
     const ask = (amountIn: bigint) =>
       ({
         address: VENUE.quoter,
@@ -115,8 +127,8 @@ export function useShot(pair: Pair | undefined, stake: bigint) {
         args: [road.in, amountIn] as const,
         chainId: CHAIN_ID,
       }) as const;
-    return [ask(stake), ask(stake / REFERENCE)];
-  }, [road, stake]);
+    return [ask(net), ask(net / REFERENCE)];
+  }, [road, net]);
 
   const bought = useReadContracts({
     contracts,
@@ -159,7 +171,7 @@ export function useShot(pair: Pair | undefined, stake: bigint) {
       small?.status === "success"
         ? ((small.result as readonly unknown[])?.[0] as bigint)
         : undefined;
-    const size = stake / REFERENCE;
+    const size = net / REFERENCE;
 
     /*
      * Unpriceable impact is read as none rather than as infinite. The
@@ -169,7 +181,7 @@ export function useShot(pair: Pair | undefined, stake: bigint) {
      */
     const impactBps =
       reference && reference > 0n && size > 0n
-        ? Math.max(0, 10_000 - Number((amountOut * size * 10_000n) / (reference * stake)))
+        ? Math.max(0, 10_000 - Number((amountOut * size * 10_000n) / (reference * net)))
         : 0;
 
     const outcome = back.data?.[0];
@@ -185,11 +197,16 @@ export function useShot(pair: Pair | undefined, stake: bigint) {
       impactBps,
       slippageBps,
       capped: slippageCapped(impactBps),
+      /*
+       * Measured against the gross stake, not the net one. What the reader
+       * wants to know is how much of the money they parted with comes back,
+       * and the fee is part of what they parted with.
+       */
       roundTrip:
         returned && stake > 0n ? Number((returned * 10_000n) / stake) / 10_000 : undefined,
       trapped: back.isFetched && returned === undefined,
     };
-  }, [amountOut, bought.data, back.data, back.isFetched, stake]);
+  }, [amountOut, bought.data, back.data, back.isFetched, stake, net]);
 
   return {
     shot,
@@ -227,24 +244,62 @@ export function useFire({
   const { address } = useAccount();
   const balance = useBalance({ address, chainId: CHAIN_ID });
 
+  /*
+   * Two legs, one transaction, one signature, still no allowance.
+   *
+   * The first sends the app's cut through the WETH/USDG pool so the treasury
+   * receives dollars; the second buys the target with the rest. Taking the cut
+   * out of the output instead would have been one call cheaper and would have
+   * paid the treasury in whatever memecoin was just bought — a balance of dust
+   * across hundreds of tokens, each of which would have to be sold through the
+   * thin pool it came from.
+   *
+   * Measured against a live pool: the second leg fills at exactly the figure
+   * the quoter gave for the net amount, to the last wei, and the trader ends up
+   * marginally ahead of the cheaper shape, because the cut leaves before their
+   * leg touches the pool.
+   */
+  const legs = useMemo(() => {
+    if (!pair || !address || !shot) return undefined;
+    const cut = feeOn(stake);
+    const buy = encodeFunctionData({
+      abi: routerAbi,
+      functionName: "exactInput",
+      args: [
+        {
+          path: buyPath(pair.token, pair.quoteToken, pair.fee),
+          recipient: address,
+          amountIn: stake - cut,
+          amountOutMinimum: shot.floor,
+        },
+      ],
+    });
+    if (cut === 0n) return [buy];
+    return [
+      encodeFunctionData({
+        abi: routerAbi,
+        functionName: "exactInput",
+        args: [
+          {
+            path: buyPath(VENUE.stable, VENUE.wrapped, REFERENCE_FEE),
+            recipient: TREASURY,
+            amountIn: cut,
+            amountOutMinimum: 0n,
+          },
+        ],
+      }),
+      buy,
+    ];
+  }, [pair, address, shot, stake]);
+
   const simulation = useSimulateContract({
     address: VENUE.router,
     abi: routerAbi,
-    functionName: "exactInput",
+    functionName: "multicall",
     value: stake,
-    args:
-      pair && address && shot
-        ? [
-            {
-              path: buyPath(pair.token, pair.quoteToken, pair.fee),
-              recipient: address,
-              amountIn: stake,
-              amountOutMinimum: shot.floor,
-            },
-          ]
-        : undefined,
+    args: legs ? [legs] : undefined,
     chainId: CHAIN_ID,
-    query: { enabled: Boolean(pair && address && shot && !shot.trapped) },
+    query: { enabled: Boolean(legs && shot && !shot.trapped) },
   });
 
   const write = useWriteContract();

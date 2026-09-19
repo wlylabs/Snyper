@@ -13,9 +13,11 @@ import { formatAmount, formatCompact } from "@/lib/format";
 import { CEILING, FLOOR } from "@/lib/screener";
 import {
   EXITS,
+  FEE_BIPS,
   SLIPPAGE_FLOOR,
   SNIPE_CEILING,
   VENUE,
+  afterFee,
   floorFor,
   slippageCapped,
   snipeSlippageFor,
@@ -294,7 +296,7 @@ function Exit({ pair, coinUsd }: { pair: Pair; coinUsd: number | undefined }) {
    * row says nothing rather than saying something wrong.
    */
   const standing = chosen ? entire.bestFor(chosen) : undefined;
-  const value = standing ? worth(standing.amountOut, chosen, coinUsd) : undefined;
+  const value = standing ? worth(afterFee(standing.amountOut), chosen, coinUsd) : undefined;
   const spent = basis && basis.spent > 0 ? basis.spent : undefined;
   const back = basis?.received ?? 0;
   const pnl = spent !== undefined && value !== undefined ? back + value - spent : undefined;
@@ -340,16 +342,17 @@ function Exit({ pair, coinUsd }: { pair: Pair; coinUsd: number | undefined }) {
       <div className="mt-3">
         <Row
           k={t("snipe.youGet")}
-          v={<span className="num">{route ? units(route.amountOut, chosen) : "—"}</span>}
+          v={<span className="num">{route ? units(afterFee(route.amountOut), chosen) : "—"}</span>}
         />
         <Row
           k={t("snipe.atLeast")}
           v={
             <span className="num">
-              {route ? units(floorFor(route.amountOut, slippage), chosen) : "—"}
+              {route ? units(afterFee(floorFor(route.amountOut, slippage)), chosen) : "—"}
             </span>
           }
         />
+        <Row k={t("snipe.fee")} v={<span className="num">{`${percent(FEE_BIPS)}%`}</span>} />
       </div>
 
       {route && costly && (
@@ -567,6 +570,64 @@ export function Terminal() {
             onChange={(value) => setStakeUsd(Number(value))}
           />
 
+          {/*
+           * The exit check, above everything and on its own.
+           *
+           * It was the fifth row of a list of six, read after the price, the
+           * impact and the tolerance — which is the wrong order, because it is
+           * the only line here that can say do not. The rest of the panel
+           * describes what this trade costs; this says whether there is a way
+           * back out of it at all, and a reader choosing a size should have
+           * settled that before they choose one.
+           *
+           * It is the same question no other terminal on any chain asks in this
+           * form. A rug check reads what a contract declares about itself. This
+           * runs the sale through the pool's own code and reports what came
+           * back, so a token that can be bought and not sold has nowhere to
+           * hide behind a clean-looking contract.
+           */}
+          <div
+            className="panel mt-2 flex items-center justify-between gap-3 p-3"
+            data-exit={shot?.trapped ? "blocked" : shot?.roundTrip !== undefined ? "open" : undefined}
+          >
+            <span className="flex min-w-0 items-center gap-2.5">
+              <Icon
+                name={shot?.trapped ? "alert" : "check"}
+                size={17}
+                className={
+                  shot?.trapped ? "short" : shot?.roundTrip !== undefined ? "long" : "text-faint"
+                }
+              />
+              <span className="min-w-0">
+                <span className="block text-[12px] font-semibold">{t("snipe.exit")}</span>
+                <span className="block text-[11px] leading-snug text-faint">
+                  {shot?.trapped
+                    ? t("snipe.exitNoneHint")
+                    : shot?.roundTrip !== undefined
+                      ? t("snipe.exitBackHint")
+                      : t("snipe.exitAsking")}
+                </span>
+              </span>
+            </span>
+            <span
+              className={`num shrink-0 text-[17px] ${
+                shot?.trapped
+                  ? "short"
+                  : shot?.roundTrip === undefined
+                    ? "text-faint"
+                    : shot.roundTrip < 0.9
+                      ? "warn"
+                      : "long"
+              }`}
+            >
+              {shot?.trapped
+                ? t("snipe.exitNone")
+                : shot?.roundTrip !== undefined
+                  ? `${formatAmount(Number((shot.roundTrip * 100).toFixed(1)))}%`
+                  : "—"}
+            </span>
+          </div>
+
           <div className="panel mt-2 p-3">
             <Row
               k={t("snipe.youGet")}
@@ -586,32 +647,7 @@ export function Terminal() {
               v={<span className="num">{shot ? `${percent(shot.slippageBps)}%` : "—"}</span>}
               tone={shot?.capped ? "warn" : undefined}
             />
-            {/*
-             * The exit is a row of its own rather than a footnote, because it is
-             * the only number here that is about the token rather than about the
-             * trade. Anything under the whole stake is the pool's fees on the way
-             * out and back; anything far under it is the pool telling the reader
-             * what leaving will cost.
-             */}
-            <Row
-              k={t("snipe.exit")}
-              v={
-                <span className="num">
-                  {shot?.trapped
-                    ? t("snipe.exitNone")
-                    : shot?.roundTrip !== undefined
-                      ? t("snipe.exitBack", { percent: formatAmount(Number((shot.roundTrip * 100).toFixed(1))) })
-                      : "—"}
-                </span>
-              }
-              tone={
-                shot?.trapped
-                  ? "short"
-                  : shot?.roundTrip !== undefined && shot.roundTrip < 0.9
-                    ? "warn"
-                    : undefined
-              }
-            />
+            <Row k={t("snipe.fee")} v={<span className="num">{`${percent(FEE_BIPS)}%`}</span>} />
             <Row
               k={t("snipe.route")}
               v={

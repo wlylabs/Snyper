@@ -80,7 +80,49 @@ export const routerAbi = parseAbi([
   "function exactInputSingle(ExactInputSingleParams params) payable returns (uint256 amountOut)",
   "struct ExactInputParams { bytes path; address recipient; uint256 amountIn; uint256 amountOutMinimum; }",
   "function exactInput(ExactInputParams params) payable returns (uint256 amountOut)",
+  "function sweepTokenWithFee(address token, uint256 amountMinimum, address recipient, uint256 feeBips, address feeRecipient) payable",
+  "function multicall(bytes[] data) payable returns (bytes[] results)",
 ]);
+
+/**
+ * Where the app's fee goes.
+ *
+ * An address and nothing else. Taking a cut of a trade needs no server, no
+ * custody and no contract of this app's own: the router already knows how to
+ * split an output, and this is the second half of the split.
+ */
+export const TREASURY = "0x8b3b2d5ed474e07196f8af47216dd3a229de4c1b" as const;
+
+/**
+ * The cut, in basis points. A quarter of one percent, each way.
+ *
+ * Half of what fomo charges on this same chain, and a quarter of the one
+ * percent that Photon, Trojan and Axiom all settled on. The usual defence of a
+ * higher number is sponsored gas, and on chain 4663 that defence does not hold:
+ * a buy costs about three cents of gas here, which is two percent of a single
+ * fee. So the thing being paid for is the app, and half is a sentence a reader
+ * understands without being told.
+ *
+ * The router will not carry more than a hundred basis points whatever this says
+ * — checked against the deployed bytecode, which accepts 100 and reverts on
+ * 101 — so there is a ceiling on this number that is not this app's to move.
+ */
+/* Typed as a number rather than as its literal, so the zero case stays
+   reachable for anyone who turns the fee off. */
+export const FEE_BIPS: number = 25;
+
+/** The router's own sentinel for "send it to me, I am not done yet". */
+export const ROUTER_SELF = "0x0000000000000000000000000000000000000002" as const;
+
+/** The app's cut of an amount. */
+export function feeOn(amount: bigint): bigint {
+  return (amount * BigInt(FEE_BIPS)) / 10_000n;
+}
+
+/** What is left of an amount once the cut is out of it. */
+export function afterFee(amount: bigint): bigint {
+  return amount - feeOn(amount);
+}
 
 /**
  * The tier the coin crosses on its way to the dollar.

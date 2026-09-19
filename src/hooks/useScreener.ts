@@ -66,6 +66,29 @@ export type Pair = {
   usdRate: number;
 };
 
+/**
+ * A pool that exists, described by nothing more than the event that made it.
+ *
+ * The screen already reads a day of `PoolCreated` to date the pairs that are
+ * new, and then throws away every launch that did not also trade in the last
+ * five minutes — on a normal day that is four hundred of them against eight
+ * kept. Nothing about that was a deliberate limit; the rows simply had nowhere
+ * to go. This is the shape they go into, and it costs no request at all,
+ * because the event carries both sides, the tier and the block it happened in.
+ *
+ * Pricing one is a separate question and a separate hook: a pool nobody has
+ * traded has no swap to read a price from, so it has to be asked, and it is
+ * only asked when a reader opens the list.
+ */
+export type Birth = {
+  pool: `0x${string}`;
+  token: `0x${string}`;
+  quoteToken: `0x${string}`;
+  baseIsToken0: boolean;
+  fee: number;
+  block: bigint;
+};
+
 type Tally = {
   swaps: number;
   amount0: bigint;
@@ -150,7 +173,9 @@ async function swapsIn(
  * cheap, they date the pairs that are new, and for those pairs they answer what
  * would otherwise be a contract read each.
  */
-async function read(client: PublicClient): Promise<Pair[]> {
+async function read(
+  client: PublicClient,
+): Promise<{ pairs: Pair[]; births: Birth[]; head: bigint }> {
   const head = await client.getBlockNumber();
 
   const [swaps, created] = await Promise.all([
@@ -191,10 +216,33 @@ async function read(client: PublicClient): Promise<Pair[]> {
     if (log.args.pool) born.set(log.args.pool.toLowerCase(), { block: log.blockNumber });
   }
 
+  /*
+   * Newest first, and only pairs with one side this app can price — the same
+   * test the traded list applies, for the same reason: two quote tokens is
+   * plumbing rather than a launch, and two unknown ones is a price in units
+   * nothing else on the screen shares.
+   */
+  const births: Birth[] = [];
+  for (let index = created.length - 1; index >= 0; index--) {
+    const log = created[index];
+    const { token0, token1, fee, pool } = log.args;
+    if (!token0 || !token1 || fee === undefined || !pool) continue;
+    const zeroIsQuote = Boolean(quoteFor(token0));
+    if (zeroIsQuote === Boolean(quoteFor(token1))) continue;
+    births.push({
+      pool,
+      token: zeroIsQuote ? token1 : token0,
+      quoteToken: zeroIsQuote ? token0 : token1,
+      baseIsToken0: !zeroIsQuote,
+      fee: Number(fee),
+      block: log.blockNumber,
+    });
+  }
+
   const busiest = [...tally.entries()]
     .sort((a, b) => b[1].swaps - a[1].swaps)
     .slice(0, DEPTH);
-  if (busiest.length === 0) return [];
+  if (busiest.length === 0) return { pairs: [], births, head };
 
   const pools = busiest.map(([pool]) => pool as `0x${string}`);
   const sides = await client.multicall({
@@ -256,7 +304,7 @@ async function read(client: PublicClient): Promise<Pair[]> {
       block: born.get(pool)?.block,
     });
   });
-  if (candidates.length === 0) return [];
+  if (candidates.length === 0) return { pairs: [], births, head };
 
   const detailOffset = referencePool?.status === "success" ? 1 : 0;
   const details = await client.multicall({
@@ -372,7 +420,7 @@ async function read(client: PublicClient): Promise<Pair[]> {
     } satisfies Pair;
   });
 
-  return fold(rows.filter((row) => !isEquity(row.name)));
+  return { pairs: fold(rows.filter((row) => !isEquity(row.name))), births, head };
 }
 
 /**
@@ -425,7 +473,10 @@ export function useScreener() {
   });
 
   return {
-    pairs: query.data ?? [],
+    pairs: query.data?.pairs ?? [],
+    /** Every pool opened in the last day, unpriced. See `Birth`. */
+    births: query.data?.births ?? [],
+    head: query.data?.head,
     loading: query.isPending,
     error: query.error,
     refetch: query.refetch,

@@ -56,6 +56,30 @@ export function quoteFor(token: string) {
 }
 
 /**
+ * A launch wearing a name that already belongs to something else.
+ *
+ * Deploying a token called USDG costs nothing and a ticker is whatever its
+ * contract says it is, so the day a screen starts listing brand new pools is
+ * the day it starts listing impersonators. One turned up in the first hour of
+ * this list: symbol USDG, two dollars resting in it, a claimed market cap of
+ * three quarters of a million, and an address that is not the chain's dollar.
+ *
+ * This is not the balance screen's heuristic, which compares a wallet's rows
+ * against each other and weighs which of them anything has priced. It does not
+ * need to be. The tokens worth impersonating on this chain are the two the app
+ * already knows by address, so the test is an equality rather than a guess, and
+ * a row it marks is wearing a name that provably is not its own.
+ */
+export function impersonates(token: string, symbol: string): boolean {
+  const claimed = symbol.trim().toUpperCase();
+  if (!claimed) return false;
+  return Object.entries(QUOTES).some(
+    ([address, quote]) =>
+      quote.symbol.toUpperCase() === claimed && address !== token.toLowerCase(),
+  );
+}
+
+/**
  * A v3 pool's price, from the square root it stores.
  *
  * `sqrtPriceX96` is the square root of token1 per token0, held as a Q64.96

@@ -6,7 +6,14 @@ import { Icon } from "@/components/ui/Icon";
 import { Row } from "@/components/ui/Panel";
 import { Segmented } from "@/components/ui/Segmented";
 import { formatAmount } from "@/lib/format";
-import { SLIPPAGE_FLOOR, floorFor, slippageFor, tooThin } from "@/lib/venue";
+import {
+  FEE_BIPS,
+  SLIPPAGE_FLOOR,
+  afterFee,
+  floorFor,
+  slippageFor,
+  tooThin,
+} from "@/lib/venue";
 import { useRoutes, useSwapAction } from "@/hooks/useSwap";
 import type { Holding } from "@/hooks/useHoldings";
 import { useI18n } from "@/hooks/useI18n";
@@ -154,7 +161,7 @@ export function SwapPanel({ row, onSold }: { row: Holding; onSold: () => void })
             v={
               <span className="num">
                 {route && chosen
-                  ? `${formatAmount(Number(formatUnits(route.amountOut, chosen.decimals)))} ${chosen.symbol}`
+                  ? `${formatAmount(Number(formatUnits(afterFee(route.amountOut), chosen.decimals)))} ${chosen.symbol}`
                   : "—"}
               </span>
             }
@@ -164,7 +171,7 @@ export function SwapPanel({ row, onSold }: { row: Holding; onSold: () => void })
             v={
               <span className="num">
                 {route && chosen
-                  ? `${formatAmount(Number(formatUnits(floor, chosen.decimals)))} ${chosen.symbol}`
+                  ? `${formatAmount(Number(formatUnits(afterFee(floor), chosen.decimals)))} ${chosen.symbol}`
                   : "—"}
               </span>
             }
@@ -182,6 +189,13 @@ export function SwapPanel({ row, onSold }: { row: Holding; onSold: () => void })
             k={t("swap.pool")}
             v={route ? t("swap.venue", { fee: percent(route.fee / 100) }) : "—"}
           />
+          {/*
+           * A row rather than a footnote. It is part of what this trade costs,
+           * and the two figures above already have it taken out of them — so
+           * naming it here is the difference between a price and a deduction
+           * the reader finds out about afterwards.
+           */}
+          <Row k={t("swap.fee")} v={<span className="num">{`${percent(FEE_BIPS)}%`}</span>} />
         </div>
       </div>
 
