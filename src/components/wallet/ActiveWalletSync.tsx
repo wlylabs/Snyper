@@ -3,10 +3,11 @@
 import { useEffect, useRef } from "react";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { useSetActiveWallet } from "@privy-io/wagmi";
-import { useAccount } from "wagmi";
+import { useAccount, useConnections, useDisconnect } from "wagmi";
 
 /**
- * Keeps the address the app reads on the wallet the reader actually connected.
+ * Keeps the address the app reads on the wallet the reader actually connected,
+ * and on nothing at all once they disconnect.
  *
  * Privy links every wallet a reader has ever signed in with, and the wagmi
  * bridge starts on whichever of them comes first in the list — which is not
@@ -26,6 +27,8 @@ export function ActiveWalletSync() {
   const { wallets } = useWallets();
   const { setActiveWallet } = useSetActiveWallet();
   const { address } = useAccount();
+  const connections = useConnections();
+  const { disconnectAsync } = useDisconnect();
   const followed = useRef<string>(undefined);
 
   const connected = user?.wallet?.address?.toLowerCase();
@@ -34,6 +37,36 @@ export function ActiveWalletSync() {
     // A reader who logs out is a new session: the next wallet is followed again.
     if (!authenticated) followed.current = undefined;
   }, [authenticated]);
+
+  /*
+   * Ending the Privy session does not, on its own, end the wagmi one.
+   *
+   * The bridge registers a connector per linked wallet and hands wagmi a
+   * connection for the active one. When the session goes it takes the
+   * connectors with it — but not the connection: wagmi's own store is left
+   * holding the old address with its status still `connected`, and the bridge
+   * only clears that on the code path this app does not take. Everything
+   * downstream reads that store, so a reader who held Disconnect watched the
+   * status strip keep saying connected and their balances sit there under an
+   * address they had just given up.
+   *
+   * So the connection is dropped here, where the session is watched, rather
+   * than in the button that happens to end it. Every way out is the same way
+   * out: the hold-to-confirm disconnect, a session Privy expires on its own,
+   * a logout from another tab. Each connection is named explicitly because the
+   * connector it belongs to has already been dropped from the config by the
+   * time this runs, and the bare call would have nothing left to look up.
+   *
+   * A connector that refuses to let go is left alone rather than retried: the
+   * wallet is gone from this app's side either way, and there is no state here
+   * that a second attempt would reach.
+   */
+  useEffect(() => {
+    if (!ready || authenticated || connections.length === 0) return;
+    for (const connection of connections) {
+      void disconnectAsync({ connector: connection.connector }).catch(() => {});
+    }
+  }, [ready, authenticated, connections, disconnectAsync]);
 
   useEffect(() => {
     if (!ready || !authenticated || !connected) return;
