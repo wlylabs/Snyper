@@ -27,6 +27,15 @@ export const CREATED_WINDOW = 864_000n;
 /** Rows the screen asks the chain about in detail. */
 export const DEPTH = 40;
 
+/**
+ * Blocks per minute on chain 4663, at a hundred milliseconds a block.
+ *
+ * One place rather than three. It turns a block count into an age for the
+ * launches list and a window into minutes for the signal's youth reading, and
+ * those two were already disagreeing about nothing in two files.
+ */
+export const PER_MINUTE = 600;
+
 export const swapEvent = parseAbiItem(
   "event Swap(address indexed sender, address indexed recipient, int256 amount0, int256 amount1, uint160 sqrtPriceX96, uint128 liquidity, int24 tick)",
 );
@@ -199,23 +208,31 @@ export const BURNED = [
 /**
  * What the last five minutes did to a token.
  *
- * The bands describe the window and nothing wider. A token that is flat here
- * has been flat for five minutes, which is not the same as accumulating — that
- * is a claim about hours, and hours are what this endpoint will not serve.
+ * Three of the bands describe the window and nothing wider. A token that is
+ * pumping here has been pumping for five minutes, which is not a claim about
+ * hours, and hours are what this endpoint will not serve.
  *
- * Fifty percent either way is the line because on this chain it is an ordinary
- * five minutes: the screen routinely carries a token up three hundred percent
- * beside one down forty. A band drawn at ten would hold everything.
+ * Fifty percent either way is the line for the two that read the price, because
+ * on this chain it is an ordinary five minutes: the screen routinely carries a
+ * token up three hundred percent beside one down forty. A band drawn at ten
+ * would hold everything.
+ *
+ * `coiling` is the odd one and the reason this screen exists in its new shape.
+ * It does not read the price at all — it reads whether the tape under the price
+ * is filling, which is `lib/signal`, and the caller passes the answer in. It
+ * took the place of a band called `flat`, which asked a weaker version of the
+ * same question and could not tell a token being quietly accumulated from one
+ * nobody has looked at in five minutes. Those are the two rows a screen about
+ * finding an entry early most needs to keep apart.
  */
-export type Band = "all" | "pumping" | "flat" | "dumping";
+export type Band = "all" | "coiling" | "pumping" | "dumping";
 
 export const MOVE = 50;
-export const STILL = 10;
 
-export function inBand(change: number, band: Band): boolean {
+export function inBand(change: number, band: Band, coiling: boolean): boolean {
+  if (band === "coiling") return coiling;
   if (band === "pumping") return change >= MOVE;
   if (band === "dumping") return change <= -MOVE;
-  if (band === "flat") return Math.abs(change) < STILL;
   return true;
 }
 

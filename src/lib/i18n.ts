@@ -105,7 +105,7 @@ const en = {
   "balance.unhide": "List it again",
   "balance.hidden": "{count} hidden",
   "balance.hiddenLess": "Put the hidden ones away",
-  "memecoin.live": "Under $10M · {floor}+ · 5m or new today",
+  "memecoin.live": "Under $10M · {floor}+ · coil ranked",
   "memecoin.mcapShort": "MCAP",
   "memecoin.gradeAll": "Any",
   "memecoin.dexscreener": "DEX Screener",
@@ -113,8 +113,8 @@ const en = {
   "memecoin.noChart": "Not enough trades to draw yet.",
   "memecoin.gradeDeep": "Deep",
   "memecoin.bandAll": "All",
+  "memecoin.bandCoil": "Coiling",
   "memecoin.bandPump": "Pumping",
-  "memecoin.bandFlat": "Flat",
   "memecoin.bandDump": "Dumping",
   "memecoin.showing": "{shown} of {total}",
   "memecoin.noMatch": "Nothing here matches that.",
@@ -139,6 +139,24 @@ const en = {
   "memecoin.failed": "The chain did not answer.",
   "memecoin.failedHint":
     "Every pair here is built from swap events read straight off chain 4663, and that read did not come back.",
+
+  "signal.title": "Coil",
+  "signal.score": "Score",
+  "signal.pressure": "Buying against selling",
+  "signal.accel": "Faster than five minutes ago",
+  "signal.breadth": "Hands, not one hand",
+  "signal.depth": "Depth behind the price",
+  "signal.youth": "Still early in its day",
+  "signal.quiet": "Price has not said so yet",
+  "signal.unread": "Not enough trades",
+  "signal.tag": "COIL {score}",
+  "signal.word": "Coil {score}",
+  "signal.hint":
+    "Every other screener ranks by volume, which is what a run leaves behind it. This ranks what comes before one: more buying than selling, arriving faster than it was, from more than one pair of hands — all of it counted for less as the price catches up, because a token that has already moved is no longer an early entry. It is read off the same swap logs the list is built from and costs no extra request.",
+  "signal.partial":
+    "{read} of the {of} readings came back. A pool with fewer than eight trades in the window has no rate and no crowd to measure, so those are left unread rather than guessed — which caps what an untouched launch can score, and is meant to.",
+  "signal.caveat":
+    "This says a crowd is forming, not that the token will run. Crowds form around tokens about to be sold into as readily as around ones about to rise, and whether the pool can be emptied under you is the separate question above.",
 
   "snipe.target": "Target",
   "snipe.targets": "Targets",
@@ -411,7 +429,7 @@ const id: Record<TKey, string> = {
   "balance.unhide": "Tampilkan lagi",
   "balance.hidden": "{count} disembunyikan",
   "balance.hiddenLess": "Simpan lagi yang disembunyikan",
-  "memecoin.live": "Di bawah $10J · {floor}+ · 5m atau baru hari ini",
+  "memecoin.live": "Di bawah $10J · {floor}+ · urut coil",
   "memecoin.mcapShort": "MCAP",
   "memecoin.gradeAll": "Semua",
   "memecoin.dexscreener": "DEX Screener",
@@ -419,8 +437,8 @@ const id: Record<TKey, string> = {
   "memecoin.noChart": "Belum cukup transaksi untuk digambar.",
   "memecoin.gradeDeep": "Dalam",
   "memecoin.bandAll": "Semua",
+  "memecoin.bandCoil": "Coiling",
   "memecoin.bandPump": "Naik",
-  "memecoin.bandFlat": "Datar",
   "memecoin.bandDump": "Jatuh",
   "memecoin.showing": "{shown} dari {total}",
   "memecoin.noMatch": "Tidak ada yang cocok dengan itu.",
@@ -445,6 +463,24 @@ const id: Record<TKey, string> = {
   "memecoin.failed": "Chain tidak menjawab.",
   "memecoin.failedHint":
     "Setiap pair di sini dibangun dari event swap yang dibaca langsung dari chain 4663, dan bacaan itu tidak kembali.",
+
+  "signal.title": "Coil",
+  "signal.score": "Skor",
+  "signal.pressure": "Beli dibanding jual",
+  "signal.accel": "Lebih cepat dari lima menit lalu",
+  "signal.breadth": "Banyak tangan, bukan satu",
+  "signal.depth": "Kedalaman di balik harga",
+  "signal.youth": "Masih awal umurnya",
+  "signal.quiet": "Harga belum mengatakannya",
+  "signal.unread": "Transaksinya belum cukup",
+  "signal.tag": "COIL {score}",
+  "signal.word": "Coil {score}",
+  "signal.hint":
+    "Screener lain mengurutkan berdasarkan volume, dan volume adalah jejak yang ditinggalkan sebuah run. Layar ini mengurutkan apa yang mendahuluinya: beli lebih banyak dari jual, datang lebih cepat dari sebelumnya, dari lebih dari satu tangan — semuanya dinilai makin kecil begitu harga mulai menyusul, karena token yang sudah bergerak bukan lagi entry awal. Semua dibaca dari log swap yang sama yang membangun daftar ini, tanpa satu pun permintaan tambahan.",
+  "signal.partial":
+    "{read} dari {of} bacaan berhasil diambil. Pool dengan kurang dari delapan transaksi dalam jendela ini tidak punya laju dan tidak punya kerumunan untuk diukur, jadi bacaannya dibiarkan kosong daripada ditebak — itu yang membatasi skor sebuah launch yang belum tersentuh, dan memang disengaja.",
+  "signal.caveat":
+    "Ini mengatakan ada kerumunan yang sedang terbentuk, bukan bahwa tokennya akan naik. Kerumunan sama mudahnya terbentuk di sekitar token yang sebentar lagi dijual habis, dan apakah pool-nya bisa dikuras dari bawah Anda adalah pertanyaan terpisah di atas.",
 
   "snipe.target": "Target",
   "snipe.targets": "Target",
