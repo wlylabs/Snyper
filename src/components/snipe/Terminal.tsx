@@ -7,8 +7,8 @@ import { Icon } from "@/components/ui/Icon";
 import { Empty, Panel, Row, Skeleton } from "@/components/ui/Panel";
 import { Segmented } from "@/components/ui/Segmented";
 import { Sheet } from "@/components/ui/Sheet";
-import { SlideToFire } from "@/components/ui/SlideToFire";
 import { CHAIN_ID, chainMeta, explorerTx } from "@/lib/chains";
+import { haptic } from "@/lib/haptics";
 import { formatAmount, formatCompact } from "@/lib/format";
 import { CEILING, FLOOR } from "@/lib/screener";
 import {
@@ -40,6 +40,14 @@ import { useAppStore } from "@/store/useAppStore";
  * out loud, with the number in it.
  */
 const COSTLY = 500;
+
+/**
+ * How long the trigger ignores a second tap, in milliseconds.
+ *
+ * Long enough to outlast the render that disables the button, short enough that
+ * a reader who meant to fire twice is never told no.
+ */
+const LATCH = 1200;
 
 /**
  * Basis points as a percent, for a label. 50 reads as 0.5, or 0,5.
@@ -468,6 +476,34 @@ export function Terminal() {
     reset();
   }, [aimed, stake, reset]);
 
+  /*
+   * See the note on the button. Shut on the tap, and opened again by a timer.
+   *
+   * A timer rather than the write's own state, which is what this was first
+   * written against and which turned out to be a button that could die. A tap
+   * whose call never reaches the wallet — the simulation momentarily absent,
+   * the write refusing before it starts — changes no state at all, so there is
+   * no transition to open the latch on, and every later tap is swallowed in
+   * silence. The window only has to outlast the render that sets `firing`;
+   * anything past that is the button's `disabled` doing the work.
+   */
+  const latch = useRef<number>(undefined);
+  useEffect(
+    () => () => {
+      if (latch.current !== undefined) window.clearTimeout(latch.current);
+    },
+    [],
+  );
+
+  const pull = useCallback(() => {
+    if (latch.current !== undefined) return;
+    latch.current = window.setTimeout(() => {
+      latch.current = undefined;
+    }, LATCH);
+    haptic("commit");
+    fire();
+  }, [fire]);
+
   const amount = (value: bigint) =>
     target ? `${formatAmount(Number(formatUnits(value, target.decimals)))} ${target.symbol}` : "—";
 
@@ -689,24 +725,43 @@ export function Terminal() {
 
           {address ? (
             /*
-             * The one control here that spends money, and the one gesture that
-             * cannot be arrived at by scrolling past it. See `SlideToFire`.
+             * One tap, and the browser already makes that safe.
+             *
+             * This was a slide, on the reasoning that a tap on a phone is the
+             * same gesture as scrolling past. That reasoning was wrong about
+             * how the platform works: a `click` fires on the up-event, not the
+             * down-event, and the browser withholds it if the pointer moves off
+             * the control or the gesture turns into a scroll. That is WCAG
+             * 2.5.2 — pointer cancellation — and a plain button satisfies it
+             * without being asked to. The slide was re-implementing a guarantee
+             * the platform already gives, and charging the reader a gesture for
+             * it, on the one screen whose whole point is not to be slow. Every
+             * terminal in this category settled on one click against a preset
+             * long ago.
+             *
+             * What a plain button does not guard against is a second tap
+             * landing before the first has changed anything on screen, which
+             * would put two transactions in flight. `disabled` cannot close
+             * that window on its own because the state behind it settles a
+             * render later, so the latch below does — it shuts on the tap and
+             * opens again when the write is no longer in flight, including
+             * when the reader rejects it in their wallet.
              */
-            <div className="mt-2">
-              <SlideToFire
-                label={
-                  quoting || checking
+            <button
+              type="button"
+              className="btn btn-accent mt-2 w-full"
+              disabled={!ready || firing || quoting || checking || shot?.trapped}
+              onClick={pull}
+            >
+              <Icon name="crosshair" size={14} />
+              {done
+                ? t("snipe.done")
+                : firing
+                  ? t("snipe.firing")
+                  : quoting || checking
                     ? t("snipe.checking")
-                    : t("snipe.fire", { symbol: target.symbol })
-                }
-                busyLabel={t("snipe.firing")}
-                doneLabel={t("snipe.done")}
-                disabled={!ready || quoting || checking || shot?.trapped}
-                busy={firing}
-                done={done}
-                onFire={fire}
-              />
-            </div>
+                    : t("snipe.fire", { symbol: target.symbol })}
+            </button>
           ) : (
             prompt && (
               <button type="button" className="btn btn-accent mt-2 w-full" onClick={prompt}>
