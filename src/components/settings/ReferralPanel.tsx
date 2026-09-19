@@ -21,11 +21,17 @@ export function ReferralPanel() {
   const { t } = useI18n();
 
   return (
-    <Panel label={t("settings.referral")} bodyClassName="p-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <p className="text-[12px] font-semibold">{t("settings.referralTitle")}</p>
-        <span className="chip chip-xs chip-live">{t("settings.referralBadge")}</span>
-      </div>
+    <Panel
+      label={t("settings.referral")}
+      /*
+       * The discount rides in the panel head rather than beside the line that
+       * invites: it is the one number on the card, and a figure read before the
+       * sentence is a figure the sentence no longer has to argue for.
+       */
+      meta={<span className="chip chip-xs chip-live">{t("settings.referralBadge")}</span>}
+      bodyClassName="p-3"
+    >
+      <p className="text-[12px] font-semibold">{t("settings.referralTitle")}</p>
       <p className="mt-1 text-[11px] leading-relaxed text-faint">
         {t("settings.referralHint")}
       </p>
