@@ -654,6 +654,69 @@
     color: var(--color-short);
   }
 
+  /*
+   * The sight closing on the target.
+   *
+   * Worn by the three controls whose icon is a crosshair — the trigger on each
+   * memecoin row, the action on a pair's sheet, and the terminal's own. It is a
+   * press response and nothing else: there is no idle pulse, because a list of
+   * ten rows would then carry ten things asking to be looked at, and a screen
+   * where everything moves is a screen where nothing does.
+   *
+   * Two parts, both on the press. The sight contracts, which is the gesture the
+   * icon already draws standing still. And the accent blooms from the middle
+   * rather than sweeping in from one side as this app's other fills do, because
+   * a crosshair has a centre and that is where a shot is aimed from.
+   *
+   * The bloom is `currentColor`, so it is lime on the dark tile and ink on the
+   * lime button without either being told which it is — the one colour that is
+   * always legible against the surface it sits on is the one already drawing on
+   * it.
+   *
+   * Timings are the app's own and they are the right ones: down in 90ms, which
+   * is inside the 100–150ms that tap feedback is held to before it starts to
+   * feel like lag, and back over 300ms on the settle curve, because going down
+   * is the reader's movement and coming back is the control's answer.
+   * `prefers-reduced-motion` takes all of it to 1ms at the foot of this file.
+   */
+  .aim {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+  }
+
+  .aim::after {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    inset: 0;
+    background: radial-gradient(
+      circle at 50% 50%,
+      color-mix(in srgb, currentColor 26%, transparent) 0%,
+      transparent 70%
+    );
+    opacity: 0;
+    transform: scale(0.35);
+    transition:
+      opacity var(--dur-tap) var(--ease-out),
+      transform var(--dur-release) var(--ease-settle);
+  }
+
+  .aim:active:not(:disabled)::after {
+    opacity: 1;
+    transform: scale(1);
+    transition-duration: var(--dur-press);
+  }
+
+  .aim > svg {
+    transition: transform var(--dur-release) var(--ease-settle);
+  }
+
+  .aim:active:not(:disabled) > svg {
+    transform: scale(0.78);
+    transition-duration: var(--dur-press);
+  }
+
   .icon-btn {
     display: inline-flex;
     align-items: center;

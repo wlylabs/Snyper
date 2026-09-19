@@ -198,7 +198,7 @@ function PairSheet({
          */}
         <button
           type="button"
-          className="btn btn-accent mt-3 w-full"
+          className="btn btn-accent aim mt-3 w-full"
           onClick={() => onSnipe(pair)}
         >
           <Icon name="crosshair" size={14} />
@@ -400,7 +400,7 @@ export function Screener() {
           </button>
           <button
             type="button"
-            className="tile w-[46px] shrink-0 justify-center px-0 text-accent"
+            className="tile aim w-[46px] shrink-0 justify-center px-0 text-accent"
             aria-label={t("memecoin.snipe", { symbol: pair.symbol })}
             onClick={() => snipe(pair)}
           >

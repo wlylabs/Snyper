@@ -962,7 +962,7 @@ export function Terminal() {
              */
             <button
               type="button"
-              className="btn btn-accent mt-2 w-full"
+              className="btn btn-accent aim mt-2 w-full"
               disabled={!ready || overBalance || firing || quoting || checking || shot?.trapped}
               onClick={pull}
             >
