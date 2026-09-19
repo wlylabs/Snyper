@@ -4,6 +4,20 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import type { Settings } from "@/lib/types";
 
+/**
+ * What a reader has put into a token through this app, and taken back out.
+ *
+ * Both in dollars at the moment of the trade, because that is the unit a
+ * position is held in: a basis kept in the coin would fold a bet on the coin
+ * into every memecoin's profit and loss, and the reader did not make that bet.
+ *
+ * This is a cost basis and not a trade log. The chain already keeps the log,
+ * and an app that kept its own would be inventing a second history to disagree
+ * with it. Two running totals per token is the least that can answer "am I up",
+ * and nothing here is ever read back as fact about the chain.
+ */
+export type Basis = { spent: number; received: number };
+
 export const DEFAULT_SETTINGS: Settings = {
   locale: "en",
   localeChosen: false,
@@ -21,10 +35,13 @@ type AppState = {
    * it survives a reload.
    */
   hidden: string[];
+  /** Cost basis by contract, lowercased. See `Basis`. */
+  basis: Record<string, Basis>;
   hydrated: boolean;
 
   setSettings: (patch: Partial<Settings>) => void;
   setHidden: (address: string, hidden: boolean) => void;
+  record: (address: string, side: "spent" | "received", usd: number) => void;
   setHydrated: () => void;
 };
 
@@ -43,6 +60,7 @@ export const useAppStore = create<AppState>()(
     (set) => ({
       settings: DEFAULT_SETTINGS,
       hidden: [],
+      basis: {},
       hydrated: false,
 
       setSettings: (patch) =>
@@ -55,12 +73,32 @@ export const useAppStore = create<AppState>()(
           return { hidden: hidden ? [...without, key] : without };
         }),
 
+      /*
+       * Added to rather than replaced: a reader who buys the same token twice
+       * has one position in it, and the second fill is part of what the first
+       * one cost them. A figure that is not a positive number is dropped rather
+       * than stored, so a failed conversion cannot quietly corrupt a basis.
+       */
+      record: (address, side, usd) =>
+        set((state) => {
+          if (!Number.isFinite(usd) || usd <= 0) return state;
+          const key = address.toLowerCase();
+          const held = state.basis[key] ?? { spent: 0, received: 0 };
+          return {
+            basis: { ...state.basis, [key]: { ...held, [side]: held[side] + usd } },
+          };
+        }),
+
       setHydrated: () => set({ hydrated: true }),
     }),
     {
       name: "snyper.state.v2",
       storage: createJSONStorage(() => localStorage),
-      partialize: (state) => ({ settings: state.settings, hidden: state.hidden }),
+      partialize: (state) => ({
+        settings: state.settings,
+        hidden: state.hidden,
+        basis: state.basis,
+      }),
       onRehydrateStorage: () => (state) => state?.setHydrated(),
     },
   ),

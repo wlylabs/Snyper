@@ -147,7 +147,10 @@ const en = {
   "snipe.empty": "Nothing on this chain is worth a shot right now.",
   "snipe.emptyHint":
     "A target is a pair under $10M with at least $1K resting in its pool and $1K traded through it in the last five minutes. The list fills again on its own.",
-  "snipe.stake": "Stake, in {coin}",
+  "snipe.stake": "Stake",
+  "snipe.sell": "Sell",
+  "snipe.worth": "Worth now",
+  "snipe.pnl": "Profit and loss",
   "snipe.youGet": "You get",
   "snipe.atLeast": "At least",
   "snipe.impact": "Price impact",
@@ -386,7 +389,10 @@ const id: Record<TKey, string> = {
   "snipe.empty": "Belum ada yang layak ditembak di chain ini.",
   "snipe.emptyHint":
     "Target itu pair di bawah $10J dengan minimal $1R mengendap di pool-nya dan $1R yang lewat dalam lima menit terakhir. Daftarnya terisi lagi sendiri.",
-  "snipe.stake": "Modal, dalam {coin}",
+  "snipe.stake": "Modal",
+  "snipe.sell": "Jual",
+  "snipe.worth": "Nilai sekarang",
+  "snipe.pnl": "Untung rugi",
   "snipe.youGet": "Kamu dapat",
   "snipe.atLeast": "Minimal",
   "snipe.impact": "Dampak harga",

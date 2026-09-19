@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { erc20Abi, formatEther, formatUnits } from "viem";
 import { useAccount, useReadContract } from "wagmi";
 import { Icon } from "@/components/ui/Icon";
 import { Empty, Panel, Row, Skeleton } from "@/components/ui/Panel";
 import { Segmented } from "@/components/ui/Segmented";
 import { Sheet } from "@/components/ui/Sheet";
+import { SlideToFire } from "@/components/ui/SlideToFire";
 import { CHAIN_ID, chainMeta, explorerTx } from "@/lib/chains";
 import { formatAmount, formatCompact } from "@/lib/format";
 import { CEILING, FLOOR } from "@/lib/screener";
@@ -19,12 +20,14 @@ import {
   slippageCapped,
   snipeSlippageFor,
 } from "@/lib/venue";
+import { useCoinUsd } from "@/hooks/useCoinUsd";
 import { useConnectPrompt } from "@/hooks/useConnectPrompt";
 import { useI18n } from "@/hooks/useI18n";
 import { useMounted } from "@/hooks/useMounted";
 import { useScreener, type Pair } from "@/hooks/useScreener";
-import { STAKES, useFire, useShot } from "@/hooks/useSnipe";
+import { STAKES, stakeIn, useFire, useShot } from "@/hooks/useSnipe";
 import { useRoutes, useSwapAction } from "@/hooks/useSwap";
+import { useAppStore } from "@/store/useAppStore";
 
 /**
  * Where a fill stops being cheap and starts being a decision.
@@ -72,8 +75,24 @@ function targets(pairs: Pair[]): Pair[] {
     .sort((a, b) => b.volume - a.volume);
 }
 
-function stakeLabel(stake: bigint): string {
-  return formatAmount(Number(formatEther(stake)));
+/** How much of a position is being sold, offered rather than typed. */
+const SLICES = [25, 50, 100] as const;
+
+/** A quote's output in the dollars it is worth, whichever side it came out on. */
+function worth(
+  amount: bigint,
+  exit: (typeof EXITS)[number] | undefined,
+  coinUsd: number | undefined,
+): number | undefined {
+  if (!exit) return undefined;
+  const units = Number(formatUnits(amount, exit.decimals));
+  if (exit.address.toLowerCase() === VENUE.stable.toLowerCase()) return units;
+  return coinUsd === undefined ? undefined : units * coinUsd;
+}
+
+/** A signed dollar figure, for a profit and loss that has to show its sign. */
+function signedUsd(value: number): string {
+  return `${value >= 0 ? "+" : "-"}$${formatCompact(Math.abs(value))}`;
 }
 
 function TargetSheet({
@@ -173,9 +192,11 @@ function Notice({ title, hint }: { title: string; hint: string }) {
  * through, priced by the same quoter — because a position taken through one
  * pool is a position that pool is known to be able to give up.
  */
-function Exit({ pair }: { pair: Pair }) {
+function Exit({ pair, coinUsd }: { pair: Pair; coinUsd: number | undefined }) {
   const { t } = useI18n();
   const { address } = useAccount();
+  const basis = useAppStore((state) => state.basis[pair.token.toLowerCase()]);
+  const record = useAppStore((state) => state.record);
 
   const { data: balance, refetch } = useReadContract({
     address: pair.token,
@@ -186,16 +207,35 @@ function Exit({ pair }: { pair: Pair }) {
     query: { enabled: Boolean(address) },
   });
 
-  const position = balance ?? 0n;
-  const reread = useCallback(() => void refetch(), [refetch]);
-  const { bestFor, tradable } = useRoutes(position > 0n ? pair.token : undefined, position);
+  const held = balance ?? 0n;
+  const [slice, setSlice] = useState<number>(100);
+
+  /*
+   * A hundred percent sends the balance itself rather than a hundredth of it
+   * multiplied back up: the two differ by the rounding, and the difference is
+   * dust left behind in a position the reader asked to be rid of.
+   */
+  const position = slice === 100 ? held : (held * BigInt(slice)) / 100n;
+
+  /*
+   * Two questions, because they are two different trades. The slice is what is
+   * being sold and has to be quoted at its own size; the whole position is what
+   * the profit and loss is measured on, and scaling one into the other would be
+   * wrong in the direction that flatters — a pool charges more for the larger
+   * trade, so half a position doubled reads as worth more than the position is.
+   *
+   * At a hundred percent both ask the chain the same thing, which is one query
+   * key, which is one request.
+   */
+  const sale = useRoutes(position > 0n ? pair.token : undefined, position);
+  const entire = useRoutes(held > 0n ? pair.token : undefined, held);
 
   /* The pair's own quote first; anything else only if that pool will not take it. */
   const chosen =
-    tradable.find(
+    sale.tradable.find(
       (option) => option.address.toLowerCase() === pair.quoteToken.toLowerCase(),
-    ) ?? tradable[0];
-  const route = chosen ? bestFor(chosen) : undefined;
+    ) ?? sale.tradable[0];
+  const route = chosen ? sale.bestFor(chosen) : undefined;
   /*
    * The terminal's ceiling on both sides, and it has to be the same one. A
    * screen that lets a reader buy into a pool at fifteen percent and then
@@ -206,23 +246,58 @@ function Exit({ pair }: { pair: Pair }) {
   const costly = route !== undefined && route.impactBps >= COSTLY;
   const capped = route !== undefined && slippageCapped(route.impactBps);
 
+  /*
+   * What this sale is worth, kept in a ref so the settle below can read it
+   * without being rebuilt every time it moves — see the note on that callback.
+   */
+  const proceeds = route ? worth(route.amountOut, chosen, coinUsd) : undefined;
+  const latest = useRef<number>(0);
+  useEffect(() => {
+    if (proceeds !== undefined) latest.current = proceeds;
+  }, [proceeds]);
+
+  /*
+   * Stable, and it has to be: the hook fires this from an effect that keeps the
+   * callback in its dependencies, so a fresh closure every render would record
+   * the sale, refetch, re-render and record it again for as long as the receipt
+   * stood. Recording what left is what lets the row above say whether the whole
+   * position made money, so it has to happen exactly once.
+   */
+  const settle = useCallback(() => {
+    record(pair.token, "received", latest.current);
+    void refetch();
+  }, [record, refetch, pair.token]);
+
   const { approved, approve, approving, send, sending, done, blocked, checking } = useSwapAction({
     token: pair.token,
     route,
     amountIn: position,
     slippageBps: slippage,
-    /*
-     * Stable, and it has to be: the hook fires this from an effect that keeps
-     * the callback in its dependencies, so a fresh closure every render would
-     * refetch, re-render and fire it again for as long as the receipt stood.
-     */
-    onDone: reread,
+    onDone: settle,
   });
 
-  if (position === 0n) return null;
+  if (held === 0n) return null;
 
   const units = (value: bigint, exit: (typeof EXITS)[number] | undefined) =>
     exit ? `${formatAmount(Number(formatUnits(value, exit.decimals)))} ${exit.symbol}` : "—";
+
+  /*
+   * Profit and loss over the whole position, not the slice being sold.
+   *
+   * What went in, what has already come back out, and what the rest would fetch
+   * if it were sold now — so moving the slider changes what is being sold and
+   * not what the position is worth.
+   *
+   * It is only offered when this app has seen the money go in. A wallet that
+   * bought the token somewhere else holds units this screen has no cost for,
+   * and a figure that quietly treats those as free would read as profit. The
+   * row says nothing rather than saying something wrong.
+   */
+  const standing = chosen ? entire.bestFor(chosen) : undefined;
+  const value = standing ? worth(standing.amountOut, chosen, coinUsd) : undefined;
+  const spent = basis && basis.spent > 0 ? basis.spent : undefined;
+  const back = basis?.received ?? 0;
+  const pnl = spent !== undefined && value !== undefined ? back + value - spent : undefined;
 
   return (
     <Panel className="mt-3" label={t("snipe.position")}>
@@ -230,22 +305,52 @@ function Exit({ pair }: { pair: Pair }) {
         k={t("snipe.held")}
         v={
           <span className="num">
-            {`${formatAmount(Number(formatUnits(position, pair.decimals)))} ${pair.symbol}`}
+            {`${formatAmount(Number(formatUnits(held, pair.decimals)))} ${pair.symbol}`}
           </span>
         }
       />
       <Row
-        k={t("snipe.youGet")}
-        v={<span className="num">{route ? units(route.amountOut, chosen) : "—"}</span>}
+        k={t("snipe.worth")}
+        v={<span className="num">{value === undefined ? "—" : `$${formatCompact(value)}`}</span>}
       />
-      <Row
-        k={t("snipe.atLeast")}
-        v={
-          <span className="num">
-            {route ? units(floorFor(route.amountOut, slippage), chosen) : "—"}
-          </span>
-        }
+      {pnl !== undefined && spent !== undefined && (
+        <Row
+          k={t("snipe.pnl")}
+          v={
+            <span className="num">
+              {signedUsd(pnl)}
+              <span className="text-faint">
+                {` (${pnl >= 0 ? "+" : "-"}${formatAmount(
+                  Number(((Math.abs(pnl) / spent) * 100).toFixed(1)),
+                )}%)`}
+              </span>
+            </span>
+          }
+          tone={pnl >= 0 ? "long" : "short"}
+        />
+      )}
+
+      <p className="lbl mt-3 mb-1.5">{t("snipe.sell")}</p>
+      <Segmented
+        options={SLICES.map((part) => ({ value: String(part), label: `${part}%` }))}
+        value={String(slice)}
+        onChange={(value) => setSlice(Number(value))}
       />
+
+      <div className="mt-3">
+        <Row
+          k={t("snipe.youGet")}
+          v={<span className="num">{route ? units(route.amountOut, chosen) : "—"}</span>}
+        />
+        <Row
+          k={t("snipe.atLeast")}
+          v={
+            <span className="num">
+              {route ? units(floorFor(route.amountOut, slippage), chosen) : "—"}
+            </span>
+          }
+        />
+      </div>
 
       {route && costly && (
         <Notice
@@ -300,9 +405,21 @@ export function Terminal() {
 
   const [picking, setPicking] = useState(false);
   const [aimed, setAimed] = useState<string>();
-  const [stake, setStake] = useState<bigint>(STAKES[0]);
+  const [stakeUsd, setStakeUsd] = useState<number>(STAKES[0]);
 
   const listed = useMemo(() => targets(pairs), [pairs]);
+
+  /*
+   * The coin's price, with the screen's own reading behind it. The hook asks
+   * the reference pool directly; every pair quoted in the coin has already been
+   * priced against that same pool by the screener, so if the dedicated read has
+   * not landed yet there is an answer sitting in the list — and the two are the
+   * same number from the same place, not a second opinion.
+   */
+  const measured = useCoinUsd();
+  const coinUsd =
+    measured ?? listed.find((pair) => pair.quote === "WETH" && pair.usdRate > 0)?.usdRate;
+  const stake = useMemo(() => stakeIn(stakeUsd, coinUsd), [stakeUsd, coinUsd]);
 
   /*
    * The target is held by address and looked up live, so a row still describes
@@ -316,10 +433,28 @@ export function Terminal() {
   }, [aimed, listed]);
 
   const { shot, unquotable, loading: quoting } = useShot(target, stake);
+
+  /*
+   * What this shot cost, kept where a stable callback can read it. `useFire`
+   * runs its completion from an effect that keeps the callback in its
+   * dependencies, so a closure rebuilt on every render would record the same
+   * fill over and over for as long as the receipt stood.
+   */
+  const record = useAppStore((state) => state.record);
+  const filled = useRef<{ token?: `0x${string}`; usd: number }>({ usd: 0 });
+  useEffect(() => {
+    filled.current = { token: target?.token, usd: stakeUsd };
+  }, [target?.token, stakeUsd]);
+
+  const banked = useCallback(() => {
+    if (filled.current.token) record(filled.current.token, "spent", filled.current.usd);
+  }, [record]);
+
   const { fire, firing, done, hash, short, checking, blocked, failure, ready, reset } = useFire({
     pair: target,
     stake,
     shot,
+    onDone: banked,
   });
 
   const coin = chainMeta(CHAIN_ID)?.nativeName ?? "ETH";
@@ -415,11 +550,21 @@ export function Terminal() {
 
       {target && (
         <>
-          <p className="lbl mt-3 mb-1.5">{t("snipe.stake", { coin })}</p>
+          <div className="mt-3 mb-1.5 flex items-baseline justify-between gap-2">
+            <p className="lbl">{t("snipe.stake")}</p>
+            {/*
+             * The coin figure is shown and not chosen. The dollars are the
+             * decision; this is the receipt for it, and a reader who wants to
+             * know what leaves their wallet should not have to work it out.
+             */}
+            <p className="num text-[11px] text-faint">
+              {stake > 0n ? `≈ ${formatAmount(Number(formatEther(stake)))} ${coin}` : "—"}
+            </p>
+          </div>
           <Segmented
-            options={STAKES.map((size) => ({ value: String(size), label: stakeLabel(size) }))}
-            value={String(stake)}
-            onChange={(value) => setStake(BigInt(value))}
+            options={STAKES.map((size) => ({ value: String(size), label: `$${size}` }))}
+            value={String(stakeUsd)}
+            onChange={(value) => setStakeUsd(Number(value))}
           />
 
           <div className="panel mt-2 p-3">
@@ -507,21 +652,25 @@ export function Terminal() {
           {failure && <p className="warn mt-2 text-[11px]">{t("snipe.failed")}</p>}
 
           {address ? (
-            <button
-              type="button"
-              className="btn btn-accent mt-2 w-full"
-              disabled={!ready || firing || checking || quoting || shot?.trapped}
-              onClick={fire}
-            >
-              <Icon name="crosshair" size={14} />
-              {done
-                ? t("snipe.done")
-                : firing
-                  ? t("snipe.firing")
-                  : quoting || checking
+            /*
+             * The one control here that spends money, and the one gesture that
+             * cannot be arrived at by scrolling past it. See `SlideToFire`.
+             */
+            <div className="mt-2">
+              <SlideToFire
+                label={
+                  quoting || checking
                     ? t("snipe.checking")
-                    : t("snipe.fire", { symbol: target.symbol })}
-            </button>
+                    : t("snipe.fire", { symbol: target.symbol })
+                }
+                busyLabel={t("snipe.firing")}
+                doneLabel={t("snipe.done")}
+                disabled={!ready || quoting || checking || shot?.trapped}
+                busy={firing}
+                done={done}
+                onFire={fire}
+              />
+            </div>
           ) : (
             prompt && (
               <button type="button" className="btn btn-accent mt-2 w-full" onClick={prompt}>
@@ -552,7 +701,7 @@ export function Terminal() {
         </>
       )}
 
-      {target && address && <Exit pair={target} />}
+      {target && address && <Exit pair={target} coinUsd={coinUsd} />}
 
       <TargetSheet
         open={picking}

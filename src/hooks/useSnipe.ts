@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
+import { parseEther } from "viem";
 import {
   useAccount,
   useBalance,
@@ -29,18 +30,32 @@ const ONE_CALL = 0;
 const REFERENCE = 100n;
 
 /**
- * Sizes offered without typing.
+ * Sizes offered without typing, in dollars.
  *
  * A sniper's whole advantage is the seconds between seeing a token and holding
- * it, and a number pad spends them. These are the sizes, in the coin gas is
- * paid in, and the reader picks one.
+ * it, and a number pad spends them. These are the sizes, and the reader picks
+ * one.
+ *
+ * Dollars rather than the coin, because that is the unit the decision is made
+ * in. Nobody chooses to risk 0.038 of a coin; they choose to risk a hundred
+ * dollars, and a ladder priced in the coin quietly changes what every rung
+ * means every time the coin moves. The chain is still paid in the coin — see
+ * `stakeIn`, which is the one place the two meet.
  */
-export const STAKES = [
-  10_000_000_000_000_000n,
-  50_000_000_000_000_000n,
-  100_000_000_000_000_000n,
-  250_000_000_000_000_000n,
-] as const;
+export const STAKES = [10, 50, 100, 250] as const;
+
+/**
+ * A dollar stake as the coin the chain actually takes.
+ *
+ * Zero when the coin has no price yet, which is the honest answer: a stake that
+ * cannot be converted is not a small stake, and every quote downstream is gated
+ * on it being above zero rather than guessing a rate.
+ */
+export function stakeIn(usd: number, coinUsd: number | undefined): bigint {
+  if (!coinUsd || !Number.isFinite(coinUsd) || coinUsd <= 0) return 0n;
+  const coins = usd / coinUsd;
+  return Number.isFinite(coins) && coins > 0 ? parseEther(coins.toFixed(18)) : 0n;
+}
 
 export type Shot = {
   /** Units of the token this buy is expected to return. */
