@@ -20,7 +20,8 @@ import { useToast } from "@/components/ui/Toast";
 import { CHAIN_ID, chainMeta, explorerAddress } from "@/lib/chains";
 import { formatAmount, truncateAddress } from "@/lib/format";
 import { useI18n } from "@/hooks/useI18n";
-import { ControlSkeleton } from "./ConnectControl";
+import { useStalled } from "@/hooks/useStalled";
+import { ControlSkeleton, SESSION_TIMEOUT_MS, SessionUnreachable } from "./ConnectControl";
 
 /**
  * The connected half of the header control — the part that reads the session.
@@ -61,6 +62,16 @@ export function WalletControl() {
    */
   const { isOpen } = useModalStatus();
 
+  /*
+   * Privy answers `ready` once it has worked out whether anyone is signed in,
+   * and it cannot answer at all if its API is unreachable — a blocked request,
+   * an app id this origin is not registered against, an extension that filters
+   * the host. That state used to hold the placeholder for the rest of the
+   * session, so the corner of the header a reader goes to in order to connect
+   * held a grey pill that was not a button and never became one.
+   */
+  const stalled = useStalled(SESSION_TIMEOUT_MS);
+
   const { login } = useLogin({
     onComplete: ({ wasAlreadyAuthenticated }) => {
       if (wasAlreadyAuthenticated) return;
@@ -73,7 +84,7 @@ export function WalletControl() {
     },
   });
 
-  if (!ready) return <ControlSkeleton />;
+  if (!ready) return stalled ? <SessionUnreachable /> : <ControlSkeleton />;
 
   if (!authenticated) {
     return (

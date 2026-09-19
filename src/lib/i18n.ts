@@ -263,6 +263,9 @@ const en = {
   "wallet.privyDisabled":
     "Wallet connection is switched off in this build. Set {env} to a Privy app id to turn it back on.",
   "wallet.securedBy": "Secured by Privy",
+  "wallet.sessionReload": "Reload the page",
+  "wallet.sessionUnreachable":
+    "The wallet session never started. Something between this device and Privy is stopping it — an extension blocking the host, a network filtering it, or an app id this build is not registered for. Reading the chain is unaffected; only connecting and signing are.",
   "wallet.switchTo": "Switch to {chain}",
   "wallet.use": "Use",
   "wallet.wallet": "Wallet",
@@ -552,6 +555,9 @@ const id: Record<TKey, string> = {
   "wallet.privyDisabled":
     "Koneksi dompet dimatikan di build ini. Isi {env} dengan app id Privy untuk menyalakannya lagi.",
   "wallet.securedBy": "Diamankan oleh Privy",
+  "wallet.sessionReload": "Muat ulang halaman",
+  "wallet.sessionUnreachable":
+    "Sesi dompet tidak pernah dimulai. Ada yang menghalangi jalur dari perangkat ini ke Privy — ekstensi yang memblokir hostnya, jaringan yang memfilternya, atau app id yang belum terdaftar untuk build ini. Data chain tetap terbaca; hanya menghubungkan dompet dan menandatangani yang tidak bisa.",
   "wallet.switchTo": "Pindah ke {chain}",
   "wallet.use": "Pakai",
   "wallet.wallet": "Dompet",

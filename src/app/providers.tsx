@@ -97,10 +97,13 @@ function WalletProviders({ children }: { children: ReactNode }) {
       })
       .catch(() => {
         /*
-         * The chunk did not arrive. The header keeps the placeholder it already
-         * had, which is where it also sits when Privy's own API cannot be
-         * reached — from the reader's side the two are the same outage, and the
-         * rest of the app carries on reading the chain either way.
+         * The chunk did not arrive, which is the same outage from the reader's
+         * side as a Privy that cannot be reached: no session either way, and the
+         * rest of the app carries on reading the chain through its own
+         * transports. Nothing is reported from here because there is nothing
+         * here to report it to — the header is what notices, by way of the
+         * timeout in `ConnectControl`, and it trades its placeholder for a
+         * control that says so rather than waiting out the session.
          */
       });
     return () => {
