@@ -192,6 +192,33 @@ function AccountSheet({
   );
   const identity = identityLabel(user);
 
+  /*
+   * The sheet closes on the hold, because the hold is the answer — but what it
+   * says afterwards waits for Privy.
+   *
+   * This used to fire the toast beside the logout call rather than after it, so
+   * a reader whose session Privy could not reach was told their wallet was
+   * disconnected while the address sat in the header behind the message. The
+   * one thing this button exists to report is the one thing it got wrong.
+   *
+   * Dropping wagmi's own connection is not done here: `ActiveWalletSync` does
+   * it off the session itself, so a session that ends any other way — expired,
+   * or logged out from another tab — clears the app the same way this does.
+   */
+  const endSession = async () => {
+    onClose();
+    try {
+      await logout();
+      toast.push({ tone: "info", message: t("wallet.disconnected") });
+    } catch (error) {
+      toast.push({
+        tone: "error",
+        message: t("wallet.disconnectFailed"),
+        detail: String(error),
+      });
+    }
+  };
+
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(address);
@@ -342,11 +369,7 @@ function AccountSheet({
           icon="power"
           label={t("wallet.disconnect")}
           holdLabel={t("common.holdToConfirm")}
-          onConfirm={() => {
-            void logout();
-            onClose();
-            toast.push({ tone: "info", message: t("wallet.disconnected") });
-          }}
+          onConfirm={() => void endSession()}
         />
 
 
