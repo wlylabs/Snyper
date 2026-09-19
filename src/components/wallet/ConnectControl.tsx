@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { Sheet } from "@/components/ui/Sheet";
 import { PRIVY_CONFIGURED } from "@/lib/privy";
+import { retryImport } from "@/lib/lazy";
 import { useConnectPrompt } from "@/hooks/useConnectPrompt";
 import { useMounted } from "@/hooks/useMounted";
 import { useI18n } from "@/hooks/useI18n";
@@ -19,8 +20,12 @@ export function ControlSkeleton() {
   return <div className="skel h-[30px] w-[116px] rounded-full" />;
 }
 
-/** Shared by the dynamic component below and the warm-up beside it. */
-const loadControl = () => import("./WalletControl");
+/**
+ * Shared by the dynamic component below and the warm-up beside it, and retried
+ * for both: a chunk that fails once leaves `dynamic` on its loading state with
+ * nothing to fall back to, which reads as a header that never finishes.
+ */
+const loadControl = () => retryImport(() => import("./WalletControl"));
 
 /*
  * The half of this control that reads the session is behind a dynamic import,
@@ -51,7 +56,10 @@ export function ConnectControl() {
    * placeholder.
    */
   useEffect(() => {
-    if (PRIVY_CONFIGURED) void loadControl();
+    if (!PRIVY_CONFIGURED) return;
+    // The warm-up is an optimisation, so it has nothing to say when it fails —
+    // the render below asks for the same chunk again on its own account.
+    void loadControl().catch(() => {});
   }, []);
 
   if (!mounted) return <ControlSkeleton />;

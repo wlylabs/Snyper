@@ -724,7 +724,22 @@
    * is no dialog to dismiss on reflex, and the fill sweeping across the button
    * tells the reader precisely how much longer their finger has to stay put.
    * Letting go early drains it and nothing happens.
+   *
+   * `touch-action` is the half of that bargain the browser holds. This button
+   * sits inside a scrolling sheet, and a finger resting on something scrollable
+   * is a gesture the browser is still deciding about: the moment it reads the
+   * press as the start of a scroll it takes the pointer away and sends a
+   * `pointercancel`, which drains the fill under a finger that never moved. A
+   * reader then holds, watches it die, holds again, and concludes that
+   * disconnecting is broken. Claiming the touch here says the press belongs to
+   * this button and the sheet does not scroll from it.
    */
+  .btn-hold {
+    touch-action: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
   .btn-hold::before {
     content: "";
     position: absolute;

@@ -5,6 +5,7 @@ import { useEffect, useState, type ComponentType, type ReactNode } from "react";
 import { WagmiProvider } from "wagmi";
 import { config } from "@/lib/wagmi";
 import { PRIVY_CONFIGURED } from "@/lib/privy";
+import { retryImport } from "@/lib/lazy";
 import { ToastProvider } from "@/components/ui/Toast";
 import { useAppStore } from "@/store/useAppStore";
 import { setNumberLocale } from "@/lib/format";
@@ -90,17 +91,18 @@ function WalletProviders({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!PRIVY_CONFIGURED) return;
     let live = true;
-    void import("@/components/wallet/WalletSession")
+    void retryImport(() => import("@/components/wallet/WalletSession"))
       .then((module) => {
         // `setState` calls a function argument, so the component goes in as one.
         if (live) setSession(() => module.WalletSession);
       })
       .catch(() => {
         /*
-         * The chunk did not arrive. The header keeps the placeholder it already
-         * had, which is where it also sits when Privy's own API cannot be
-         * reached — from the reader's side the two are the same outage, and the
-         * rest of the app carries on reading the chain either way.
+         * The chunk did not arrive, and it was asked for more than once. The
+         * header keeps the placeholder it already had, which is where it also
+         * sits when Privy's own API cannot be reached — from the reader's side
+         * the two are the same outage, and the rest of the app carries on
+         * reading the chain either way.
          */
       });
     return () => {

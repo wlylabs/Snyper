@@ -89,19 +89,9 @@ export function WalletControl() {
     );
   }
 
-  /*
-   * Authenticated, but wagmi has no account yet: Privy is still creating or
-   * attaching the embedded wallet. The pill holds its place at its final size
-   * so the header does not jump when the address lands.
-   */
-  if (!address) {
-    return (
-      <span className="pill cursor-default" aria-live="polite">
-        <span className="avatar avatar-empty" style={{ width: 22, height: 22 }} />
-        <span className="text-[11px] text-dim">{t("wallet.connecting")}</span>
-      </span>
-    );
-  }
+  // Authenticated, with no account under it yet — see `WaitingControl`. The
+  // pill it renders is the size of this one, so the header is laid out once.
+  if (!address) return <WaitingControl />;
 
   const active = walletFor(wallets, address);
 
@@ -128,6 +118,112 @@ export function WalletControl() {
         user={user}
       />
     </>
+  );
+}
+
+/**
+ * Ending the session, and saying what happened only once Privy has.
+ *
+ * This used to fire the toast beside the logout call rather than after it, so a
+ * reader whose session Privy could not reach was told their wallet was
+ * disconnected while the address sat in the header behind the message. The one
+ * thing this exists to report is the one thing it got wrong.
+ *
+ * Dropping wagmi's own connection is not done here: `ActiveWalletSync` does it
+ * off the session itself, so a session that ends any other way — expired, or
+ * logged out from another tab — clears the app the same way this does.
+ *
+ * @param close Run first, because the surface that asked is the answer.
+ */
+function useEndSession(close: () => void) {
+  const { t } = useI18n();
+  const toast = useToast();
+  const { logout } = usePrivy();
+
+  return async () => {
+    close();
+    try {
+      await logout();
+      toast.push({ tone: "info", message: t("wallet.disconnected") });
+    } catch (error) {
+      toast.push({
+        tone: "error",
+        message: t("wallet.disconnectFailed"),
+        detail: String(error),
+      });
+    }
+  };
+}
+
+/**
+ * Signed in, with nothing to show for it.
+ *
+ * Normally this is a second: Privy has authenticated and the bridge is a beat
+ * behind with the wallet. But it is also where a session lands when that never
+ * finishes — a wallet Privy holds a record of and no provider for, an extension
+ * closed since the last visit, an embedded wallet that could not be reached.
+ * `ActiveWalletSync` spends a couple of seconds trying to end it, and when it
+ * cannot, this is the whole of what the reader has: a header that says
+ * Connecting and means forever.
+ *
+ * So it is a button, not a label. What is behind it is the two ways out that a
+ * reader stuck here has no other route to — attach a wallet, or drop the
+ * session and start it again — and pressing it during the ordinary second it is
+ * usually up costs them a sheet they can close.
+ */
+function WaitingControl() {
+  const { t } = useI18n();
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <button
+        type="button"
+        className="pill"
+        data-open={open ? "true" : undefined}
+        onClick={() => setOpen(true)}
+        aria-label={t("wallet.waiting")}
+      >
+        <span className="avatar avatar-empty" style={{ width: 22, height: 22 }} />
+        <span className="text-[11px] text-dim" aria-live="polite">
+          {t("wallet.connecting")}
+        </span>
+      </button>
+      <WaitingSheet open={open} onClose={() => setOpen(false)} />
+    </>
+  );
+}
+
+function WaitingSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { t } = useI18n();
+  const { connectWallet } = usePrivy();
+  const endSession = useEndSession(onClose);
+
+  return (
+    <Sheet open={open} title={t("wallet.waiting")} onClose={onClose}>
+      <div className="p-3">
+        <p className="wrap-any text-[11px] leading-relaxed text-dim">{t("wallet.waitingHint")}</p>
+
+        <button type="button" className="tile mt-3" onClick={() => connectWallet()}>
+          <span
+            className="avatar avatar-empty flex items-center justify-center"
+            style={{ width: 26, height: 26 }}
+          >
+            <Icon name="plus" size={13} className="text-dim" />
+          </span>
+          <span className="flex-1">{t("wallet.attach")}</span>
+          <Icon name="chevron" size={13} className="-rotate-90 text-faint" />
+        </button>
+
+        <HoldButton
+          className="btn-short mt-2 w-full"
+          icon="power"
+          label={t("wallet.disconnect")}
+          holdLabel={t("common.holdToConfirm")}
+          onConfirm={() => void endSession()}
+        />
+      </div>
+    </Sheet>
   );
 }
 
@@ -164,8 +260,8 @@ function AccountSheet({
   user: User | null;
 }) {
   const { t } = useI18n();
-  const toast = useToast();
-  const { logout, connectWallet } = usePrivy();
+  const { connectWallet } = usePrivy();
+  const endSession = useEndSession(onClose);
   const { exportWallet } = useExportWallet();
   const { wallets } = useWallets();
   const { setActiveWallet } = useSetActiveWallet();
@@ -191,33 +287,6 @@ function AccountSheet({
     (wallet) => wallet.address.toLowerCase() !== address.toLowerCase(),
   );
   const identity = identityLabel(user);
-
-  /*
-   * The sheet closes on the hold, because the hold is the answer — but what it
-   * says afterwards waits for Privy.
-   *
-   * This used to fire the toast beside the logout call rather than after it, so
-   * a reader whose session Privy could not reach was told their wallet was
-   * disconnected while the address sat in the header behind the message. The
-   * one thing this button exists to report is the one thing it got wrong.
-   *
-   * Dropping wagmi's own connection is not done here: `ActiveWalletSync` does
-   * it off the session itself, so a session that ends any other way — expired,
-   * or logged out from another tab — clears the app the same way this does.
-   */
-  const endSession = async () => {
-    onClose();
-    try {
-      await logout();
-      toast.push({ tone: "info", message: t("wallet.disconnected") });
-    } catch (error) {
-      toast.push({
-        tone: "error",
-        message: t("wallet.disconnectFailed"),
-        detail: String(error),
-      });
-    }
-  };
 
   const copy = async () => {
     try {
