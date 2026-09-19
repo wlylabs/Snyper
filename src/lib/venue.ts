@@ -89,9 +89,19 @@ export const routerAbi = parseAbi([
  *
  * An address and nothing else. Taking a cut of a trade needs no server, no
  * custody and no contract of this app's own: the router already knows how to
- * split an output, and this is the second half of the split.
+ * split an output, and this is the second half of the split. Nothing has to be
+ * deployed or switched on for it to start receiving — an account on an EVM
+ * chain exists because somebody holds the key to it, and a transfer to one that
+ * has never been used works exactly like a transfer to one that has.
+ *
+ * Written checksummed, and that is not cosmetic. Both spellings encode to the
+ * same calldata, but a mistyped character in the all-lowercase form is accepted
+ * in silence and the money goes wherever the typo points; the same character
+ * changed here fails the checksum and viem refuses to encode the call at all.
+ * On the one constant in this app that receives money, a loud failure is worth
+ * more than a tidy line.
  */
-export const TREASURY = "0x8b3b2d5ed474e07196f8af47216dd3a229de4c1b" as const;
+export const TREASURY = "0x8b3B2D5Ed474e07196F8AF47216dD3A229DE4c1B" as const;
 
 /**
  * The cut, in basis points. A quarter of one percent, each way.
