@@ -1,3 +1,4 @@
+import type { Drift } from "./memory";
 import { CREATED_WINDOW, DEPTH_RATIO, PER_MINUTE } from "./screener";
 
 /**
@@ -75,17 +76,26 @@ export type Flow = {
   late: number;
 };
 
-/** Everything the score reads, which `Pair` already satisfies. */
+/** Everything the score reads, which `Pair` already satisfies bar the drift. */
 export type Measured = {
   change: number;
   marketCap?: number;
   liquidity: number;
   age?: number;
   flow?: Flow;
+  /** What this browser has watched the token do since the screen opened. */
+  drift?: Drift;
 };
 
-/** The five questions, in the order the sheet prints them. */
-export type Reading = "pressure" | "accel" | "breadth" | "depth" | "youth";
+/** The seven questions, in the order the sheet prints them. */
+export type Reading =
+  | "pressure"
+  | "accel"
+  | "breadth"
+  | "depth"
+  | "youth"
+  | "building"
+  | "waking";
 
 /**
  * What each reading is worth, and why they do not add up on a quiet row.
@@ -102,6 +112,23 @@ export type Reading = "pressure" | "accel" | "breadth" | "depth" | "youth";
  * launch at thirty however good it looks — and that is the honest shape of it,
  * because two readings is two readings. A screen that scaled those two up to a
  * hundred would be reporting confidence it bought by knowing less.
+ *
+ * The last two are the readings this app has to earn, and they are the reason
+ * the column adds to more than one. They come from `lib/memory` — what the
+ * screen watched the token do across the half hour before now, rather than
+ * inside the one window the endpoint will serve — and they are unavailable for
+ * the first ten minutes after a reader opens the screen, every time, for every
+ * token. Folded into the hundred they would have made a cold start score every
+ * token lower than a warm one, which is a reader being marked down for having
+ * just arrived. So they sit above it and the total is capped: five readings
+ * decide the hundred, and two more can only push a row up it.
+ *
+ * That also keeps the measurement under `Signal` honest. It was taken on the
+ * five, from a script that could replay the chain; the two below cannot be
+ * backtested the same way, because what they read is not on the chain at all —
+ * it is what this browser was open for. They are here on the strength of the
+ * mechanism rather than of a number, which is said plainly rather than left
+ * for the reader to assume otherwise.
  */
 export const WEIGHTS: Record<Reading, number> = {
   pressure: 0.3,
@@ -109,7 +136,10 @@ export const WEIGHTS: Record<Reading, number> = {
   breadth: 0.2,
   depth: 0.17,
   youth: 0.13,
+  building: 0.1,
+  waking: 0.1,
 };
+
 
 /**
  * How many trades a window needs before its shape means anything.
@@ -126,7 +156,7 @@ export const WEIGHTS: Record<Reading, number> = {
  * of three hundred and twenty two non-equity pools that traded in a sampled
  * window, seventy nine cleared eight and forty six cleared twelve. Below it the
  * three flow readings are reported as unread rather than guessed, which is why
- * the sheet prints how many of the five came back.
+ * the sheet prints how many of the seven came back.
  */
 export const MIN_TRADES = 8;
 
@@ -166,6 +196,38 @@ const SHARED = 0.2;
 const CROWDED = 0.7;
 
 /**
+ * Depth arriving, over the span the screen has actually watched.
+ *
+ * Level at one, full marks at half again as much resting in the pool as there
+ * was when the watching started. It is the clearest thing a memecoin does
+ * before it moves and the one thing no five-minute window can see: a pool's
+ * balance is a standing figure, identical whether the money has been there an
+ * hour or arrived a minute ago. Two readings apart in time is the whole of
+ * what it takes, and this app is the only one on this chain taking them.
+ *
+ * Depth leaving scores nothing rather than scoring negative, because the score
+ * is a floor at zero and a token cannot be pushed below one. That it happened
+ * is not swallowed: the sheet says so in its own line, in the warning colour,
+ * because liquidity walking out of a pool the reader is looking at is the most
+ * useful sentence this file can produce.
+ */
+const RESTING = 1;
+const FILLING = 1.5;
+
+/**
+ * The newest window against the middle of the ones before it.
+ *
+ * Four times is full marks, which sounds steep until it is read as what it is:
+ * five minutes that traded four times what the last half hour's five-minute
+ * windows typically did. That is not a busy market, it is a market that has
+ * just been noticed, and it is the shape `accel` is reaching for inside a
+ * single window and cannot quite get — four trades against four is not a rate.
+ * This is the same question with an hour behind it instead of five minutes.
+ */
+const USUAL = 1;
+const WAKING = 4;
+
+/**
  * The price that has not caught up yet, which is the whole point.
  *
  * Everything above describes a crowd arriving. This is the reading that decides
@@ -190,10 +252,12 @@ const BLEED = 60;
 /**
  * What a row scores, out of a hundred, and what that was measured to be worth.
  *
- * The test: four windows half an hour apart on chain 4663, scored exactly as
- * this file scores them, filtered by the same floor and ceiling the screen
- * applies, then read against the thirty minutes of chain that followed. Fifty
- * rows cleared the floor and forty-eight were still trading half an hour on.
+ * The test: four windows half an hour apart on chain 4663, scored on the five
+ * readings that make up the hundred, filtered by the same floor and ceiling the
+ * screen applies, then read against the thirty minutes of chain that followed.
+ * Fifty rows cleared the floor and forty-eight were still trading half an hour
+ * on. The two watched readings are not in this and could not be: what they read
+ * is what a browser was open for, which no script can replay.
  *
  * What came out, in full, including the part that does not flatter it:
  *
@@ -217,7 +281,8 @@ const BLEED = 60;
  * Fifty rows is a small sample and this is written down rather than rounded up
  * because the number appears on a screen beside a button that spends money. A
  * coil is a better place to look than a volume column. It is not a forecast,
- * and no arrangement of five readings off five minutes of chain would be.
+ * and no arrangement of readings off five minutes of chain and half an hour of
+ * watching would be.
  */
 export type Signal = {
   /** Nought to a hundred, after the quiet multiplier. */
@@ -226,7 +291,7 @@ export type Signal = {
   quiet: number;
   /** Each reading in printing order, `undefined` where it could not be read. */
   readings: { key: Reading; weight: number; value: number | undefined }[];
-  /** How many of the five came back. See `WEIGHTS` on why this is not hidden. */
+  /** How many of the seven came back. See `WEIGHTS` on why this is not hidden. */
   read: number;
 };
 
@@ -237,6 +302,12 @@ export type Signal = {
  * are worth thirty, so a row cannot get here on standing facts alone — it needs
  * a quarter of the seventy that only a filling tape can pay, under a price that
  * has not moved. That is the sentence the chip is making, so it is the bar.
+ *
+ * The two watched readings can carry a row over it, and that is the one case
+ * where a chip appears for something no other screen on this chain can see: a
+ * pool being filled and traded harder than it was half an hour ago, while the
+ * price has not said so. It still takes a tape underneath — twenty points of
+ * watching cannot reach fifty five on their own, and are not meant to.
  *
  * Measured, three of forty-eight rows that cleared the screen's floor were
  * over it — and the rows that were had a two-in-three chance of being higher
@@ -298,6 +369,16 @@ function youthOf(pair: Measured): number | undefined {
   return clamp(1 - pair.age / YOUNG);
 }
 
+/** Depth now against depth when this browser started watching. */
+function buildingOf(drift: Drift): number | undefined {
+  return drift.depth === undefined ? undefined : span(drift.depth, RESTING, FILLING);
+}
+
+/** This window's trading against the windows watched before it. */
+function wakingOf(drift: Drift): number | undefined {
+  return drift.trade === undefined ? undefined : span(drift.trade, USUAL, WAKING);
+}
+
 /** The multiplier: one while the price is still quiet, nothing once it is not. */
 export function quietOf(change: number): number {
   return change >= 0
@@ -306,19 +387,23 @@ export function quietOf(change: number): number {
 }
 
 /**
- * The five readings, the multiplier, and the number they come to.
+ * The seven readings, the multiplier, and the number they come to.
  *
  * A reading that could not be taken contributes nothing and is reported as
- * nothing — see `WEIGHTS` on why it is not scaled away instead.
+ * nothing — see `WEIGHTS` on why it is not scaled away instead, and why the
+ * last two of the seven sit above the hundred rather than inside it.
  */
 export function signalOf(pair: Measured): Signal {
   const flow = pair.flow;
+  const drift = pair.drift;
   const values: Record<Reading, number | undefined> = {
     pressure: flow && pressureOf(flow),
     accel: flow && accelOf(flow),
     breadth: flow && breadthOf(flow),
     depth: depthOf(pair),
     youth: youthOf(pair),
+    building: drift && buildingOf(drift),
+    waking: drift && wakingOf(drift),
   };
 
   const readings = (Object.keys(WEIGHTS) as Reading[]).map((key) => ({
@@ -333,8 +418,14 @@ export function signalOf(pair: Measured): Signal {
     0,
   );
 
+  /*
+   * Capped, because the two watched readings sit above the hundred rather than
+   * inside it. A row that has already answered the five as well as they can be
+   * answered gains nothing further from having been watched, which is the
+   * right shape: the cap is reached by evidence, not by waiting.
+   */
   return {
-    score: Math.round(100 * base * quiet),
+    score: Math.min(100, Math.round(100 * base * quiet)),
     quiet,
     readings,
     read: readings.filter((reading) => reading.value !== undefined).length,
@@ -344,4 +435,30 @@ export function signalOf(pair: Measured): Signal {
 /** Whether a row has earned the chip. */
 export function coiling(score: number): boolean {
   return score >= COIL;
+}
+
+/**
+ * Depth arriving fast enough to say so on the row, and depth leaving at all.
+ *
+ * A quarter again as much resting in the pool as when the watching started is
+ * not a rounding error on any span this screen keeps, and it is the one fact a
+ * reader scrolling past would want stopped for. The row only ever wears it
+ * when the coil chip is not already there — the coil is made partly of this,
+ * and a row carrying both marks is saying one thing twice.
+ *
+ * Leaving is set far looser, at a fifth gone, and is not a chip at all. It is
+ * a sentence on the sheet in the warning colour, because it is the opposite of
+ * an invitation: money walking out of a pool while a reader is reading about
+ * it is the single most useful thing this file can tell them, and it does not
+ * belong compressed into a badge.
+ */
+export const ARRIVING = 1.25;
+export const LEAVING = 0.8;
+
+export function filling(drift: Drift | undefined): boolean {
+  return drift?.depth !== undefined && drift.depth >= ARRIVING;
+}
+
+export function leaving(drift: Drift | undefined): boolean {
+  return drift?.depth !== undefined && drift.depth <= LEAVING;
 }

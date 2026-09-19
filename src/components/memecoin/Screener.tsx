@@ -23,8 +23,10 @@ import {
   type Grade,
 } from "@/lib/screener";
 import { shareOf, verdictOf, type Lock, type Verdict } from "@/lib/lock";
-import { coiling, signalOf, type Signal } from "@/lib/signal";
+import { coiling, filling, leaving, signalOf, type Signal } from "@/lib/signal";
+import { driftOf, type Drift } from "@/lib/memory";
 import { useLaunches } from "@/hooks/useLaunches";
+import { useWatch } from "@/hooks/useWatch";
 import { useLiquidityLock, useLiquidityLocks } from "@/hooks/useLiquidityLock";
 import { useScreener, type Pair } from "@/hooks/useScreener";
 import type { TKey } from "@/lib/i18n";
@@ -64,6 +66,25 @@ function usd(value: number | undefined): string {
 
 function signed(change: number): string {
   return `${change >= 0 ? "+" : ""}${change.toFixed(1)}%`;
+}
+
+/**
+ * A drift, written as the change it stands for rather than as the ratio it is.
+ *
+ * The meters above these sentences all read the same way — how much of a
+ * reading a row earned — which is what makes them comparable and is also why
+ * the two watched readings need their figures said again in words. A meter
+ * full at "depth arriving" means the reading was maxed out, and a reader who
+ * took that for "depth doubled" would be reading a different number entirely.
+ */
+function drifted(ratio: number): string {
+  const percent = Math.round((ratio - 1) * 100);
+  return `${percent >= 0 ? "+" : ""}${percent}%`;
+}
+
+/** The same for a figure that is naturally read as a multiple. */
+function times(ratio: number): string {
+  return `${ratio >= 10 ? Math.round(ratio) : ratio.toFixed(1)}×`;
 }
 
 /**
@@ -113,8 +134,13 @@ function thin(pair: Pair): boolean {
   return pair.marketCap !== undefined && pair.liquidity < pair.marketCap * DEPTH_RATIO;
 }
 
-/** A row and what the chain says about its chances, kept together. */
-type Scored = { pair: Pair; signal: Signal };
+/**
+ * A row, what the chain says about its chances, and what this screen watched
+ * it do to get there. The drift travels beside the signal rather than inside
+ * it because the sheet prints it as figures — a span, a ratio — where the
+ * signal only carries it as two readings out of seven.
+ */
+type Scored = { pair: Pair; signal: Signal; drift: Drift | undefined };
 
 /**
  * Coil first, then busiest, then freshest.
@@ -295,6 +321,23 @@ function SignalChip({ signal }: { signal: Signal }) {
   );
 }
 
+/**
+ * The row's one word about what this screen watched the pool do.
+ *
+ * Only where the coil chip is not, and only upward. See `filling` in
+ * `lib/signal` for why both marks never sit on the same row, and `leaving` for
+ * where the opposite of this is said instead.
+ */
+function FillingChip({ signal, drift }: { signal: Signal; drift: Drift | undefined }) {
+  const { t } = useI18n();
+  if (coiling(signal.score) || !filling(drift)) return null;
+  return (
+    <span className="chip chip-xs chip-coil ml-1.5">
+      {t("signal.tagFilling", { percent: Math.round(((drift?.depth ?? 1) - 1) * 100) })}
+    </span>
+  );
+}
+
 function SignalWord({ signal }: { signal: Signal }) {
   const { t } = useI18n();
   if (coiling(signal.score)) return null;
@@ -330,7 +373,7 @@ function Meter({ value }: { value: number }) {
  * how much of the evidence actually came back — which is the difference
  * between a low score and a quiet chain.
  */
-function SignalPanel({ signal }: { signal: Signal }) {
+function SignalPanel({ signal, drift }: { signal: Signal; drift: Drift | undefined }) {
   const { t } = useI18n();
 
   return (
@@ -362,6 +405,40 @@ function SignalPanel({ signal }: { signal: Signal }) {
       </Panel>
 
       <div className="mt-2 grid gap-1">
+        {/*
+         * What the last two readings were taken over, or why they are missing.
+         * A span is printed rather than implied: these are the only figures in
+         * the app that describe something longer than five minutes, and the
+         * only honest way to show one is beside the time it was measured over.
+         */}
+        {drift ? (
+          <>
+            <p className="text-[11px] text-faint">
+              {drift.depth === undefined
+                ? t("signal.watchedFlat", { span: age(drift.span), samples: drift.samples })
+                : t("signal.watched", {
+                    span: age(drift.span),
+                    samples: drift.samples,
+                    depth: drifted(drift.depth),
+                  })}
+            </p>
+            {drift.trade !== undefined && (
+              <p className="text-[11px] text-faint">
+                {t("signal.watchedTrade", { trade: times(drift.trade) })}
+              </p>
+            )}
+          </>
+        ) : (
+          <p className="text-[11px] text-faint">{t("signal.watching")}</p>
+        )}
+        {leaving(drift) && (
+          <p className="text-[11px] warn">
+            {t("signal.leaving", {
+              percent: Math.round((1 - (drift?.depth ?? 1)) * 100),
+              span: age(drift?.span ?? 0),
+            })}
+          </p>
+        )}
         <p className="text-[11px] text-dim">{t("signal.hint")}</p>
         {/*
          * Never optional, for the same reason the burned verdict carries its
@@ -449,7 +526,7 @@ function PairSheet({
   const { lock, loading: lockLoading, failed: lockFailed } = useLiquidityLock(entry?.pair.pool);
 
   if (!entry) return null;
-  const { pair, signal } = entry;
+  const { pair, signal, drift } = entry;
 
   const verdict = lock ? verdictOf(lock) : undefined;
   const share = lock ? shareOf(lock) : undefined;
@@ -487,7 +564,7 @@ function PairSheet({
          * which is whether anybody is arriving yet.
          */}
         <div className="mb-3">
-          <SignalPanel signal={signal} />
+          <SignalPanel signal={signal} drift={drift} />
         </div>
 
         <Panel>
@@ -627,12 +704,27 @@ export function Screener() {
    */
   const all = useMemo(() => dropCopycats(merge(pairs, launches)), [pairs, launches]);
   /*
+   * This reading goes into the record before anything is scored against it.
+   * The screen is the only caller that records — see `useWatch` — because it
+   * is the only one holding both sources merged into one row per token, which
+   * is the shape everything filed under a token has to have been measured in.
+   */
+  const watch = useWatch(all, head);
+
+  /*
    * Scored once, then filtered and ordered on what came out. The band reads
    * the score, the order reads the score and both chips read the score, and a
    * screen that worked it out in three places would eventually work it out
    * three ways.
    */
-  const scored = useMemo(() => all.map((pair) => ({ pair, signal: signalOf(pair) })), [all]);
+  const scored = useMemo(
+    () =>
+      all.map((pair) => {
+        const drift = driftOf(watch[pair.token.toLowerCase()]);
+        return { pair, drift, signal: signalOf({ ...pair, drift }) };
+      }),
+    [all, watch],
+  );
   const listed = useMemo(
     () => order(scored.filter(({ pair, signal }) => keep(pair, signal.score, band, grade))),
     [scored, band, grade],
@@ -701,7 +793,7 @@ export function Screener() {
 
     return (
       <div className="flex flex-col gap-1.5">
-        {listed.map(({ pair, signal }) => (
+        {listed.map(({ pair, signal, drift }) => (
           /*
            * Two controls, side by side, rather than one inside the other — a
            * button cannot legally contain a button, and the reader is asking
@@ -718,15 +810,21 @@ export function Screener() {
                 {pair.symbol}
                 <span className="font-normal text-faint">/{pair.quote}</span>
                 {/*
-                 * Two chips at most, so each one still means something. A
-                 * coiling row gives up its NEW mark rather than wearing both:
-                 * between the two it is the stronger claim, and the age the
-                 * other one stood for is three words along the line below.
+                 * One chip about what the row is doing, at most, and then the
+                 * lock. The three are in order of what they claim: a coil is
+                 * the strongest, depth arriving is the part of a coil that can
+                 * stand alone, and NEW is a fact about the calendar. A row
+                 * that has earned a louder one gives up the quieter, and the
+                 * age it would have said is three words along the line below.
                  */}
-                {pair.age !== undefined && pair.age < FRESH && !coiling(signal.score) && (
-                  <span className="chip chip-xs chip-live ml-1.5">{t("memecoin.fresh")}</span>
-                )}
+                {pair.age !== undefined &&
+                  pair.age < FRESH &&
+                  !coiling(signal.score) &&
+                  !filling(drift) && (
+                    <span className="chip chip-xs chip-live ml-1.5">{t("memecoin.fresh")}</span>
+                  )}
                 <SignalChip signal={signal} />
+                <FillingChip signal={signal} drift={drift} />
                 <LockChip lock={locks.get(pair.pool.toLowerCase())} />
               </span>
               {/*

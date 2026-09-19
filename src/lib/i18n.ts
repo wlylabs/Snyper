@@ -147,14 +147,24 @@ const en = {
   "signal.breadth": "Hands, not one hand",
   "signal.depth": "Depth behind the price",
   "signal.youth": "Still early in its day",
+  "signal.building": "Depth arriving while you watched",
+  "signal.waking": "Busier than the half hour before",
   "signal.quiet": "Price has not said so yet",
   "signal.unread": "Not enough trades",
   "signal.tag": "COIL {score}",
   "signal.word": "Coil {score}",
+  "signal.tagFilling": "LIQ +{percent}%",
+  "signal.watched": "Watched for {span}, across {samples} readings — depth {depth} across it.",
+  "signal.watchedFlat": "Watched for {span}, across {samples} readings.",
+  "signal.watchedTrade": "This window traded {trade} what the earlier ones typically did.",
+  "signal.watching":
+    "The last two readings need ten minutes of this screen being open before they say anything. They are the only figures in this app that are not on the chain — five minutes is all chain 4663 will serve in one answer, so the hour has to be remembered a reading at a time, and nothing else on this chain keeps it.",
+  "signal.leaving":
+    "Depth has left this pool since this screen started watching: {percent}% of what was resting in it is gone, over {span}. Nothing here says who took it or why, only that it is no longer behind the price.",
   "signal.hint":
-    "Every other screener ranks by volume, which is what a run leaves behind it. This ranks what comes before one: more buying than selling, arriving faster than it was, from more than one pair of hands — all of it counted for less as the price catches up, because a token that has already moved is no longer an early entry. It is read off the same swap logs the list is built from and costs no extra request.",
+    "Every other screener ranks by volume, which is what a run leaves behind it. This ranks what comes before one: more buying than selling, arriving faster than it was, from more than one pair of hands — all of it counted for less as the price catches up, because a token that has already moved is no longer an early entry. The first five readings come off the same swap logs the list is built from and cost no extra request. The last two are what this screen watched happen while it was open, and they can push a score up but never down.",
   "signal.partial":
-    "{read} of the {of} readings came back. A pool with fewer than eight trades in the window has no rate and no crowd to measure, so those are left unread rather than guessed — which caps what an untouched launch can score, and is meant to.",
+    "{read} of the {of} readings came back. A pool with fewer than eight trades in the window has no rate and no crowd to measure; a token whose pool was not opened in the last day has no age; and the last two need ten minutes of watching. All of them are left unread rather than guessed, which is why a row can score low for having been looked at early rather than for being poor.",
   "signal.caveat":
     "This says a crowd is forming, not that the token will run. Crowds form around tokens about to be sold into as readily as around ones about to rise, and whether the pool can be emptied under you is the separate question above.",
 
@@ -471,14 +481,24 @@ const id: Record<TKey, string> = {
   "signal.breadth": "Banyak tangan, bukan satu",
   "signal.depth": "Kedalaman di balik harga",
   "signal.youth": "Masih awal umurnya",
+  "signal.building": "Kedalaman berdatangan selama diamati",
+  "signal.waking": "Lebih ramai dari setengah jam sebelumnya",
   "signal.quiet": "Harga belum mengatakannya",
   "signal.unread": "Transaksinya belum cukup",
   "signal.tag": "COIL {score}",
   "signal.word": "Coil {score}",
+  "signal.tagFilling": "LIK +{percent}%",
+  "signal.watched": "Diamati selama {span}, dari {samples} bacaan — kedalaman {depth} sepanjang itu.",
+  "signal.watchedFlat": "Diamati selama {span}, dari {samples} bacaan.",
+  "signal.watchedTrade": "Jendela ini memperdagangkan {trade} dari yang biasanya di jendela-jendela sebelumnya.",
+  "signal.watching":
+    "Dua bacaan terakhir butuh layar ini terbuka sepuluh menit sebelum bisa mengatakan apa pun. Keduanya satu-satunya angka di aplikasi ini yang tidak ada di chain — chain 4663 hanya melayani lima menit dalam satu jawaban, jadi satu jam harus diingat satu bacaan demi satu bacaan, dan tidak ada layar lain di chain ini yang menyimpannya.",
+  "signal.leaving":
+    "Kedalaman sudah keluar dari pool ini sejak layar ini mulai mengamati: {percent}% dari yang tadinya mengendap sudah hilang, dalam {span}. Tidak ada yang bisa dikatakan di sini soal siapa yang menariknya atau kenapa, hanya bahwa ia tidak lagi menopang harga.",
   "signal.hint":
-    "Screener lain mengurutkan berdasarkan volume, dan volume adalah jejak yang ditinggalkan sebuah run. Layar ini mengurutkan apa yang mendahuluinya: beli lebih banyak dari jual, datang lebih cepat dari sebelumnya, dari lebih dari satu tangan — semuanya dinilai makin kecil begitu harga mulai menyusul, karena token yang sudah bergerak bukan lagi entry awal. Semua dibaca dari log swap yang sama yang membangun daftar ini, tanpa satu pun permintaan tambahan.",
+    "Screener lain mengurutkan berdasarkan volume, dan volume adalah jejak yang ditinggalkan sebuah run. Layar ini mengurutkan apa yang mendahuluinya: beli lebih banyak dari jual, datang lebih cepat dari sebelumnya, dari lebih dari satu tangan — semuanya dinilai makin kecil begitu harga mulai menyusul, karena token yang sudah bergerak bukan lagi entry awal. Lima bacaan pertama diambil dari log swap yang sama yang membangun daftar ini, tanpa satu pun permintaan tambahan. Dua terakhir adalah apa yang layar ini lihat terjadi selama ia terbuka, dan keduanya hanya bisa menaikkan skor, tidak pernah menurunkannya.",
   "signal.partial":
-    "{read} dari {of} bacaan berhasil diambil. Pool dengan kurang dari delapan transaksi dalam jendela ini tidak punya laju dan tidak punya kerumunan untuk diukur, jadi bacaannya dibiarkan kosong daripada ditebak — itu yang membatasi skor sebuah launch yang belum tersentuh, dan memang disengaja.",
+    "{read} dari {of} bacaan berhasil diambil. Pool dengan kurang dari delapan transaksi dalam jendela ini tidak punya laju dan tidak punya kerumunan untuk diukur; token yang pool-nya tidak dibuka dalam sehari terakhir tidak punya umur; dan dua bacaan terakhir butuh sepuluh menit pengamatan. Semuanya dibiarkan kosong daripada ditebak — jadi skor rendah bisa berarti baru dilihat, bukan berarti jelek.",
   "signal.caveat":
     "Ini mengatakan ada kerumunan yang sedang terbentuk, bukan bahwa tokennya akan naik. Kerumunan sama mudahnya terbentuk di sekitar token yang sebentar lagi dijual habis, dan apakah pool-nya bisa dikuras dari bawah Anda adalah pertanyaan terpisah di atas.",
 
