@@ -20,13 +20,44 @@ import { CHAIN } from "./chains";
  */
 
 /** Derived from the chain, so there is one place a network is described. */
-const BASE = CHAIN.blockExplorers?.default.url ?? "";
+export const BASE = CHAIN.blockExplorers?.default.url ?? "";
 
 /** Whether this chain has an index to read at all. */
 export const SCAN_CONFIGURED = BASE.length > 0;
 
 /** Long enough for a cold index, short enough to fail before a reader gives up. */
 const TIMEOUT = 12_000;
+
+/**
+ * The paths on the index, named once so the relay and the browser cannot drift
+ * into asking it two different questions.
+ */
+export const SCAN_PATHS = {
+  balances: (address: string) => `/api/v2/addresses/${address}/token-balances`,
+  stats: "/api/v2/stats",
+} as const;
+
+/**
+ * The same-origin way to the index, for the readers who have no other.
+ *
+ * This explorer sits behind Cloudflare, and Cloudflare answers a request it
+ * does not like with a challenge rather than an error — measured from a
+ * datacentre address it is a flat `403` with `cf-mitigated: challenge`, and
+ * from a browser it can be a challenge page served as a clean `200`. Either way
+ * it arrives cross-origin, which means a browser that is refused cannot read
+ * why, and the balance screen loses every token row it exists to show while the
+ * native balance beside them keeps updating.
+ *
+ * So the browser asks the explorer itself first and comes here when that fails,
+ * which is exactly the arrangement `/api/rpc` has with the chain. A server is a
+ * different client on a different network: it is not carrying the reader's
+ * fingerprint, it is not subject to their network's blocks, and its answer
+ * arrives from this origin where no cross-origin policy applies.
+ */
+const RELAY = {
+  balances: (address: string) => `/api/balances/${address}`,
+  stats: "/api/coin-price",
+} as const;
 
 export type ScanToken = {
   address_hash: string;
@@ -46,23 +77,42 @@ export type ScanBalance = {
   value: string;
 };
 
-async function read<T>(path: string): Promise<T> {
-  const response = await fetch(`${BASE}${path}`, {
+export async function read<T>(url: string): Promise<T> {
+  const response = await fetch(url, {
     headers: { accept: "application/json" },
     signal: AbortSignal.timeout(TIMEOUT),
   });
   /*
-   * The explorer sits behind Cloudflare, which answers a request it does not
-   * like with an HTML challenge page rather than an error. Anything that is not
-   * a clean JSON 200 is treated the same way — as an index that did not answer.
+   * A challenge page is served as HTML and sometimes as a clean 200, so the
+   * status alone does not say whether this answered. Anything that is not JSON
+   * is treated the same way as a refusal — as an index that did not answer.
    */
   if (!response.ok) throw new Error(`Explorer answered ${response.status}`);
+  if (!response.headers.get("content-type")?.includes("json")) {
+    throw new Error("Explorer did not answer with JSON");
+  }
   return (await response.json()) as T;
+}
+
+/**
+ * The index, then this origin's relay to it.
+ *
+ * Only in a browser. On the server a relative URL is not fetchable, and the
+ * relay's upstream is the host the server would already be calling — so there
+ * the direct read stands alone, exactly as the chain transport does.
+ */
+async function either<T>(path: string, relay: string): Promise<T> {
+  try {
+    return await read<T>(`${BASE}${path}`);
+  } catch (error) {
+    if (typeof window === "undefined") throw error;
+    return read<T>(relay);
+  }
 }
 
 /** Every token the index has seen this address hold, zero balances excluded. */
 export function fetchTokenBalances(address: string): Promise<ScanBalance[]> {
-  return read<ScanBalance[]>(`/api/v2/addresses/${address}/token-balances`);
+  return either<ScanBalance[]>(SCAN_PATHS.balances(address), RELAY.balances(address));
 }
 
 /**
@@ -73,7 +123,7 @@ export function fetchTokenBalances(address: string): Promise<ScanBalance[]> {
  * the coin says so — and is passed on as undefined rather than as a failure.
  */
 export function fetchCoinPrice(): Promise<number | undefined> {
-  return read<{ coin_price: string | null }>("/api/v2/stats").then((stats) =>
-    stats.coin_price ? Number(stats.coin_price) : undefined,
+  return either<{ coin_price: string | null }>(SCAN_PATHS.stats, RELAY.stats).then(
+    (stats) => (stats.coin_price ? Number(stats.coin_price) : undefined),
   );
 }

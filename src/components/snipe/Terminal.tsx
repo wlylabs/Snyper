@@ -29,7 +29,7 @@ import { useMounted } from "@/hooks/useMounted";
 import { useScreener, type Pair } from "@/hooks/useScreener";
 import { STAKES, stakeIn, useFire, useShot } from "@/hooks/useSnipe";
 import { useRoutes, useSwapAction } from "@/hooks/useSwap";
-import { useAppStore } from "@/store/useAppStore";
+import { basisKey, useAppStore } from "@/store/useAppStore";
 
 /**
  * What the wallet keeps back for gas when the reader asks for everything.
@@ -238,7 +238,8 @@ function Notice({ title, hint }: { title: string; hint: string }) {
 function Exit({ pair, coinUsd }: { pair: Pair; coinUsd: number | undefined }) {
   const { t } = useI18n();
   const { address } = useAccount();
-  const basis = useAppStore((state) => state.basis[pair.token.toLowerCase()]);
+  const key = basisKey(address, pair.token);
+  const basis = useAppStore((state) => (key ? state.basis[key] : undefined));
   const record = useAppStore((state) => state.record);
 
   const { data: balance, refetch } = useReadContract({
@@ -337,9 +338,9 @@ function Exit({ pair, coinUsd }: { pair: Pair; coinUsd: number | undefined }) {
    * position made money, so it has to happen exactly once.
    */
   const settle = useCallback(() => {
-    record(pair.token, "received", latest.current);
+    record(address, pair.token, "received", latest.current);
     void refetch();
-  }, [record, refetch, pair.token]);
+  }, [record, refetch, address, pair.token]);
 
   const { approved, approve, approving, send, sending, done, blocked, checking } = useSwapAction({
     token: pair.token,
@@ -589,13 +590,23 @@ export function Terminal() {
    * fill over and over for as long as the receipt stood.
    */
   const record = useAppStore((state) => state.record);
-  const filled = useRef<{ token?: `0x${string}`; usd: number }>({ usd: 0 });
+  /*
+   * The wallet rides in the ref beside the fill, rather than being read when
+   * the receipt lands. A reader who switches accounts while a transaction is in
+   * flight would otherwise have the fill filed against whoever is connected
+   * when it confirms, which is the same mistake the unscoped key used to make,
+   * only narrower.
+   */
+  const filled = useRef<{ owner?: `0x${string}`; token?: `0x${string}`; usd: number }>({
+    usd: 0,
+  });
   useEffect(() => {
-    filled.current = { token: target?.token, usd: stakeUsd };
-  }, [target?.token, stakeUsd]);
+    filled.current = { owner: address, token: target?.token, usd: stakeUsd };
+  }, [address, target?.token, stakeUsd]);
 
   const banked = useCallback(() => {
-    if (filled.current.token) record(filled.current.token, "spent", filled.current.usd);
+    const { owner, token, usd } = filled.current;
+    if (token) record(owner, token, "spent", usd);
   }, [record]);
 
   const { fire, firing, done, hash, short, checking, blocked, failure, ready, reset } = useFire({

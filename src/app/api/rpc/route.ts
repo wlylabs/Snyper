@@ -1,4 +1,5 @@
 import { CHAIN } from "@/lib/chains";
+import { spend, tooMany } from "@/lib/ratelimit";
 
 /**
  * The same-origin way to the chain.
@@ -18,8 +19,8 @@ import { CHAIN } from "@/lib/chains";
  * a different network with a different rate limit budget, and it answers from
  * this origin, where there is no cross-origin policy to fall foul of. The
  * browser tries the chain directly first and comes here only when that failed —
- * the same arrangement the holdings indexer already has in
- * `/api/balances/[address]`, and for the same reason.
+ * the same arrangement the holdings indexer has in `/api/balances/[address]`,
+ * and for the same reason.
  *
  * `RPC_4663` is read ahead of the public variable so a deployment can relay
  * through an endpoint of its own without shipping its URL to every reader.
@@ -47,6 +48,17 @@ const MAX_BODY = 512 * 1024;
  * batch always fits and a body built to make this server work does not.
  */
 const MAX_CALLS = 64;
+
+/**
+ * Requests a single caller may relay in a minute.
+ *
+ * Generous against what a reader costs — every screen in this app batches, so
+ * even the market scan refreshing hard is a few requests a second at worst, and
+ * this relay is the second way to the chain rather than the first, reached only
+ * when a direct call has already failed. See `spend` for what this does and
+ * does not promise.
+ */
+const PER_MINUTE = 150;
 
 /**
  * What may be relayed.
@@ -96,6 +108,19 @@ function refuse(message: string, code = -32600) {
 }
 
 export async function POST(request: Request) {
+  /*
+   * Counted before the body is read, so a caller over their budget costs this
+   * server the parse as well as the upstream call they were refused.
+   */
+  const budget = spend(request, "rpc", PER_MINUTE);
+  if (budget.exceeded) {
+    return tooMany(budget.retryAfter, {
+      jsonrpc: "2.0",
+      id: null,
+      error: { code: -32005, message: "too many requests" },
+    });
+  }
+
   const declared = Number(request.headers.get("content-length"));
   if (Number.isFinite(declared) && declared > MAX_BODY) {
     return refuse("request too large");

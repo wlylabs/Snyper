@@ -262,6 +262,11 @@ const en = {
   "wallet.wallets": "Wallets",
   "wallet.wrongNetwork": "Wrong network",
 
+  "error.title": "Something on this screen stopped working.",
+  "error.hint": "Nothing was sent and nothing was signed. Your wallet and everything in it are untouched.",
+  "error.retry": "Try again",
+  "error.home": "Back to Snyper",
+
   "notFound.title": "That route is not part of this app.",
   "notFound.action": "Back to Snyper",
 } as const;
@@ -511,6 +516,11 @@ const id: Record<TKey, string> = {
   "wallet.wallet": "Dompet",
   "wallet.wallets": "Dompet",
   "wallet.wrongNetwork": "Jaringan salah",
+
+  "error.title": "Ada bagian layar ini yang berhenti bekerja.",
+  "error.hint": "Tidak ada yang dikirim dan tidak ada yang ditandatangani. Dompet Anda dan seluruh isinya tidak tersentuh.",
+  "error.retry": "Coba lagi",
+  "error.home": "Kembali ke Snyper",
 
   "notFound.title": "Rute itu bukan bagian dari aplikasi ini.",
   "notFound.action": "Kembali ke Snyper",
