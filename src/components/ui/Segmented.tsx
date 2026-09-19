@@ -31,7 +31,16 @@ export function Segmented<T extends string>({
     const root = track.current;
     if (!root) return;
     const active = root.querySelector<HTMLElement>('[data-active="true"]');
-    if (!active) return;
+    /*
+     * Nothing selected is a state, not a failure to measure. A control whose
+     * value has moved somewhere else — a typed amount beside a row of presets —
+     * used to keep its block sitting under whichever option was picked last,
+     * which reads as a claim that the preset is still in force.
+     */
+    if (!active) {
+      setMarker(undefined);
+      return;
+    }
 
     const measure = () => setMarker({ left: active.offsetLeft, width: active.offsetWidth });
     measure();

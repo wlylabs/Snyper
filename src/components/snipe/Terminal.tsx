@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { erc20Abi, formatEther, formatUnits } from "viem";
-import { useAccount, useReadContract } from "wagmi";
+import { useAccount, useBalance, useReadContract } from "wagmi";
 import { Icon } from "@/components/ui/Icon";
 import { Empty, Panel, Row, Skeleton } from "@/components/ui/Panel";
 import { Segmented } from "@/components/ui/Segmented";
@@ -30,6 +30,33 @@ import { useScreener, type Pair } from "@/hooks/useScreener";
 import { STAKES, stakeIn, useFire, useShot } from "@/hooks/useSnipe";
 import { useRoutes, useSwapAction } from "@/hooks/useSwap";
 import { useAppStore } from "@/store/useAppStore";
+
+/**
+ * What the wallet keeps back for gas when the reader asks for everything.
+ *
+ * A buy on this chain costs a few cents of gas, and gas comes out of the same
+ * balance the stake does — so "all of it" has to mean all but enough to pay for
+ * the sending. A quarter of a dollar is many times the real cost and still
+ * small enough that nobody feels it withheld.
+ */
+const RESERVE = 0.25;
+
+/**
+ * The number after the reader has stopped typing.
+ *
+ * Every quote is a call to the chain, and a pool moves with the size of the
+ * trade, so a figure cannot be scaled from some other figure — it has to be
+ * asked for. Quoting each keystroke would be right and unaffordable; this waits
+ * for the number to stand still first.
+ */
+function useSettled<T>(value: T, ms = 350): T {
+  const [settled, setSettled] = useState(value);
+  useEffect(() => {
+    const id = window.setTimeout(() => setSettled(value), ms);
+    return () => window.clearTimeout(id);
+  }, [value, ms]);
+  return settled;
+}
 
 /**
  * Where a fill stops being cheap and starts being a decision.
@@ -98,6 +125,17 @@ function worth(
   const units = Number(formatUnits(amount, exit.decimals));
   if (exit.address.toLowerCase() === VENUE.stable.toLowerCase()) return units;
   return coinUsd === undefined ? undefined : units * coinUsd;
+}
+
+/**
+ * Dollars as money rather than as a measurement.
+ *
+ * Rounded down to the cent, and down rather than to nearest, because this is
+ * used for what a wallet can spend: rounding up would offer a figure the
+ * balance cannot cover.
+ */
+function money(value: number): number {
+  return Math.floor(value * 100) / 100;
 }
 
 /** A signed dollar figure, for a profit and loss that has to show its sign. */
@@ -416,7 +454,8 @@ export function Terminal() {
 
   const [picking, setPicking] = useState(false);
   const [aimed, setAimed] = useState<string>();
-  const [stakeUsd, setStakeUsd] = useState<number>(STAKES[0]);
+  const [preset, setPreset] = useState<number | undefined>(STAKES[0]);
+  const [typed, setTyped] = useState("");
 
   const listed = useMemo(() => targets(pairs), [pairs]);
 
@@ -430,7 +469,31 @@ export function Terminal() {
   const measured = useCoinUsd();
   const coinUsd =
     measured ?? listed.find((pair) => pair.quote === "WETH" && pair.usdRate > 0)?.usdRate;
+  /*
+   * A ladder for the common sizes and a field for every other one.
+   *
+   * The presets were the whole control, which quietly decided that nobody
+   * trades ten dollars in two-dollar bites — and a reader holding ten dollars
+   * had four buttons of which three were unaffordable and one was their entire
+   * balance, gas included. Whichever was touched last wins: typing clears the
+   * preset, tapping a preset clears the field.
+   */
+  const custom = useMemo(() => {
+    const clean = typed.replace(",", ".").trim();
+    if (!clean) return undefined;
+    const value = Number(clean);
+    return Number.isFinite(value) && value > 0 ? value : undefined;
+  }, [typed]);
+
+  const stakeUsd = useSettled(custom ?? preset ?? 0);
   const stake = useMemo(() => stakeIn(stakeUsd, coinUsd), [stakeUsd, coinUsd]);
+
+  /* What the wallet could actually put in, for the ladder and for `Max`. */
+  const held = useBalance({ address, chainId: CHAIN_ID });
+  const spendable =
+    held.data && coinUsd !== undefined
+      ? Math.max(Number(formatEther(held.data.value)) * coinUsd - RESERVE, 0)
+      : undefined;
 
   /*
    * The target is held by address and looked up live, so a row still describes
@@ -596,15 +659,83 @@ export function Terminal() {
              * decision; this is the receipt for it, and a reader who wants to
              * know what leaves their wallet should not have to work it out.
              */}
+            {/* What this wallet could put in, once gas is kept back. */}
             <p className="num text-[11px] text-faint">
-              {stake > 0n ? `≈ ${formatAmount(Number(formatEther(stake)))} ${coin}` : "—"}
+              {spendable !== undefined
+                ? t("snipe.spendable", { amount: `$${formatAmount(money(spendable))}` })
+                : "—"}
             </p>
           </div>
+          {/*
+           * A rung the wallet cannot pay for is shown and disabled rather than
+           * hidden, so the ladder stays the same shape between readers and a
+           * greyed rung says "not with this balance" instead of vanishing.
+           */}
           <Segmented
-            options={STAKES.map((size) => ({ value: String(size), label: `$${size}` }))}
-            value={String(stakeUsd)}
-            onChange={(value) => setStakeUsd(Number(value))}
+            options={STAKES.map((size) => ({
+              value: String(size),
+              label: `$${size}`,
+              disabled: spendable !== undefined && size > spendable,
+            }))}
+            value={custom === undefined && preset !== undefined ? String(preset) : ""}
+            onChange={(value) => {
+              setTyped("");
+              setPreset(Number(value));
+            }}
           />
+
+          <div className="mt-1.5 flex items-center gap-2">
+            {/*
+             * The unit is marked inside the box rather than left to the row
+             * around it. Every preset says dollars and the receipt below says
+             * the coin, but the one place a reader could still mean something
+             * else is the field they type into.
+             */}
+            <div className="relative min-w-0 flex-1">
+              <span className="num pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-[13px] text-faint">
+                $
+              </span>
+              <input
+                className="field num w-full pl-5"
+                inputMode="decimal"
+                placeholder={t("snipe.custom")}
+                aria-label={t("snipe.custom")}
+                value={typed}
+                onChange={(event) => {
+                  setTyped(event.target.value);
+                  setPreset(undefined);
+                }}
+              />
+            </div>
+            {/*
+             * Everything, less what the sending costs. Gas comes out of the
+             * same balance as the stake, so a max that meant the whole balance
+             * would be a button that always fails.
+             */}
+            <button
+              type="button"
+              className="btn btn-sm btn-short"
+              disabled={spendable === undefined || spendable <= 0}
+              onClick={() => {
+                setPreset(undefined);
+                setTyped(spendable ? String(money(spendable)) : "");
+              }}
+            >
+              {t("swap.max")}
+            </button>
+          </div>
+
+          {/*
+           * The coin figure is shown and not chosen. The dollars are the
+           * decision; this is the receipt for it, and a reader who wants to
+           * know what actually leaves their wallet should not have to work it
+           * out from a rate they were never shown.
+           */}
+          {stake > 0n && (
+            <p className="num mt-1.5 text-right text-[11px] text-faint">
+              {`≈ ${formatAmount(Number(formatEther(stake)))} ${coin}`}
+            </p>
+          )}
 
           {/*
            * The exit check, above everything and on its own.

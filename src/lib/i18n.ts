@@ -158,6 +158,8 @@ const en = {
   "snipe.emptyHint":
     "A target is a pair under $10M with at least $1K resting in its pool and $1K traded through it in the last five minutes. The list fills again on its own.",
   "snipe.stake": "Stake",
+  "snipe.custom": "Any amount",
+  "snipe.spendable": "{amount} spendable",
   "snipe.sell": "Sell",
   "snipe.worth": "Worth now",
   "snipe.pnl": "Profit and loss",
@@ -414,6 +416,8 @@ const id: Record<TKey, string> = {
   "snipe.emptyHint":
     "Target itu pair di bawah $10J dengan minimal $1R mengendap di pool-nya dan $1R yang lewat dalam lima menit terakhir. Daftarnya terisi lagi sendiri.",
   "snipe.stake": "Modal",
+  "snipe.custom": "Jumlah bebas",
+  "snipe.spendable": "Bisa dipakai {amount}",
   "snipe.sell": "Jual",
   "snipe.worth": "Nilai sekarang",
   "snipe.pnl": "Untung rugi",
