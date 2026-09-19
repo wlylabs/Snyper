@@ -1,5 +1,6 @@
 "use client";
 
+import { ReferralPanel } from "@/components/settings/ReferralPanel";
 import { Panel } from "@/components/ui/Panel";
 import { Segmented } from "@/components/ui/Segmented";
 import { useI18n } from "@/hooks/useI18n";
@@ -71,6 +72,8 @@ export default function SettingsPage() {
           )}
         </div>
       </Panel>
+
+      <ReferralPanel />
     </div>
   );
 }
