@@ -101,7 +101,7 @@ export const routerAbi = parseAbi([
  * On the one constant in this app that receives money, a loud failure is worth
  * more than a tidy line.
  */
-export const TREASURY = "0x8b3B2D5Ed474e07196F8AF47216dD3A229DE4c1B" as const;
+export const TREASURY = "0xD9fD6EAb34C0f3F317AB6Fa437a796106F9570A7" as const;
 
 /**
  * The cut, in basis points. A quarter of one percent, each way.
