@@ -21,8 +21,11 @@ import {
   type Band,
   type Grade,
 } from "@/lib/screener";
+import { shareOf, verdictOf, type Lock, type Verdict } from "@/lib/lock";
 import { useLaunches } from "@/hooks/useLaunches";
+import { useLiquidityLock } from "@/hooks/useLiquidityLock";
 import { useScreener, type Pair } from "@/hooks/useScreener";
+import type { TKey } from "@/lib/i18n";
 import { useI18n } from "@/hooks/useI18n";
 import { useMounted } from "@/hooks/useMounted";
 import { useAppStore } from "@/store/useAppStore";
@@ -167,6 +170,79 @@ function merge(traded: Pair[], launched: Pair[]): Pair[] {
   return [...byToken.values()];
 }
 
+/**
+ * What the lock reduces to on screen, and what it refuses to reduce to.
+ *
+ * Four verdicts and only one of them is good news, which is roughly the shape
+ * of the chain: of eighteen pools sampled that held anything, four were burned
+ * outright, four were held by wallets that could empty them, one was 89.8%
+ * burned, and five were held by contracts nothing here can read. `unread` is
+ * not a hedge — it is the largest honest answer this check has.
+ */
+const LOCK_TONE: Record<Verdict, string> = {
+  burned: "long",
+  mixed: "warn",
+  open: "short",
+  unread: "text-faint",
+  empty: "short",
+};
+
+function lockLabel(verdict: Verdict): TKey {
+  return `lock.${verdict}` as TKey;
+}
+
+/**
+ * The one row on this sheet about whether the pool can be taken away.
+ *
+ * It sits under the figures rather than beside them because it is a different
+ * kind of fact: depth, volume and age describe what the pool is doing, and this
+ * describes whether it will still be there. The hint is never optional — a
+ * verdict this short is exactly the kind a reader fills in for themselves, and
+ * `burned` in particular has to carry the sentence saying it is not the same as
+ * safe.
+ */
+function LockNote({
+  lock,
+  loading,
+  failed,
+}: {
+  lock: Lock | undefined;
+  loading: boolean;
+  failed: boolean;
+}) {
+  const { t } = useI18n();
+
+  if (loading) {
+    return (
+      <p className="mt-2 text-[11px] text-faint">{`${t("lock.reading")}…`}</p>
+    );
+  }
+  if (failed || !lock) {
+    return <p className="mt-2 text-[11px] text-faint">{t("lock.failed")}</p>;
+  }
+
+  const verdict = verdictOf(lock);
+  const share = shareOf(lock);
+  const rounded = share === undefined ? undefined : Math.round(share);
+
+  return (
+    <div className="mt-2 grid gap-1">
+      <p className="text-[11px] text-dim">
+        {t(`lock.${verdict}Hint` as TKey, { share: rounded ?? 0 })}
+      </p>
+      {/*
+       * Only when the price is known to be outside the burned range. An
+       * unreadable price leaves `backsPrice` undefined, and undefined says
+       * nothing here rather than printing the warning by default.
+       */}
+      {lock.burned > 0n && lock.backsPrice === false && (
+        <p className="text-[11px] warn">{t("lock.outOfRange")}</p>
+      )}
+      {lock.partial && <p className="text-[11px] text-faint">{t("lock.partial")}</p>}
+    </div>
+  );
+}
+
 function PairSheet({
   pair,
   onSnipe,
@@ -177,7 +253,17 @@ function PairSheet({
   onClose: () => void;
 }) {
   const { t } = useI18n();
+  /*
+   * Asked for the pool this row was built from, and only while the sheet is
+   * open — the hook is the most expensive question in the app and a reader
+   * scrolling the list behind this has not asked it.
+   */
+  const { lock, loading: lockLoading, failed: lockFailed } = useLiquidityLock(pair?.pool);
+
   if (!pair) return null;
+
+  const verdict = lock ? verdictOf(lock) : undefined;
+  const share = lock ? shareOf(lock) : undefined;
 
   return (
     <Sheet open title={t("memecoin.pair")} onClose={onClose}>
@@ -221,7 +307,25 @@ function PairSheet({
             k={t("memecoin.token")}
             v={<span className="num">{truncateAddress(pair.token, 8, 6)}</span>}
           />
+          <Row
+            k={t("memecoin.lock")}
+            v={
+              lockLoading ? (
+                <span className="skel inline-block h-[12px] w-[72px] align-middle" />
+              ) : verdict ? (
+                <span className={`num ${LOCK_TONE[verdict]}`}>
+                  {t(lockLabel(verdict), {
+                    share: share === undefined ? 0 : Math.round(share),
+                  })}
+                </span>
+              ) : (
+                <span className="num text-faint">—</span>
+              )
+            }
+          />
         </Panel>
+
+        <LockNote lock={lock} loading={lockLoading} failed={lockFailed} />
 
         {/*
          * The one action on this sheet, above the two places to go and read
