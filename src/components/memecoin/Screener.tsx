@@ -15,7 +15,7 @@ import {
   HEALTHY_DILUTION,
   HEALTHY_LIQUIDITY,
   clearsFloor,
-  impersonates,
+  dropCopycats,
   inBand,
   underCeiling,
   type Band,
@@ -472,7 +472,19 @@ export function Screener() {
   };
   const { launches, loading: pricing } = useLaunches(births, head, true);
 
-  const all = useMemo(() => merge(pairs, launches), [pairs, launches]);
+  /*
+   * Copycats go before the reader's own filters rather than after them. Which
+   * contract holds a ticker is decided against everything the screen knows
+   * about, so a band or a grade that happens to exclude the real one cannot
+   * promote a copy into being the only thing wearing the name.
+   */
+  /*
+   * Copycats go before the reader's own filters rather than after them. Which
+   * contract holds a ticker is decided against everything the screen knows
+   * about, so a band or a grade that happens to exclude the real one cannot
+   * promote a copy into being the only thing wearing the name.
+   */
+  const all = useMemo(() => dropCopycats(merge(pairs, launches)), [pairs, launches]);
   const listed = useMemo(
     () => order(all.filter((pair) => keep(pair, band, grade))),
     [all, band, grade],
@@ -559,9 +571,6 @@ export function Screener() {
                 <span className="font-normal text-faint">/{pair.quote}</span>
                 {pair.age !== undefined && pair.age < FRESH && (
                   <span className="chip chip-xs chip-live ml-1.5">{t("memecoin.fresh")}</span>
-                )}
-                {impersonates(pair.token, pair.symbol) && (
-                  <span className="chip chip-xs chip-warn ml-1.5">{t("memecoin.fake")}</span>
                 )}
                 <LockChip lock={locks.get(pair.pool.toLowerCase())} />
               </span>

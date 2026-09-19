@@ -10,7 +10,7 @@ import { Sheet } from "@/components/ui/Sheet";
 import { CHAIN_ID, chainMeta, explorerTx } from "@/lib/chains";
 import { haptic } from "@/lib/haptics";
 import { formatAmount, formatCompact } from "@/lib/format";
-import { clearsFloor, underCeiling } from "@/lib/screener";
+import { clearsFloor, dropCopycats, underCeiling } from "@/lib/screener";
 import {
   EXITS,
   FEE_BIPS,
@@ -102,7 +102,17 @@ function usd(value: number | undefined): string {
  * question left is what is moving now.
  */
 function targets(pairs: Pair[]): Pair[] {
-  return pairs
+  /*
+   * The same names the memecoin screen refuses, refused here too.
+   *
+   * This list is not that one and does not have to agree with it about depth or
+   * about what is worth showing — but a ticker held by several contracts is not
+   * a matter of taste, and a screen that hides a copy while the screen that
+   * fires still offers it has put the copy exactly where it does damage. The
+   * floor above went through this once already, under three different standards
+   * on three screens; there is no reason to learn it a second time.
+   */
+  return dropCopycats(pairs)
     .filter((pair) => underCeiling(pair) && clearsFloor(pair))
     .sort((a, b) => b.volume - a.volume);
 }

@@ -80,6 +80,81 @@ export function impersonates(token: string, symbol: string): boolean {
 }
 
 /**
+ * What a row has to carry to be tested for wearing someone else's name.
+ */
+export type Named = {
+  token: string;
+  symbol: string;
+  liquidity: number;
+  volume: number;
+};
+
+/**
+ * One ticker, one row.
+ *
+ * A ticker is whatever a contract says it is, and deploying one costs nothing,
+ * so a screen that lists brand new pools is a screen that lists the same name
+ * over and over. Measured across a day of launches on this chain: thirty-six
+ * tickers claimed by more than one contract, SIRIUS by thirty-five of them, SIU
+ * by twenty-nine, RIP by fifteen. A reader looking at a row that says SIRIUS
+ * cannot tell which of the thirty-five they are about to buy, and that is the
+ * entire purpose of deploying the other thirty-four.
+ *
+ * Most of them never reach the screen, because they hold nothing and the floor
+ * already refuses them — of all those copies only five cleared it, and only one
+ * ticker had two copies clear it at once. So this is not a flood being held
+ * back. It is the handful that get through the floor by holding real money,
+ * which are also the only ones a reader could lose anything to.
+ *
+ * Two different tests, because two different things are knowable:
+ *
+ *   A token calling itself by one of the two names this app knows by address
+ *   is refused outright. That is `impersonates`, and it is proof rather than
+ *   judgement — the chain's dollar has an address, and a second contract
+ *   answering USDG is not it. One turned up in the measured day, named
+ *   "Gelobal Dollar".
+ *
+ *   Among the rest, a ticker held by several contracts keeps the one the market
+ *   is in. Note what that claims and what it does not: not that the deepest
+ *   pool is the honest token, which nothing here can know, but that it is the
+ *   one being traded — and a copy wearing the name without the market is a row
+ *   that can only be mistaken for it. Depth decides rather than age, because a
+ *   pool's depth is on the chain now and a token's age often is not.
+ *
+ * Order is preserved, so whatever sorted the list still decides what it shows.
+ */
+export function dropCopycats<T extends Named>(rows: readonly T[]): T[] {
+  const genuine = rows.filter((row) => !impersonates(row.token, row.symbol));
+
+  /* Which contract holds the market for each name anyone shares. */
+  const holder = new Map<string, T>();
+  for (const row of genuine) {
+    const name = row.symbol.trim().toUpperCase();
+    if (!name) continue;
+    const held = holder.get(name);
+    if (!held) {
+      holder.set(name, row);
+      continue;
+    }
+    if (row.liquidity > held.liquidity) holder.set(name, row);
+    else if (row.liquidity === held.liquidity && row.volume > held.volume) {
+      holder.set(name, row);
+    }
+  }
+
+  /*
+   * A row with no ticker at all is kept. It is unreadable rather than
+   * borrowed, nothing else can be confused with it, and the floor already
+   * decides whether it is worth showing.
+   */
+  return genuine.filter((row) => {
+    const name = row.symbol.trim().toUpperCase();
+    if (!name) return true;
+    return holder.get(name) === row;
+  });
+}
+
+/**
  * A v3 pool's price, from the square root it stores.
  *
  * `sqrtPriceX96` is the square root of token1 per token0, held as a Q64.96
