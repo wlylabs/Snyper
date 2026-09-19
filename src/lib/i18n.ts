@@ -161,6 +161,7 @@ const en = {
   "snipe.custom": "Any amount",
   "snipe.spendable": "{amount} spendable",
   "snipe.sell": "Sell",
+  "snipe.units": "Any amount",
   "snipe.worth": "Worth now",
   "snipe.pnl": "Profit and loss",
   "snipe.youGet": "You get",
@@ -182,7 +183,6 @@ const en = {
   "snipe.checking": "Asking the chain…",
   "snipe.done": "Filled",
   "snipe.receipt": "Receipt",
-  "snipe.oneSignature": "No approval to grant first — one signature, and nothing left standing after it.",
   "snipe.trapped": "This token cannot be sold",
   "snipe.trappedHint":
     "The chain was asked to quote selling this position straight back, and it refused. A token that can be bought and not sold is the oldest trick there is, so nothing is offered to sign here.",
@@ -419,6 +419,7 @@ const id: Record<TKey, string> = {
   "snipe.custom": "Jumlah bebas",
   "snipe.spendable": "Bisa dipakai {amount}",
   "snipe.sell": "Jual",
+  "snipe.units": "Jumlah bebas",
   "snipe.worth": "Nilai sekarang",
   "snipe.pnl": "Untung rugi",
   "snipe.youGet": "Kamu dapat",
@@ -440,7 +441,6 @@ const id: Record<TKey, string> = {
   "snipe.checking": "Memastikan ke chain…",
   "snipe.done": "Kena",
   "snipe.receipt": "Bukti transaksi",
-  "snipe.oneSignature": "Tidak ada izin yang perlu diberikan dulu — satu tanda tangan, dan tidak ada sisa setelahnya.",
   "snipe.trapped": "Token ini tidak bisa dijual",
   "snipe.trappedHint":
     "Chain diminta menghitung penjualan posisi ini balik saat itu juga, dan ia menolak. Token yang bisa dibeli tapi tidak bisa dijual adalah trik paling tua yang ada, jadi di sini tidak ada yang ditawarkan untuk ditandatangani.",
