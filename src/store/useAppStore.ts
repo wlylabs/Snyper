@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import type { Settings } from "@/lib/types";
+import type { Pair } from "@/hooks/useScreener";
 
 /**
  * What a reader has put into a token through this app, and taken back out.
@@ -37,11 +38,28 @@ type AppState = {
   hidden: string[];
   /** Cost basis by contract, lowercased. See `Basis`. */
   basis: Record<string, Basis>;
+  /**
+   * A pair handed from one screen to another, on its way to the terminal.
+   *
+   * The memecoin screens are where a target is found and the terminal is where
+   * it is shot at, and until now the two could not say a word to each other —
+   * a reader who spotted something had to remember its ticker, walk to the
+   * other screen and find it again in a list that may not even carry it.
+   *
+   * The whole pair travels rather than its address, because the terminal can
+   * quote anything it is handed and the lists do not agree on what they hold:
+   * a launch with no trades in the last five minutes is not in the terminal's
+   * own list and is perfectly buyable. It is deliberately not persisted — an
+   * aim is a thing you take now, not something to find still pointed somewhere
+   * a day later.
+   */
+  aimed?: Pair;
   hydrated: boolean;
 
   setSettings: (patch: Partial<Settings>) => void;
   setHidden: (address: string, hidden: boolean) => void;
   record: (address: string, side: "spent" | "received", usd: number) => void;
+  aim: (pair: Pair | undefined) => void;
   setHydrated: () => void;
 };
 
@@ -88,6 +106,8 @@ export const useAppStore = create<AppState>()(
             basis: { ...state.basis, [key]: { ...held, [side]: held[side] + usd } },
           };
         }),
+
+      aim: (pair) => set({ aimed: pair }),
 
       setHydrated: () => set({ hydrated: true }),
     }),

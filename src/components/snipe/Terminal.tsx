@@ -552,15 +552,33 @@ export function Terminal() {
   const overBalance = spendable !== undefined && stakeUsd > spendable;
 
   /*
-   * The target is held by address and looked up live, so a row still describes
-   * the pool as it is now rather than as it was at the tap. A target that falls
-   * out of the list — traded past the ceiling, or simply quiet for five minutes
-   * — is dropped rather than left on screen with numbers that stopped moving.
+   * A target picked here, or one handed over from the memecoin screens.
+   *
+   * The live row wins wherever there is one, so a pair this screen is already
+   * watching keeps describing the pool as it is now rather than as it was at
+   * the tap. A handed pair that this list does not carry is kept anyway rather
+   * than dropped: the terminal can quote anything, and the reason it is missing
+   * is usually that nobody traded it in the last five minutes — which is also
+   * the reason its figures have not moved since they were read.
+   *
+   * A target picked from this screen's own list and then falling out of it is
+   * still dropped, because there it means the pool went quiet while the reader
+   * was looking at numbers that would otherwise sit there frozen.
    */
-  const target = listed.find((pair) => pair.pool === aimed);
+  const handed = useAppStore((state) => state.aimed);
+  const aim = useAppStore((state) => state.aim);
   useEffect(() => {
-    if (aimed && !listed.some((pair) => pair.pool === aimed)) setAimed(undefined);
-  }, [aimed, listed]);
+    if (handed) setAimed(handed.pool);
+  }, [handed]);
+
+  const target =
+    listed.find((pair) => pair.pool === aimed) ??
+    (handed?.pool === aimed ? handed : undefined);
+
+  useEffect(() => {
+    if (!aimed || handed?.pool === aimed) return;
+    if (!listed.some((pair) => pair.pool === aimed)) setAimed(undefined);
+  }, [aimed, listed, handed]);
 
   const { shot, unquotable, loading: quoting } = useShot(target, stake);
 
@@ -987,7 +1005,10 @@ export function Terminal() {
         pairs={listed}
         loading={loading}
         chosen={aimed}
-        onPick={setAimed}
+        onPick={(pool) => {
+          aim(undefined);
+          setAimed(pool);
+        }}
         onClose={() => setPicking(false)}
       />
     </div>

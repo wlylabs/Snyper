@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Icon } from "@/components/ui/Icon";
 import { Empty, Panel, Row, Skeleton } from "@/components/ui/Panel";
@@ -24,6 +25,7 @@ import { useLaunches } from "@/hooks/useLaunches";
 import { useScreener, type Pair } from "@/hooks/useScreener";
 import { useI18n } from "@/hooks/useI18n";
 import { useMounted } from "@/hooks/useMounted";
+import { useAppStore } from "@/store/useAppStore";
 
 /**
  * The chart is fetched only once a pair is opened.
@@ -132,7 +134,15 @@ function order(pairs: Pair[]): Pair[] {
   return [...pairs].sort((a, b) => b.volume - a.volume);
 }
 
-function PairSheet({ pair, onClose }: { pair: Pair | undefined; onClose: () => void }) {
+function PairSheet({
+  pair,
+  onSnipe,
+  onClose,
+}: {
+  pair: Pair | undefined;
+  onSnipe: (pair: Pair) => void;
+  onClose: () => void;
+}) {
   const { t } = useI18n();
   if (!pair) return null;
 
@@ -180,7 +190,22 @@ function PairSheet({ pair, onClose }: { pair: Pair | undefined; onClose: () => v
           />
         </Panel>
 
-        <div className="mt-3 grid grid-cols-2 gap-2">
+        {/*
+         * The one action on this sheet, above the two places to go and read
+         * more about it. Everything above this — the chart, the depth, the age
+         * — is there to answer one question, and it was ending in two outbound
+         * links and no way to act on the answer.
+         */}
+        <button
+          type="button"
+          className="btn btn-accent mt-3 w-full"
+          onClick={() => onSnipe(pair)}
+        >
+          <Icon name="crosshair" size={14} />
+          {t("memecoin.snipe", { symbol: pair.symbol })}
+        </button>
+
+        <div className="mt-2 grid grid-cols-2 gap-2">
           <a
             href={explorerAddress(CHAIN_ID, pair.token)}
             target="_blank"
@@ -239,6 +264,20 @@ export function Screener() {
   const [opened, setOpened] = useState<string>();
   const [view, setView] = useState<"trading" | "new">("trading");
   const { pairs, births, head, loading, error, refetch } = useScreener();
+  const router = useRouter();
+  const aim = useAppStore((state) => state.aim);
+
+  /*
+   * Hand the whole pair over and go. The terminal can quote anything it is
+   * given, so nothing here has to check whether its own list would have
+   * carried this one — and the launches list is full of pairs that would not
+   * be in it, because a pool nobody traded in the last five minutes is still a
+   * pool you can buy from.
+   */
+  const snipe = (pair: Pair) => {
+    aim(pair);
+    router.push("/");
+  };
   const { launches, loading: pricing } = useLaunches(births, head, view === "new");
 
   const listed = useMemo(
@@ -303,10 +342,15 @@ export function Screener() {
     return (
       <div className="flex flex-col gap-1.5">
         {listed.map((pair) => (
+          /*
+           * Two controls, side by side, rather than one inside the other — a
+           * button cannot legally contain a button, and the reader is asking
+           * two different questions anyway: tell me more, or take me to it.
+           */
+          <div key={pair.pool} className="flex items-stretch gap-1.5">
           <button
-            key={pair.pool}
             type="button"
-            className="tile"
+            className="tile min-w-0 flex-1"
             onClick={() => setOpened(pair.pool)}
           >
             <span className="min-w-0 flex-1">
@@ -354,6 +398,15 @@ export function Screener() {
               )}
             </span>
           </button>
+          <button
+            type="button"
+            className="tile w-[46px] shrink-0 justify-center px-0 text-accent"
+            aria-label={t("memecoin.snipe", { symbol: pair.symbol })}
+            onClick={() => snipe(pair)}
+          >
+            <Icon name="crosshair" size={16} />
+          </button>
+          </div>
         ))}
       </div>
     );
@@ -426,6 +479,7 @@ export function Screener() {
 
       <PairSheet
         pair={listed.find((pair) => pair.pool === opened)}
+        onSnipe={snipe}
         onClose={() => setOpened(undefined)}
       />
     </div>
