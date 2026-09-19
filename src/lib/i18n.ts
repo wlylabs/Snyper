@@ -106,10 +106,9 @@ const en = {
   "balance.hidden": "{count} hidden",
   "balance.hiddenLess": "Put the hidden ones away",
   "memecoin.live": "Under $10M · {floor}+ · 5m",
-  "memecoin.liveAny": "Under $10M · no floor · 5m",
   "memecoin.viewTrading": "Trading",
   "memecoin.viewNew": "New",
-  "memecoin.born": "Opened in 24h{floor}",
+  "memecoin.born": "Opened in 24h · {floor}+",
   "memecoin.mcapShort": "MCAP",
   "memecoin.noNew": "No pool has opened on this chain today.",
   "memecoin.noNewHint":
@@ -363,10 +362,9 @@ const id: Record<TKey, string> = {
   "balance.hidden": "{count} disembunyikan",
   "balance.hiddenLess": "Simpan lagi yang disembunyikan",
   "memecoin.live": "Di bawah $10J · {floor}+ · 5m",
-  "memecoin.liveAny": "Di bawah $10J · tanpa batas bawah · 5m",
   "memecoin.viewTrading": "Jalan",
   "memecoin.viewNew": "Baru",
-  "memecoin.born": "Dibuka 24 jam{floor}",
+  "memecoin.born": "Dibuka 24 jam · {floor}+",
   "memecoin.mcapShort": "MCAP",
   "memecoin.noNew": "Belum ada pool yang dibuka di chain ini hari ini.",
   "memecoin.noNewHint":

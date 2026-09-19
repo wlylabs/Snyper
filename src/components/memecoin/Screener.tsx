@@ -87,7 +87,6 @@ function signed(change: number): string {
 function keep(pair: Pair, band: Band, grade: Grade): boolean {
   if (!underCeiling(pair)) return false;
   if (!inBand(pair.change, band)) return false;
-  if (grade === "all") return true;
   if (!clearsFloor(pair)) return false;
   return grade === "floor" || healthy(pair);
 }
@@ -111,7 +110,6 @@ function healthy(pair: Pair): boolean {
  */
 function keepNew(pair: Pair, grade: Grade): boolean {
   if (!underCeiling(pair)) return false;
-  if (grade === "all") return true;
   /* Every test the traded list makes except volume — see `clearsFloor`. */
   if (!clearsFloor(pair, false)) return false;
   return grade === "floor" || healthy(pair);
@@ -329,7 +327,7 @@ export function Screener() {
               className="btn btn-sm btn-short"
               onClick={() => {
                 setBand("all");
-                setGrade("all");
+                setGrade("floor");
               }}
             >
               {t("memecoin.clear")}
@@ -446,8 +444,7 @@ export function Screener() {
           )}
           <Segmented
             options={[
-              { value: "all", label: t("memecoin.gradeAll") },
-              { value: "floor", label: `$${formatCompact(FLOOR)}+` },
+              { value: "floor", label: t("memecoin.gradeAll") },
               { value: "healthy", label: t("memecoin.gradeHealthy") },
             ]}
             value={grade}
@@ -457,14 +454,11 @@ export function Screener() {
       )}
 
       <Panel
+        /* The floor is always on now, so the header always names it. */
         label={
           view === "new"
-            ? t("memecoin.born", {
-                floor: grade === "all" ? "" : ` · $${formatCompact(FLOOR)}+`,
-              })
-            : grade === "all"
-              ? t("memecoin.liveAny")
-              : t("memecoin.live", { floor: `$${formatCompact(FLOOR)}` })
+            ? t("memecoin.born", { floor: `$${formatCompact(FLOOR)}` })
+            : t("memecoin.live", { floor: `$${formatCompact(FLOOR)}` })
         }
         meta={
           mounted && pairs.length > 0 ? (

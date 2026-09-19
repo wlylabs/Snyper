@@ -181,8 +181,17 @@ export const CEILING = 10_000_000;
 export const HEALTHY_LIQUIDITY = 0.1;
 export const HEALTHY_DILUTION = 2;
 
-/** How hard the list is filtered, in one control. */
-export type Grade = "all" | "floor" | "healthy";
+/**
+ * How hard the list is filtered, in one control.
+ *
+ * Two settings, and the lower one is still a floor. There used to be a third
+ * below it that let everything through, which meant the screen could be sitting
+ * on four dollars of volume while the control above it read "Any" — a word that
+ * sounds like breadth and was working as an off switch. Any here means any
+ * token that has cleared the floor, not any token at all, and there is no
+ * longer a way to switch the floor off.
+ */
+export type Grade = "floor" | "healthy";
 
 /**
  * The reader's bar, applied to all four figures alike.
