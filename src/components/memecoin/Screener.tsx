@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Icon } from "@/components/ui/Icon";
 import { Empty, Panel, Row, Skeleton } from "@/components/ui/Panel";
@@ -13,8 +14,10 @@ import {
   FLOOR,
   HEALTHY_DILUTION,
   HEALTHY_LIQUIDITY,
+  clearsFloor,
   impersonates,
   inBand,
+  underCeiling,
   type Band,
   type Grade,
 } from "@/lib/screener";
@@ -22,6 +25,7 @@ import { useLaunches } from "@/hooks/useLaunches";
 import { useScreener, type Pair } from "@/hooks/useScreener";
 import { useI18n } from "@/hooks/useI18n";
 import { useMounted } from "@/hooks/useMounted";
+import { useAppStore } from "@/store/useAppStore";
 
 /**
  * The chart is fetched only once a pair is opened.
@@ -81,34 +85,21 @@ function signed(change: number): string {
  * market cap is a hundred, and a hundred dollars of depth is not a market.
  */
 function keep(pair: Pair, band: Band, grade: Grade): boolean {
-  if (pair.marketCap !== undefined && pair.marketCap > CEILING) return false;
+  if (!underCeiling(pair)) return false;
+  /*
+   * A movement filter cannot be answered by something that has not moved. An
+   * untraded pool is not flat, it is silent, and letting it fall into `flat`
+   * would be the screen making up an answer on its behalf.
+   */
+  if (band !== "all" && pair.swaps === 0) return false;
   if (!inBand(pair.change, band)) return false;
-  if (grade === "all") return true;
-
-  const { marketCap, fdv, volume, liquidity } = pair;
-  if (marketCap === undefined || fdv === undefined) return false;
-  if (marketCap < FLOOR || fdv < FLOOR || volume < FLOOR || liquidity < FLOOR) return false;
-  if (grade === "floor") return true;
-
-  return liquidity >= marketCap * HEALTHY_LIQUIDITY && fdv <= marketCap * HEALTHY_DILUTION;
+  /* Volume is asked of a row only if that row has trades behind it. */
+  if (!clearsFloor(pair, pair.swaps > 0)) return false;
+  return grade === "floor" || healthy(pair);
 }
 
-/**
- * Whether a launch survives, which is a different question from whether a
- * trade does.
- *
- * Volume cannot be in this test. A pool that opened twenty minutes ago and has
- * not been touched since has no volume by definition, and a floor that tested
- * it would empty the list of exactly the rows the list exists to show. What
- * can be asked of a launch is whether there is anything in it to trade against,
- * so depth is the whole of the floor here, and the ceiling still holds.
- */
-function keepNew(pair: Pair, grade: Grade): boolean {
-  if (pair.marketCap !== undefined && pair.marketCap > CEILING) return false;
-  if (grade === "all") return true;
-  if (pair.liquidity < FLOOR) return false;
-  if (grade === "floor") return true;
-
+/** Deep enough for its size, and not mostly supply that has not arrived yet. */
+function healthy(pair: Pair): boolean {
   const { marketCap, fdv, liquidity } = pair;
   if (marketCap === undefined || fdv === undefined) return false;
   return liquidity >= marketCap * HEALTHY_LIQUIDITY && fdv <= marketCap * HEALTHY_DILUTION;
@@ -120,18 +111,71 @@ function thin(pair: Pair): boolean {
 }
 
 /**
- * Busiest first, and only busiest.
+ * Busiest first, then freshest.
  *
- * The sort control is gone: inside a ten-million ceiling the question of what
- * to read first has one answer, which is what is being traded now. Newest was
- * a list of launches most of which never traded at all, and biggest mover put
- * a token up four hundred percent on nine dollars of volume at the top.
+ * One rule rather than a control, and it falls out of the list holding both
+ * sources. What is being traded now goes to the top in the order the money
+ * went through it; everything nobody has touched has the same volume as
+ * everything else nobody has touched, so what separates those is how recently
+ * they opened. A pool with no creation in the last day has no age and sits at
+ * the end — unknown is old here.
  */
 function order(pairs: Pair[]): Pair[] {
-  return [...pairs].sort((a, b) => b.volume - a.volume);
+  return [...pairs].sort(
+    (a, b) => b.volume - a.volume || (a.age ?? Infinity) - (b.age ?? Infinity),
+  );
 }
 
-function PairSheet({ pair, onClose }: { pair: Pair | undefined; onClose: () => void }) {
+/**
+ * The two sources, as one list, one row per token.
+ *
+ * Per token and not per pool, which is the distinction that bit. A token can
+ * have several pools and they do not have to agree: DEGEN turned up three
+ * times in one reading — a thin pool that had traded and two deeper ones that
+ * had not — pricing one contract at nine thousand dollars and at one and a
+ * half million. A token has one size, so a screen showing it twice is a screen
+ * contradicting itself, and the traded list has always folded by token for
+ * exactly this reason. Merging by pool quietly opted the launches out of that
+ * rule and then stood the results next to each other.
+ *
+ * The deepest pool wins the figures, because depth is what a price is worth
+ * anything at: a market cap read off two thousand dollars of liquidity is a
+ * number one person could have moved by themselves, and depth is already the
+ * rule the launches are chosen by. Volume and trades are summed across the
+ * token's pools rather than taken from the winner, since money that went
+ * through a shallow pool still went through. Nothing is double counted — a
+ * launch row carries no volume and no trades by construction, so a pool in
+ * both sources adds zero to itself.
+ */
+function merge(traded: Pair[], launched: Pair[]): Pair[] {
+  const byToken = new Map<string, Pair>();
+  for (const pair of [...launched, ...traded]) {
+    const key = pair.token.toLowerCase();
+    const held = byToken.get(key);
+    if (!held) {
+      byToken.set(key, pair);
+      continue;
+    }
+    const youngest = Math.min(held.age ?? Infinity, pair.age ?? Infinity);
+    byToken.set(key, {
+      ...(pair.liquidity > held.liquidity ? pair : held),
+      volume: held.volume + pair.volume,
+      swaps: held.swaps + pair.swaps,
+      age: youngest === Infinity ? undefined : youngest,
+    });
+  }
+  return [...byToken.values()];
+}
+
+function PairSheet({
+  pair,
+  onSnipe,
+  onClose,
+}: {
+  pair: Pair | undefined;
+  onSnipe: (pair: Pair) => void;
+  onClose: () => void;
+}) {
   const { t } = useI18n();
   if (!pair) return null;
 
@@ -179,7 +223,22 @@ function PairSheet({ pair, onClose }: { pair: Pair | undefined; onClose: () => v
           />
         </Panel>
 
-        <div className="mt-3 grid grid-cols-2 gap-2">
+        {/*
+         * The one action on this sheet, above the two places to go and read
+         * more about it. Everything above this — the chart, the depth, the age
+         * — is there to answer one question, and it was ending in two outbound
+         * links and no way to act on the answer.
+         */}
+        <button
+          type="button"
+          className="btn btn-accent aim mt-3 w-full"
+          onClick={() => onSnipe(pair)}
+        >
+          <Icon name="crosshair" size={14} />
+          {t("memecoin.snipe", { symbol: pair.symbol })}
+        </button>
+
+        <div className="mt-2 grid grid-cols-2 gap-2">
           <a
             href={explorerAddress(CHAIN_ID, pair.token)}
             target="_blank"
@@ -236,21 +295,37 @@ export function Screener() {
    */
   const [grade, setGrade] = useState<Grade>("floor");
   const [opened, setOpened] = useState<string>();
-  const [view, setView] = useState<"trading" | "new">("trading");
   const { pairs, births, head, loading, error, refetch } = useScreener();
-  const { launches, loading: pricing } = useLaunches(births, head, view === "new");
+  const router = useRouter();
+  const aim = useAppStore((state) => state.aim);
 
+  /*
+   * Hand the whole pair over and go. The terminal can quote anything it is
+   * given, so nothing here has to check whether its own list would have
+   * carried this one — and the launches list is full of pairs that would not
+   * be in it, because a pool nobody traded in the last five minutes is still a
+   * pool you can buy from.
+   */
+  const snipe = (pair: Pair) => {
+    aim(pair);
+    router.push("/");
+  };
+  const { launches, loading: pricing } = useLaunches(births, head, true);
+
+  const all = useMemo(() => merge(pairs, launches), [pairs, launches]);
   const listed = useMemo(
-    () =>
-      view === "new"
-        ? launches.filter((pair) => keepNew(pair, grade))
-        : order(pairs.filter((pair) => keep(pair, band, grade))),
-    [view, launches, pairs, band, grade],
+    () => order(all.filter((pair) => keep(pair, band, grade))),
+    [all, band, grade],
   );
 
   const body = () => {
-    if (!mounted || loading || (view === "new" && pricing && launches.length === 0))
-      return <Loading />;
+    /*
+     * Both reads, not just the first. The launches are priced after the
+     * screener hands over the day's pool creations, so showing the traded rows
+     * the moment they land would reflow the list under the reader's thumb a
+     * moment later.
+     */
+    if (!mounted || loading || (pricing && launches.length === 0)) return <Loading />;
 
     if (error) {
       return (
@@ -273,12 +348,8 @@ export function Screener() {
        * a reader who has narrowed the list to nothing should be told that they
        * did it rather than that the chain went quiet.
        */
-      const nothing = view === "new" ? launches.length === 0 : pairs.length === 0;
-      return nothing ? (
-        <Empty
-          title={t(view === "new" ? "memecoin.noNew" : "memecoin.empty")}
-          hint={t(view === "new" ? "memecoin.noNewHint" : "memecoin.emptyHint")}
-        />
+      return all.length === 0 ? (
+        <Empty title={t("memecoin.empty")} hint={t("memecoin.emptyHint")} />
       ) : (
         <Empty
           title={t("memecoin.noMatch")}
@@ -289,7 +360,7 @@ export function Screener() {
               className="btn btn-sm btn-short"
               onClick={() => {
                 setBand("all");
-                setGrade("all");
+                setGrade("floor");
               }}
             >
               {t("memecoin.clear")}
@@ -302,10 +373,15 @@ export function Screener() {
     return (
       <div className="flex flex-col gap-1.5">
         {listed.map((pair) => (
+          /*
+           * Two controls, side by side, rather than one inside the other — a
+           * button cannot legally contain a button, and the reader is asking
+           * two different questions anyway: tell me more, or take me to it.
+           */
+          <div key={pair.pool} className="flex items-stretch gap-1.5">
           <button
-            key={pair.pool}
             type="button"
-            className="tile"
+            className="tile min-w-0 flex-1"
             onClick={() => setOpened(pair.pool)}
           >
             <span className="min-w-0 flex-1">
@@ -320,12 +396,13 @@ export function Screener() {
                 )}
               </span>
               {/*
-               * A launch has no volume and has not moved, so the line says what
-               * it does have — how deep it is and how long it has existed —
-               * rather than printing two zeroes that look like a failed read.
+               * A row nobody has traded has no volume and has not moved, so it
+               * says what it does have — how deep it is and how long it has
+               * existed — rather than printing two zeroes that read as a
+               * failed call. Decided per row, since both kinds share one list.
                */}
               <span className="block truncate text-[11px] font-normal text-faint">
-                {view === "trading" && (
+                {pair.swaps > 0 && (
                   <>
                     <span className="lbl">{t("memecoin.volShort")}</span>{" "}
                     <span className="num">{usd(pair.volume)}</span>
@@ -342,7 +419,7 @@ export function Screener() {
             </span>
             <span className="shrink-0 text-right">
               <span className="num block text-[12px]">{usd(pair.marketCap)}</span>
-              {view === "trading" ? (
+              {pair.swaps > 0 ? (
                 <span
                   className={`num block text-[11px] font-normal ${pair.change >= 0 ? "long" : "short"}`}
                 >
@@ -353,6 +430,15 @@ export function Screener() {
               )}
             </span>
           </button>
+          <button
+            type="button"
+            className="tile aim w-[46px] shrink-0 justify-center px-0 text-accent"
+            aria-label={t("memecoin.snipe", { symbol: pair.symbol })}
+            onClick={() => snipe(pair)}
+          >
+            <Icon name="crosshair" size={16} />
+          </button>
+          </div>
         ))}
       </div>
     );
@@ -364,36 +450,24 @@ export function Screener() {
 
       {mounted && (
         <div className="mb-3 flex flex-col gap-1.5">
-          <Segmented
-            options={[
-              { value: "trading", label: t("memecoin.viewTrading") },
-              { value: "new", label: t("memecoin.viewNew") },
-            ]}
-            value={view}
-            onChange={setView}
-          />
           {/*
-           * The movement filter belongs to the traded list alone. A launch that
-           * nobody has bought has not pumped, gone flat or dumped — it has done
-           * nothing, and offering to sort it by which would be offering a
-           * control that cannot do anything.
+           * Asking for a movement narrows the list to rows that have moved,
+           * which is what it has always meant — it now also drops the ones
+           * that have not traded at all, because silence is not a direction.
            */}
-          {view === "trading" && (
-            <Segmented
-              options={[
-                { value: "all", label: t("memecoin.bandAll") },
-                { value: "pumping", label: t("memecoin.bandPump") },
-                { value: "flat", label: t("memecoin.bandFlat") },
-                { value: "dumping", label: t("memecoin.bandDump") },
-              ]}
-              value={band}
-              onChange={setBand}
-            />
-          )}
           <Segmented
             options={[
-              { value: "all", label: t("memecoin.gradeAll") },
-              { value: "floor", label: `$${formatCompact(FLOOR)}+` },
+              { value: "all", label: t("memecoin.bandAll") },
+              { value: "pumping", label: t("memecoin.bandPump") },
+              { value: "flat", label: t("memecoin.bandFlat") },
+              { value: "dumping", label: t("memecoin.bandDump") },
+            ]}
+            value={band}
+            onChange={setBand}
+          />
+          <Segmented
+            options={[
+              { value: "floor", label: t("memecoin.gradeAll") },
               { value: "healthy", label: t("memecoin.gradeHealthy") },
             ]}
             value={grade}
@@ -403,19 +477,17 @@ export function Screener() {
       )}
 
       <Panel
-        label={
-          view === "new"
-            ? t("memecoin.born", {
-                floor: grade === "all" ? "" : ` · $${formatCompact(FLOOR)}+`,
-              })
-            : grade === "all"
-              ? t("memecoin.liveAny")
-              : t("memecoin.live", { floor: `$${formatCompact(FLOOR)}` })
-        }
+        /*
+         * One list, one header, and it names both windows — they are the whole
+         * of what this screen can see: what traded in the last five minutes,
+         * and what opened since yesterday. The floor is always on, so it is
+         * always said.
+         */
+        label={t("memecoin.live", { floor: `$${formatCompact(FLOOR)}` })}
         meta={
-          mounted && pairs.length > 0 ? (
+          mounted && all.length > 0 ? (
             <span className="lbl">
-              {t("memecoin.showing", { shown: listed.length, total: pairs.length })}
+              {t("memecoin.showing", { shown: listed.length, total: all.length })}
             </span>
           ) : undefined
         }
@@ -425,6 +497,7 @@ export function Screener() {
 
       <PairSheet
         pair={listed.find((pair) => pair.pool === opened)}
+        onSnipe={snipe}
         onClose={() => setOpened(undefined)}
       />
     </div>

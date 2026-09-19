@@ -105,17 +105,11 @@ const en = {
   "balance.unhide": "List it again",
   "balance.hidden": "{count} hidden",
   "balance.hiddenLess": "Put the hidden ones away",
-  "memecoin.live": "Under $10M · {floor}+ · 5m",
-  "memecoin.liveAny": "Under $10M · no floor · 5m",
-  "memecoin.viewTrading": "Trading",
-  "memecoin.viewNew": "New",
-  "memecoin.born": "Opened in 24h{floor}",
+  "memecoin.live": "Under $10M · {floor}+ · 5m or new today",
   "memecoin.mcapShort": "MCAP",
-  "memecoin.noNew": "No pool has opened on this chain today.",
-  "memecoin.noNewHint":
-    "This reads a day of pool creations straight off chain 4663. An empty list means a quiet day, not a broken read.",
   "memecoin.gradeAll": "Any",
   "memecoin.dexscreener": "DEX Screener",
+  "memecoin.snipe": "Snyper · buy {symbol}",
   "memecoin.noChart": "Not enough trades to draw yet.",
   "memecoin.gradeHealthy": "Healthy",
   "memecoin.bandAll": "All",
@@ -140,9 +134,9 @@ const en = {
   "memecoin.age": "Age",
   "memecoin.pool": "Pool fee",
   "memecoin.token": "Token",
-  "memecoin.empty": "Nothing has traded in the last five minutes.",
+  "memecoin.empty": "Nothing has traded or opened recently.",
   "memecoin.emptyHint":
-    "This reads the chain rather than a list, so an empty screen means an empty five minutes. It fills again on its own.",
+    "This reads the chain rather than a list: what has traded in the last five minutes, and what has opened since yesterday. An empty screen means both were empty. It fills again on its own.",
   "memecoin.failed": "The chain did not answer.",
   "memecoin.failedHint":
     "Every pair here is built from swap events read straight off chain 4663, and that read did not come back.",
@@ -161,6 +155,7 @@ const en = {
   "snipe.custom": "Any amount",
   "snipe.spendable": "{amount} spendable",
   "snipe.sell": "Sell",
+  "snipe.units": "Any amount",
   "snipe.worth": "Worth now",
   "snipe.pnl": "Profit and loss",
   "snipe.youGet": "You get",
@@ -182,7 +177,6 @@ const en = {
   "snipe.checking": "Asking the chain…",
   "snipe.done": "Filled",
   "snipe.receipt": "Receipt",
-  "snipe.oneSignature": "No approval to grant first — one signature, and nothing left standing after it.",
   "snipe.trapped": "This token cannot be sold",
   "snipe.trappedHint":
     "The chain was asked to quote selling this position straight back, and it refused. A token that can be bought and not sold is the oldest trick there is, so nothing is offered to sign here.",
@@ -204,8 +198,6 @@ const en = {
   "snipe.position": "Position",
   "snipe.held": "Held",
   "snipe.dump": "Sell all {symbol}",
-  "snipe.twoSignatures":
-    "Out costs two: a token can only be moved by a contract that has been allowed to move it. The allowance is written for exactly this position.",
 
 
 
@@ -363,17 +355,11 @@ const id: Record<TKey, string> = {
   "balance.unhide": "Tampilkan lagi",
   "balance.hidden": "{count} disembunyikan",
   "balance.hiddenLess": "Simpan lagi yang disembunyikan",
-  "memecoin.live": "Di bawah $10J · {floor}+ · 5m",
-  "memecoin.liveAny": "Di bawah $10J · tanpa batas bawah · 5m",
-  "memecoin.viewTrading": "Jalan",
-  "memecoin.viewNew": "Baru",
-  "memecoin.born": "Dibuka 24 jam{floor}",
+  "memecoin.live": "Di bawah $10J · {floor}+ · 5m atau baru hari ini",
   "memecoin.mcapShort": "MCAP",
-  "memecoin.noNew": "Belum ada pool yang dibuka di chain ini hari ini.",
-  "memecoin.noNewHint":
-    "Ini membaca sehari pembuatan pool langsung dari chain 4663. Daftar kosong berarti harinya sepi, bukan bacaannya rusak.",
   "memecoin.gradeAll": "Semua",
   "memecoin.dexscreener": "DEX Screener",
+  "memecoin.snipe": "Snyper · beli {symbol}",
   "memecoin.noChart": "Belum cukup transaksi untuk digambar.",
   "memecoin.gradeHealthy": "Sehat",
   "memecoin.bandAll": "Semua",
@@ -398,7 +384,7 @@ const id: Record<TKey, string> = {
   "memecoin.age": "Umur",
   "memecoin.pool": "Biaya pool",
   "memecoin.token": "Token",
-  "memecoin.empty": "Tidak ada yang diperdagangkan dalam lima menit terakhir.",
+  "memecoin.empty": "Belum ada yang jalan atau dibuka belakangan ini.",
   "memecoin.emptyHint":
     "Layar ini membaca chain, bukan sebuah daftar, jadi layar kosong berarti lima menit yang kosong. Ia akan terisi lagi dengan sendirinya.",
   "memecoin.failed": "Chain tidak menjawab.",
@@ -419,6 +405,7 @@ const id: Record<TKey, string> = {
   "snipe.custom": "Jumlah bebas",
   "snipe.spendable": "Bisa dipakai {amount}",
   "snipe.sell": "Jual",
+  "snipe.units": "Jumlah bebas",
   "snipe.worth": "Nilai sekarang",
   "snipe.pnl": "Untung rugi",
   "snipe.youGet": "Kamu dapat",
@@ -440,7 +427,6 @@ const id: Record<TKey, string> = {
   "snipe.checking": "Memastikan ke chain…",
   "snipe.done": "Kena",
   "snipe.receipt": "Bukti transaksi",
-  "snipe.oneSignature": "Tidak ada izin yang perlu diberikan dulu — satu tanda tangan, dan tidak ada sisa setelahnya.",
   "snipe.trapped": "Token ini tidak bisa dijual",
   "snipe.trappedHint":
     "Chain diminta menghitung penjualan posisi ini balik saat itu juga, dan ia menolak. Token yang bisa dibeli tapi tidak bisa dijual adalah trik paling tua yang ada, jadi di sini tidak ada yang ditawarkan untuk ditandatangani.",
@@ -462,8 +448,6 @@ const id: Record<TKey, string> = {
   "snipe.position": "Posisi",
   "snipe.held": "Dipegang",
   "snipe.dump": "Jual semua {symbol}",
-  "snipe.twoSignatures":
-    "Keluarnya butuh dua: token hanya bisa dipindahkan oleh kontrak yang sudah diizinkan memindahkannya. Izinnya ditulis pas sebesar posisi ini.",
 
 
 

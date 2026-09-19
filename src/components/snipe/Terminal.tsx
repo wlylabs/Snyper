@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { erc20Abi, formatEther, formatUnits } from "viem";
+import { erc20Abi, formatEther, formatUnits, parseUnits } from "viem";
 import { useAccount, useBalance, useReadContract } from "wagmi";
 import { Icon } from "@/components/ui/Icon";
 import { Empty, Panel, Row, Skeleton } from "@/components/ui/Panel";
@@ -10,7 +10,7 @@ import { Sheet } from "@/components/ui/Sheet";
 import { CHAIN_ID, chainMeta, explorerTx } from "@/lib/chains";
 import { haptic } from "@/lib/haptics";
 import { formatAmount, formatCompact } from "@/lib/format";
-import { CEILING, FLOOR } from "@/lib/screener";
+import { clearsFloor, underCeiling } from "@/lib/screener";
 import {
   EXITS,
   FEE_BIPS,
@@ -103,12 +103,7 @@ function usd(value: number | undefined): string {
  */
 function targets(pairs: Pair[]): Pair[] {
   return pairs
-    .filter(
-      (pair) =>
-        (pair.marketCap === undefined || pair.marketCap <= CEILING) &&
-        pair.liquidity >= FLOOR &&
-        pair.volume >= FLOOR,
-    )
+    .filter((pair) => underCeiling(pair) && clearsFloor(pair))
     .sort((a, b) => b.volume - a.volume);
 }
 
@@ -256,14 +251,37 @@ function Exit({ pair, coinUsd }: { pair: Pair; coinUsd: number | undefined }) {
   });
 
   const held = balance ?? 0n;
-  const [slice, setSlice] = useState<number>(100);
+  const [slice, setSlice] = useState<number | undefined>(100);
+  const [typed, setTyped] = useState("");
+
+  /*
+   * A fraction to tap and a figure to type, the same deal the stake gets.
+   *
+   * Three percentages cover most exits and cover none of the rest: a reader
+   * taking a fixed number of tokens off the table, or leaving an exact amount
+   * behind, had no way to say so. Whichever was touched last wins.
+   */
+  const wanted = useMemo(() => {
+    const clean = typed.replace(",", ".").trim();
+    if (!clean) return undefined;
+    try {
+      const value = parseUnits(clean, pair.decimals);
+      return value > 0n ? value : undefined;
+    } catch {
+      return undefined;
+    }
+  }, [typed, pair.decimals]);
 
   /*
    * A hundred percent sends the balance itself rather than a hundredth of it
    * multiplied back up: the two differ by the rounding, and the difference is
-   * dust left behind in a position the reader asked to be rid of.
+   * dust left behind in a position the reader asked to be rid of. A typed
+   * figure past the balance is clamped to it for the same reason — the chain
+   * would refuse it, and refusing it here says so without a failed signature.
    */
-  const position = slice === 100 ? held : (held * BigInt(slice)) / 100n;
+  const asked = wanted ?? (slice === 100 ? held : (held * BigInt(slice ?? 0)) / 100n);
+  const position = useSettled(asked > held ? held : asked);
+  const tooMuch = wanted !== undefined && wanted > held;
 
   /*
    * Two questions, because they are two different trades. The slice is what is
@@ -278,11 +296,18 @@ function Exit({ pair, coinUsd }: { pair: Pair; coinUsd: number | undefined }) {
   const sale = useRoutes(position > 0n ? pair.token : undefined, position);
   const entire = useRoutes(held > 0n ? pair.token : undefined, held);
 
-  /* The pair's own quote first; anything else only if that pool will not take it. */
+  /*
+   * The pair's own quote first; anything else only if that pool will not take
+   * it. Falling back to the whole position's exits matters when the reader has
+   * emptied the field — there is nothing being sold, so the sale has no routes,
+   * and the position's worth above would go blank for a figure that has not
+   * changed.
+   */
+  const offered = sale.tradable.length > 0 ? sale.tradable : entire.tradable;
   const chosen =
-    sale.tradable.find(
+    offered.find(
       (option) => option.address.toLowerCase() === pair.quoteToken.toLowerCase(),
-    ) ?? sale.tradable[0];
+    ) ?? offered[0];
   const route = chosen ? sale.bestFor(chosen) : undefined;
   /*
    * The terminal's ceiling on both sides, and it has to be the same one. A
@@ -381,9 +406,30 @@ function Exit({ pair, coinUsd }: { pair: Pair; coinUsd: number | undefined }) {
       <p className="lbl mt-3 mb-1.5">{t("snipe.sell")}</p>
       <Segmented
         options={SLICES.map((part) => ({ value: String(part), label: `${part}%` }))}
-        value={String(slice)}
-        onChange={(value) => setSlice(Number(value))}
+        value={wanted === undefined && slice !== undefined ? String(slice) : ""}
+        onChange={(value) => {
+          setTyped("");
+          setSlice(Number(value));
+        }}
       />
+
+      <div className="relative mt-1.5">
+        <input
+          className="field num w-full pr-16"
+          inputMode="decimal"
+          placeholder={t("snipe.units")}
+          aria-label={t("snipe.units")}
+          value={typed}
+          onChange={(event) => {
+            setTyped(event.target.value);
+            setSlice(undefined);
+          }}
+        />
+        <span className="lbl pointer-events-none absolute top-1/2 right-2.5 max-w-[56px] -translate-y-1/2 truncate">
+          {pair.symbol}
+        </span>
+      </div>
+      {tooMuch && <p className="warn mt-1.5 text-[11px]">{t("swap.tooMuch")}</p>}
 
       <div className="mt-3">
         <Row
@@ -431,7 +477,6 @@ function Exit({ pair, coinUsd }: { pair: Pair; coinUsd: number | undefined }) {
                   ? t("snipe.dump", { symbol: pair.symbol })
                   : t("swap.approve", { symbol: pair.symbol })}
       </button>
-      <p className="mt-2 text-center text-[11px] text-faint">{t("snipe.twoSignatures")}</p>
     </Panel>
   );
 }
@@ -496,15 +541,44 @@ export function Terminal() {
       : undefined;
 
   /*
-   * The target is held by address and looked up live, so a row still describes
-   * the pool as it is now rather than as it was at the tap. A target that falls
-   * out of the list — traded past the ceiling, or simply quiet for five minutes
-   * — is dropped rather than left on screen with numbers that stopped moving.
+   * Asking for more than the wallet can send, judged here rather than deeper
+   * down. The check inside `useFire` compares the stake against the whole
+   * balance, which only catches a stake larger than everything held — a stake
+   * that fits but leaves nothing for gas slips past it and surfaces as the
+   * chain refusing the trade, which is true and says nothing useful. This
+   * screen already knows what is spendable once gas is kept back, so it is the
+   * one place that can name the real reason.
    */
-  const target = listed.find((pair) => pair.pool === aimed);
+  const overBalance = spendable !== undefined && stakeUsd > spendable;
+
+  /*
+   * A target picked here, or one handed over from the memecoin screens.
+   *
+   * The live row wins wherever there is one, so a pair this screen is already
+   * watching keeps describing the pool as it is now rather than as it was at
+   * the tap. A handed pair that this list does not carry is kept anyway rather
+   * than dropped: the terminal can quote anything, and the reason it is missing
+   * is usually that nobody traded it in the last five minutes — which is also
+   * the reason its figures have not moved since they were read.
+   *
+   * A target picked from this screen's own list and then falling out of it is
+   * still dropped, because there it means the pool went quiet while the reader
+   * was looking at numbers that would otherwise sit there frozen.
+   */
+  const handed = useAppStore((state) => state.aimed);
+  const aim = useAppStore((state) => state.aim);
   useEffect(() => {
-    if (aimed && !listed.some((pair) => pair.pool === aimed)) setAimed(undefined);
-  }, [aimed, listed]);
+    if (handed) setAimed(handed.pool);
+  }, [handed]);
+
+  const target =
+    listed.find((pair) => pair.pool === aimed) ??
+    (handed?.pool === aimed ? handed : undefined);
+
+  useEffect(() => {
+    if (!aimed || handed?.pool === aimed) return;
+    if (!listed.some((pair) => pair.pool === aimed)) setAimed(undefined);
+  }, [aimed, listed, handed]);
 
   const { shot, unquotable, loading: quoting } = useShot(target, stake);
 
@@ -667,16 +741,22 @@ export function Terminal() {
             </p>
           </div>
           {/*
-           * A rung the wallet cannot pay for is shown and disabled rather than
-           * hidden, so the ladder stays the same shape between readers and a
-           * greyed rung says "not with this balance" instead of vanishing.
+           * Every rung is live, including the ones this wallet cannot pay for.
+           *
+           * They were disabled, which was wrong twice over. There is no styling
+           * in this app for a dead segment, so a rung a reader could not afford
+           * looked exactly like one they could and simply did nothing when
+           * tapped — a control that refuses in silence, which reads as broken
+           * rather than as unaffordable. And it withheld the one thing the
+           * reader was asking for by tapping it: what fifty dollars of this
+           * token would be.
+           *
+           * So the size is always selectable, the quote is always shown, and
+           * the balance is answered where an answer can carry a reason — the
+           * notice below and the trigger it disables.
            */}
           <Segmented
-            options={STAKES.map((size) => ({
-              value: String(size),
-              label: `$${size}`,
-              disabled: spendable !== undefined && size > spendable,
-            }))}
+            options={STAKES.map((size) => ({ value: String(size), label: `$${size}` }))}
             value={custom === undefined && preset !== undefined ? String(preset) : ""}
             onChange={(value) => {
               setTyped("");
@@ -848,7 +928,9 @@ export function Terminal() {
               }
             />
           )}
-          {short && <Notice title={t("snipe.short", { coin })} hint={t("snipe.shortHint")} />}
+          {(short || overBalance) && (
+            <Notice title={t("snipe.short", { coin })} hint={t("snipe.shortHint")} />
+          )}
           {blocked && !shot?.trapped && (
             <Notice title={t("snipe.blocked")} hint={t("snipe.blockedHint")} />
           )}
@@ -880,8 +962,8 @@ export function Terminal() {
              */
             <button
               type="button"
-              className="btn btn-accent mt-2 w-full"
-              disabled={!ready || firing || quoting || checking || shot?.trapped}
+              className="btn btn-accent aim mt-2 w-full"
+              disabled={!ready || overBalance || firing || quoting || checking || shot?.trapped}
               onClick={pull}
             >
               <Icon name="crosshair" size={14} />
@@ -901,13 +983,6 @@ export function Terminal() {
               </button>
             )
           )}
-
-          {/*
-           * Said once, under the button, rather than beside every control: the
-           * coin going in is the chain's own, so there is no allowance to grant
-           * first and none left standing afterwards.
-           */}
-          <p className="mt-2 text-center text-[11px] text-faint">{t("snipe.oneSignature")}</p>
 
           {done && hash && (
             <a
@@ -930,7 +1005,10 @@ export function Terminal() {
         pairs={listed}
         loading={loading}
         chosen={aimed}
-        onPick={setAimed}
+        onPick={(pool) => {
+          aim(undefined);
+          setAimed(pool);
+        }}
         onClose={() => setPicking(false)}
       />
     </div>
