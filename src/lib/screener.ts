@@ -193,3 +193,44 @@ export type Grade = "all" | "floor" | "healthy";
  * at a hundred dollars of depth, which is not a market anybody can leave.
  */
 export const FLOOR = 1_000;
+
+/** The four figures every list in this app judges a pair by. */
+export type Sized = {
+  marketCap?: number;
+  fdv?: number;
+  liquidity: number;
+  volume: number;
+};
+
+/** Above this, the entry belongs to somebody else. */
+export function underCeiling(pair: Sized): boolean {
+  return pair.marketCap === undefined || pair.marketCap <= CEILING;
+}
+
+/**
+ * One floor, for every list that claims to have one.
+ *
+ * There were three, which is how a screen ends up promising a thousand dollars
+ * and showing something else. The traded list tested all four figures and
+ * refused a pair whose size the contract would not report; the launches list
+ * tested depth alone, so a pool with five thousand dollars in it and a three
+ * hundred dollar token passed; the terminal's target list tested depth and
+ * volume but never size, and let an unreported supply through as though
+ * unknown were small. A reader moving between three screens of the same app
+ * was reading three different standards, none of them written down.
+ *
+ * Unknown is not small. A token whose supply its own contract will not report
+ * has not been shown to clear anything, and the point of a floor is to stop
+ * reading rows that have not been shown to be worth reading.
+ *
+ * Volume is the one axis that can be absent for a good reason: a pool that
+ * opened twenty minutes ago and has not been touched since has none by
+ * definition, and testing it there would empty the list of exactly the rows
+ * that list exists to show. Nowhere else is it optional.
+ */
+export function clearsFloor(pair: Sized, traded = true): boolean {
+  const { marketCap, fdv, liquidity, volume } = pair;
+  if (marketCap === undefined || fdv === undefined) return false;
+  if (marketCap < FLOOR || fdv < FLOOR || liquidity < FLOOR) return false;
+  return !traded || volume >= FLOOR;
+}

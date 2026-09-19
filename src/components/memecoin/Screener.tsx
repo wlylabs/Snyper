@@ -13,8 +13,10 @@ import {
   FLOOR,
   HEALTHY_DILUTION,
   HEALTHY_LIQUIDITY,
+  clearsFloor,
   impersonates,
   inBand,
+  underCeiling,
   type Band,
   type Grade,
 } from "@/lib/screener";
@@ -81,15 +83,17 @@ function signed(change: number): string {
  * market cap is a hundred, and a hundred dollars of depth is not a market.
  */
 function keep(pair: Pair, band: Band, grade: Grade): boolean {
-  if (pair.marketCap !== undefined && pair.marketCap > CEILING) return false;
+  if (!underCeiling(pair)) return false;
   if (!inBand(pair.change, band)) return false;
   if (grade === "all") return true;
+  if (!clearsFloor(pair)) return false;
+  return grade === "floor" || healthy(pair);
+}
 
-  const { marketCap, fdv, volume, liquidity } = pair;
+/** Deep enough for its size, and not mostly supply that has not arrived yet. */
+function healthy(pair: Pair): boolean {
+  const { marketCap, fdv, liquidity } = pair;
   if (marketCap === undefined || fdv === undefined) return false;
-  if (marketCap < FLOOR || fdv < FLOOR || volume < FLOOR || liquidity < FLOOR) return false;
-  if (grade === "floor") return true;
-
   return liquidity >= marketCap * HEALTHY_LIQUIDITY && fdv <= marketCap * HEALTHY_DILUTION;
 }
 
@@ -104,14 +108,11 @@ function keep(pair: Pair, band: Band, grade: Grade): boolean {
  * so depth is the whole of the floor here, and the ceiling still holds.
  */
 function keepNew(pair: Pair, grade: Grade): boolean {
-  if (pair.marketCap !== undefined && pair.marketCap > CEILING) return false;
+  if (!underCeiling(pair)) return false;
   if (grade === "all") return true;
-  if (pair.liquidity < FLOOR) return false;
-  if (grade === "floor") return true;
-
-  const { marketCap, fdv, liquidity } = pair;
-  if (marketCap === undefined || fdv === undefined) return false;
-  return liquidity >= marketCap * HEALTHY_LIQUIDITY && fdv <= marketCap * HEALTHY_DILUTION;
+  /* Every test the traded list makes except volume — see `clearsFloor`. */
+  if (!clearsFloor(pair, false)) return false;
+  return grade === "floor" || healthy(pair);
 }
 
 /** Whether the pool behind a row could absorb the position it is quoting. */

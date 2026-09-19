@@ -204,8 +204,6 @@ const en = {
   "snipe.position": "Position",
   "snipe.held": "Held",
   "snipe.dump": "Sell all {symbol}",
-  "snipe.twoSignatures":
-    "Out costs two: a token can only be moved by a contract that has been allowed to move it. The allowance is written for exactly this position.",
 
 
 
@@ -462,8 +460,6 @@ const id: Record<TKey, string> = {
   "snipe.position": "Posisi",
   "snipe.held": "Dipegang",
   "snipe.dump": "Jual semua {symbol}",
-  "snipe.twoSignatures":
-    "Keluarnya butuh dua: token hanya bisa dipindahkan oleh kontrak yang sudah diizinkan memindahkannya. Izinnya ditulis pas sebesar posisi ini.",
 
 
 

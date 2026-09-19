@@ -10,7 +10,7 @@ import { Sheet } from "@/components/ui/Sheet";
 import { CHAIN_ID, chainMeta, explorerTx } from "@/lib/chains";
 import { haptic } from "@/lib/haptics";
 import { formatAmount, formatCompact } from "@/lib/format";
-import { CEILING, FLOOR } from "@/lib/screener";
+import { clearsFloor, underCeiling } from "@/lib/screener";
 import {
   EXITS,
   FEE_BIPS,
@@ -103,12 +103,7 @@ function usd(value: number | undefined): string {
  */
 function targets(pairs: Pair[]): Pair[] {
   return pairs
-    .filter(
-      (pair) =>
-        (pair.marketCap === undefined || pair.marketCap <= CEILING) &&
-        pair.liquidity >= FLOOR &&
-        pair.volume >= FLOOR,
-    )
+    .filter((pair) => underCeiling(pair) && clearsFloor(pair))
     .sort((a, b) => b.volume - a.volume);
 }
 
@@ -482,7 +477,6 @@ function Exit({ pair, coinUsd }: { pair: Pair; coinUsd: number | undefined }) {
                   ? t("snipe.dump", { symbol: pair.symbol })
                   : t("swap.approve", { symbol: pair.symbol })}
       </button>
-      <p className="mt-2 text-center text-[11px] text-faint">{t("snipe.twoSignatures")}</p>
     </Panel>
   );
 }
