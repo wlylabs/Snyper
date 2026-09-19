@@ -179,6 +179,50 @@ export function tooThin(impactBps: number): boolean {
   return slippageFor(impactBps) >= SLIPPAGE_CEILING;
 }
 
+/**
+ * The most a shot will accept, which is four times what a sale will.
+ *
+ * Five percent is the right ceiling for selling a holding into a pool that has
+ * been trading for months, and it is the wrong one for buying into a pair that
+ * opened an hour ago: those pools are thin by definition, they move between the
+ * quote and the block the trade lands in, and a tolerance that tight is a trade
+ * that reverts rather than a trade that is protected. The screen was calling
+ * that "this pool cannot take a stake this size" when what it meant was that
+ * this app would not.
+ *
+ * Twenty is where the outside world has put it. Uniswap's own wallet caps a
+ * reader's custom slippage at twenty percent; the sniping guides that bother to
+ * give a number say ten to twenty for a new pair and stop there, on the grounds
+ * that a trade needing more than twenty is either a token with a transfer tax
+ * over twenty — which is a honeypot by another name — or a pool with nothing in
+ * it. Both of those are already answered on this screen: the tax and the trap
+ * by the exit check, the empty pool by the quote that would not fill.
+ *
+ * So this is not a refusal, and nothing on the terminal blocks on it. It is the
+ * last line under the fill — at the cap, the trade still goes through and still
+ * cannot land more than a fifth below what was quoted.
+ */
+export const SNIPE_CEILING = 2000;
+
+/**
+ * The same bet as `slippageFor`, priced for a pair nobody has traded yet.
+ *
+ * One times the impact rather than one and a half. The extra half was there to
+ * cover the wait on a pool thin enough to wander, and against a twenty percent
+ * cap it did the opposite: it pinned the tolerance at the ceiling from thirteen
+ * percent impact upward, so the number stopped describing the pool long before
+ * the pool stopped being tradeable. At one times, the cap is reached where the
+ * guidance says it should be — a fill that has already cost a fifth.
+ */
+export function snipeSlippageFor(impactBps: number): number {
+  return Math.min(SLIPPAGE_FLOOR + Math.max(impactBps, 0), SNIPE_CEILING);
+}
+
+/** Whether the tolerance above is pinned at its cap rather than measured. */
+export function slippageCapped(impactBps: number): boolean {
+  return snipeSlippageFor(impactBps) >= SNIPE_CEILING;
+}
+
 /** Basis points, applied to a quote to get the floor a swap will accept. */
 export function floorFor(amountOut: bigint, slippageBps: number): bigint {
   return (amountOut * BigInt(10_000 - slippageBps)) / 10_000n;

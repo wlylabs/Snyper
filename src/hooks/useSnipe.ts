@@ -17,8 +17,8 @@ import {
   quoterAbi,
   routerAbi,
   sellPath,
-  slippageFor,
-  tooThin,
+  slippageCapped,
+  snipeSlippageFor,
 } from "@/lib/venue";
 import type { Pair } from "./useScreener";
 
@@ -50,6 +50,8 @@ export type Shot = {
   /** What the trade costs itself, in basis points. */
   impactBps: number;
   slippageBps: number;
+  /** True when the tolerance above is pinned at its cap rather than measured. */
+  capped: boolean;
   /**
    * What fraction of the stake comes back if the position is sold again at
    * once, quoted rather than assumed. Undefined while the sell side has not
@@ -161,12 +163,13 @@ export function useShot(pair: Pair | undefined, stake: bigint) {
         ? ((outcome.result as readonly unknown[])?.[0] as bigint)
         : undefined;
 
-    const slippageBps = slippageFor(impactBps);
+    const slippageBps = snipeSlippageFor(impactBps);
     return {
       amountOut,
       floor: floorFor(amountOut, slippageBps),
       impactBps,
       slippageBps,
+      capped: slippageCapped(impactBps),
       roundTrip:
         returned && stake > 0n ? Number((returned * 10_000n) / stake) / 10_000 : undefined,
       trapped: back.isFetched && returned === undefined,
@@ -178,7 +181,6 @@ export function useShot(pair: Pair | undefined, stake: bigint) {
     /** No quote at all, which is a pool that cannot fill a trade this size. */
     unquotable: contracts.length > 0 && bought.isFetched && amountOut === undefined,
     loading: bought.isFetching || back.isFetching,
-    thin: shot ? tooThin(shot.impactBps) : false,
   };
 }
 

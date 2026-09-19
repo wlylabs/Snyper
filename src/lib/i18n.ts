@@ -167,9 +167,11 @@ const en = {
   "snipe.trapped": "This token cannot be sold",
   "snipe.trappedHint":
     "The chain was asked to quote selling this position straight back, and it refused. A token that can be bought and not sold is the oldest trick there is, so nothing is offered to sign here.",
-  "snipe.thin": "This pool cannot take a stake this size",
-  "snipe.thinHint":
-    "The price it would fill at is far enough from the going rate that no tolerance worth offering would cover it. A smaller stake will find a better one.",
+  "snipe.costly": "This fill costs {percent}%",
+  "snipe.costlyHint":
+    "That is what the pool charges for a trade this size against what is resting in it, and it is already inside the figure above rather than sitting on top of it. A smaller stake costs less. Nothing here is holding the shot.",
+  "snipe.cappedHint":
+    "That is also as far as the tolerance goes: {cap}% is the most this will accept, so the fill cannot land further than that under the quote. A pool asking for more is usually a token taxing the trade rather than a pool that is merely small, and the exit check above is what catches the difference.",
   "snipe.unquotable": "This pool would not quote the trade",
   "snipe.unquotableHint":
     "The route into this token came back empty at this size. That is the pool saying it cannot fill it — try a smaller stake, or another target.",
@@ -404,9 +406,11 @@ const id: Record<TKey, string> = {
   "snipe.trapped": "Token ini tidak bisa dijual",
   "snipe.trappedHint":
     "Chain diminta menghitung penjualan posisi ini balik saat itu juga, dan ia menolak. Token yang bisa dibeli tapi tidak bisa dijual adalah trik paling tua yang ada, jadi di sini tidak ada yang ditawarkan untuk ditandatangani.",
-  "snipe.thin": "Pool ini tidak sanggup menampung modal sebesar ini",
-  "snipe.thinHint":
-    "Harga isiannya terlalu jauh dari harga berjalan sampai tidak ada toleransi yang pantas ditawarkan. Modal yang lebih kecil akan dapat harga lebih baik.",
+  "snipe.costly": "Isian ini memakan {percent}%",
+  "snipe.costlyHint":
+    "Itu yang diminta pool untuk trade sebesar ini terhadap isinya, dan angkanya sudah masuk ke hitungan di atas, bukan tambahan di atasnya. Modal lebih kecil memakan lebih sedikit. Tidak ada yang menahan tembakannya di sini.",
+  "snipe.cappedHint":
+    "Itu juga sejauh toleransinya berjalan: {cap}% adalah yang paling jauh diterima, jadi isiannya tidak bisa jatuh lebih dari itu di bawah perhitungan. Pool yang minta lebih biasanya token yang memajaki tradenya, bukan sekadar pool kecil, dan cek jalan keluar di atas yang membedakan keduanya.",
   "snipe.unquotable": "Pool ini tidak mau menghitung tradenya",
   "snipe.unquotableHint":
     "Rute masuk ke token ini kembali kosong di ukuran segini. Itu cara pool bilang ia tidak sanggup mengisinya — coba modal lebih kecil, atau target lain.",

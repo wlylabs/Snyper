@@ -10,13 +10,31 @@ import { Sheet } from "@/components/ui/Sheet";
 import { CHAIN_ID, chainMeta, explorerTx } from "@/lib/chains";
 import { formatAmount, formatCompact } from "@/lib/format";
 import { CEILING, FLOOR } from "@/lib/screener";
-import { EXITS, SLIPPAGE_FLOOR, VENUE, floorFor, slippageFor, tooThin } from "@/lib/venue";
+import {
+  EXITS,
+  SLIPPAGE_FLOOR,
+  SNIPE_CEILING,
+  VENUE,
+  floorFor,
+  slippageCapped,
+  snipeSlippageFor,
+} from "@/lib/venue";
 import { useConnectPrompt } from "@/hooks/useConnectPrompt";
 import { useI18n } from "@/hooks/useI18n";
 import { useMounted } from "@/hooks/useMounted";
 import { useScreener, type Pair } from "@/hooks/useScreener";
 import { STAKES, useFire, useShot } from "@/hooks/useSnipe";
 import { useRoutes, useSwapAction } from "@/hooks/useSwap";
+
+/**
+ * Where a fill stops being cheap and starts being a decision.
+ *
+ * Nothing refuses at this line — five percent is an ordinary price for an
+ * ordinary memecoin pool, and a screen that blocked it would be a sniper that
+ * cannot shoot. It is where the cost stops being a row among rows and gets said
+ * out loud, with the number in it.
+ */
+const COSTLY = 500;
 
 /**
  * Basis points as a percent, for a label. 50 reads as 0.5, or 0,5.
@@ -178,12 +196,19 @@ function Exit({ pair }: { pair: Pair }) {
       (option) => option.address.toLowerCase() === pair.quoteToken.toLowerCase(),
     ) ?? tradable[0];
   const route = chosen ? bestFor(chosen) : undefined;
-  const slippage = route ? slippageFor(route.impactBps) : SLIPPAGE_FLOOR;
-  const thin = route !== undefined && tooThin(route.impactBps);
+  /*
+   * The terminal's ceiling on both sides, and it has to be the same one. A
+   * screen that lets a reader buy into a pool at fifteen percent and then
+   * refuses to sell them out of it at five has not protected them from
+   * anything — it has built the trap the exit check exists to find.
+   */
+  const slippage = route ? snipeSlippageFor(route.impactBps) : SLIPPAGE_FLOOR;
+  const costly = route !== undefined && route.impactBps >= COSTLY;
+  const capped = route !== undefined && slippageCapped(route.impactBps);
 
   const { approved, approve, approving, send, sending, done, blocked, checking } = useSwapAction({
     token: pair.token,
-    route: thin ? undefined : route,
+    route,
     amountIn: position,
     slippageBps: slippage,
     /*
@@ -222,13 +247,22 @@ function Exit({ pair }: { pair: Pair }) {
         }
       />
 
-      {thin && <Notice title={t("swap.thin")} hint={t("swap.thinHint")} />}
+      {route && costly && (
+        <Notice
+          title={t("snipe.costly", { percent: percent(route.impactBps) })}
+          hint={
+            capped
+              ? t("snipe.cappedHint", { cap: percent(SNIPE_CEILING) })
+              : t("snipe.costlyHint")
+          }
+        />
+      )}
       {blocked && <Notice title={t("swap.blocked")} hint={t("swap.blockedHint")} />}
 
       <button
         type="button"
         className="btn btn-short mt-2 w-full"
-        disabled={!route || thin || approving || sending || checking || (approved && !!blocked)}
+        disabled={!route || approving || sending || checking || (approved && !!blocked)}
         onClick={() => (approved ? send() : approve())}
       >
         {done
@@ -281,7 +315,7 @@ export function Terminal() {
     if (aimed && !listed.some((pair) => pair.pool === aimed)) setAimed(undefined);
   }, [aimed, listed]);
 
-  const { shot, unquotable, loading: quoting, thin } = useShot(target, stake);
+  const { shot, unquotable, loading: quoting } = useShot(target, stake);
   const { fire, firing, done, hash, short, checking, blocked, failure, ready, reset } = useFire({
     pair: target,
     stake,
@@ -400,11 +434,12 @@ export function Terminal() {
             <Row
               k={t("snipe.impact")}
               v={<span className="num">{shot ? `${percent(shot.impactBps)}%` : "—"}</span>}
-              tone={shot && shot.impactBps >= 100 ? "warn" : undefined}
+              tone={shot && shot.impactBps >= COSTLY ? "warn" : undefined}
             />
             <Row
               k={t("snipe.slippage")}
               v={<span className="num">{shot ? `${percent(shot.slippageBps)}%` : "—"}</span>}
+              tone={shot?.capped ? "warn" : undefined}
             />
             {/*
              * The exit is a row of its own rather than a footnote, because it is
@@ -448,8 +483,22 @@ export function Terminal() {
             <Notice title={t("snipe.unquotable")} hint={t("snipe.unquotableHint")} />
           )}
           {shot?.trapped && <Notice title={t("snipe.trapped")} hint={t("snipe.trappedHint")} />}
-          {thin && !shot?.trapped && (
-            <Notice title={t("snipe.thin")} hint={t("snipe.thinHint")} />
+          {/*
+           * A price, not a verdict. The pool charges what it charges for a
+           * trade this size and the figure above already has it in — so this
+           * says what that costs and leaves the button alone, which is the
+           * whole of what a sniper is for. The one thing that does stop a shot
+           * is the exit check above it.
+           */}
+          {shot && !shot.trapped && shot.impactBps >= COSTLY && (
+            <Notice
+              title={t("snipe.costly", { percent: percent(shot.impactBps) })}
+              hint={
+                shot.capped
+                  ? t("snipe.cappedHint", { cap: percent(SNIPE_CEILING) })
+                  : t("snipe.costlyHint")
+              }
+            />
           )}
           {short && <Notice title={t("snipe.short", { coin })} hint={t("snipe.shortHint")} />}
           {blocked && !shot?.trapped && (
