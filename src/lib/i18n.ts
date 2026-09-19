@@ -211,8 +211,8 @@ const en = {
   "settings.language": "Language",
   "settings.languageHint": "Interface text, number and date formatting.",
 
-  "settings.referral": "Referral",
-  "settings.referralTitle": "Trade with me on Fomo",
+  "settings.referral": "I just joined Fomo",
+  "settings.referralTitle": "Trade with me there",
   "settings.referralBadge": "10% off",
   "settings.referralHint":
     "Open Fomo through this link and 10% comes off the fees you pay there.",
@@ -499,8 +499,8 @@ const id: Record<TKey, string> = {
   "settings.language": "Bahasa",
   "settings.languageHint": "Teks antarmuka, format angka, dan tanggal.",
 
-  "settings.referral": "Referral",
-  "settings.referralTitle": "Trading bareng di Fomo",
+  "settings.referral": "Aku baru gabung Fomo",
+  "settings.referralTitle": "Trading bareng di sana",
   "settings.referralBadge": "Hemat 10%",
   "settings.referralHint":
     "Buka Fomo lewat tautan ini dan biaya yang kamu bayar di sana berkurang 10%.",
