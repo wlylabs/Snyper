@@ -259,6 +259,7 @@ const en = {
   "wallet.disconnected": "Wallet disconnected",
   "wallet.embedded": "Embedded wallet",
   "wallet.exportKey": "Export private key",
+  "wallet.noWallet": "No wallet",
   "wallet.otherNetwork":
     "Your wallet is pointing at another network. What it holds on {chain} is read over this app's own endpoint either way — switching networks only matters for signing.",
   "wallet.privyDisabled":
@@ -552,6 +553,7 @@ const id: Record<TKey, string> = {
   "wallet.disconnected": "Dompet diputus",
   "wallet.embedded": "Dompet bawaan",
   "wallet.exportKey": "Ekspor kunci privat",
+  "wallet.noWallet": "Tanpa dompet",
   "wallet.otherNetwork":
     "Dompetmu sedang menunjuk jaringan lain. Isi dompet di {chain} tetap dibaca lewat endpoint aplikasi ini — pindah jaringan hanya perlu saat menandatangani transaksi.",
   "wallet.privyDisabled":

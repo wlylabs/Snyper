@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   useExportWallet,
   useLogin,
@@ -21,6 +21,7 @@ import { CHAIN_ID, chainMeta, explorerAddress } from "@/lib/chains";
 import { formatAmount, truncateAddress } from "@/lib/format";
 import { useI18n } from "@/hooks/useI18n";
 import { ControlSkeleton } from "./ConnectControl";
+import { ACTIVATION_BUDGET } from "./ActiveWalletSync";
 
 /**
  * The connected half of the header control — the part that reads the session.
@@ -31,6 +32,12 @@ import { ControlSkeleton } from "./ConnectControl";
  * lazy provider in `WalletSession` would have saved nothing. This file is only
  * ever reached through a dynamic import, and only once that provider is up.
  */
+
+/**
+ * The margin between the sync giving up and the header saying so, so the last
+ * attempt has time to land rather than being called a failure a frame early.
+ */
+const RETRY_GRACE = 500;
 
 /** The wallet a given address belongs to, out of everything Privy has linked. */
 function walletFor(wallets: ConnectedWallet[], address?: string) {
@@ -174,6 +181,31 @@ function useEndSession(close: () => void) {
 function WaitingControl() {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
+  const [stalled, setStalled] = useState(false);
+
+  /*
+   * "Connecting…" is a promise about the near future, and it was being made to
+   * readers nobody was doing anything for.
+   *
+   * Privy keeps a signed-in session in the browser, so most arrivals here are
+   * not a connect at all: the reader opens the app, the session comes back
+   * without them touching anything, and the header goes straight past Connect
+   * to this. When the wallet behind that session reattaches — an embedded one
+   * always does — the wait is the half second it says it is. When it does not,
+   * because the extension is locked or the pairing the session was built on is
+   * long gone, the word stopped being true the moment `ActiveWalletSync` ran
+   * out of tries, and a reader who had clicked nothing was left watching the
+   * app claim to be connecting to something, forever.
+   *
+   * So the label only outlives the trying by the moment it takes the last
+   * attempt to land. After that this says what is actually the case — there is
+   * a session and no wallet under it — and the sheet behind it is where that
+   * gets fixed or ended.
+   */
+  useEffect(() => {
+    const timer = window.setTimeout(() => setStalled(true), ACTIVATION_BUDGET + RETRY_GRACE);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   return (
     <>
@@ -182,11 +214,15 @@ function WaitingControl() {
         className="pill"
         data-open={open ? "true" : undefined}
         onClick={() => setOpen(true)}
-        aria-label={t("wallet.waiting")}
       >
-        <span className="avatar avatar-empty" style={{ width: 22, height: 22 }} />
+        <span
+          className="avatar avatar-empty flex items-center justify-center"
+          style={{ width: 22, height: 22 }}
+        >
+          {stalled && <Icon name="alert" size={12} className="warn" />}
+        </span>
         <span className="text-[11px] text-dim" aria-live="polite">
-          {t("wallet.connecting")}
+          {stalled ? t("wallet.noWallet") : t("wallet.connecting")}
         </span>
       </button>
       <WaitingSheet open={open} onClose={() => setOpen(false)} />
