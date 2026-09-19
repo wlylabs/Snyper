@@ -15,14 +15,17 @@ import {
   HEALTHY_DILUTION,
   HEALTHY_LIQUIDITY,
   clearsFloor,
-  impersonates,
+  dropCopycats,
   inBand,
   underCeiling,
   type Band,
   type Grade,
 } from "@/lib/screener";
+import { shareOf, verdictOf, type Lock, type Verdict } from "@/lib/lock";
 import { useLaunches } from "@/hooks/useLaunches";
+import { useLiquidityLock, useLiquidityLocks } from "@/hooks/useLiquidityLock";
 import { useScreener, type Pair } from "@/hooks/useScreener";
+import type { TKey } from "@/lib/i18n";
 import { useI18n } from "@/hooks/useI18n";
 import { useMounted } from "@/hooks/useMounted";
 import { useAppStore } from "@/store/useAppStore";
@@ -167,6 +170,135 @@ function merge(traded: Pair[], launched: Pair[]): Pair[] {
   return [...byToken.values()];
 }
 
+/**
+ * What the lock reduces to on screen, and what it refuses to reduce to.
+ *
+ * Four verdicts and only one of them is good news, which is roughly the shape
+ * of the chain: of eighteen pools sampled that held anything, four were burned
+ * outright, four were held by wallets that could empty them, one was 89.8%
+ * burned, and five were held by contracts nothing here can read. `unread` is
+ * not a hedge — it is the largest honest answer this check has.
+ */
+const LOCK_TONE: Record<Verdict, string> = {
+  burned: "long",
+  mixed: "warn",
+  open: "short",
+  unread: "text-faint",
+  empty: "short",
+};
+
+function lockLabel(verdict: Verdict): TKey {
+  return `lock.${verdict}` as TKey;
+}
+
+/**
+ * The same verdict, on a list row, in two registers.
+ *
+ * A chip beside the ticker is loud — it is what `NEW` and `FAKE` already use —
+ * so it is spent only on the answers worth stopping a scroll for: liquidity
+ * that was burned, liquidity that was partly burned, and a pool somebody has
+ * already emptied. Those are rare. Measured across the pools this screen
+ * surfaces, almost every row is either withdrawable or unreadable, and a list
+ * that puts a badge on its own default is a list whose badges stop being read.
+ *
+ * So the ordinary two go in the metadata line instead, in the same dim type as
+ * the depth and the age beside them — which is the pattern this row already
+ * uses for a thin pool. They are still said, because a row that says nothing is
+ * a row a reader cannot tell apart from one that has not been checked yet, and
+ * that ambiguity is the whole reason to print the quiet ones at all.
+ *
+ * A row still being read has neither, which is the honest third thing: no
+ * verdict has arrived. It resolves within a few seconds of the list appearing.
+ */
+const LOCK_CHIP: Partial<Record<Verdict, { key: TKey; tone: string }>> = {
+  burned: { key: "lock.tagBurned", tone: "chip-live" },
+  mixed: { key: "lock.tagMixed", tone: "chip-warn" },
+  empty: { key: "lock.tagEmpty", tone: "chip-short" },
+};
+
+const LOCK_WORD: Partial<Record<Verdict, TKey>> = {
+  open: "lock.tagOpen",
+  unread: "lock.tagUnread",
+};
+
+function LockChip({ lock }: { lock: Lock | undefined }) {
+  const { t } = useI18n();
+  if (!lock) return null;
+  const chip = LOCK_CHIP[verdictOf(lock)];
+  if (!chip) return null;
+  const share = shareOf(lock);
+  return (
+    <span className={`chip chip-xs ml-1.5 ${chip.tone}`}>
+      {t(chip.key, { share: share === undefined ? 0 : Math.round(share) })}
+    </span>
+  );
+}
+
+function LockWord({ lock }: { lock: Lock | undefined }) {
+  const { t } = useI18n();
+  if (!lock) return null;
+  const word = LOCK_WORD[verdictOf(lock)];
+  if (!word) return null;
+  return (
+    <>
+      {" · "}
+      <span className="lbl">{t(word)}</span>
+    </>
+  );
+}
+
+/**
+ * The one row on this sheet about whether the pool can be taken away.
+ *
+ * It sits under the figures rather than beside them because it is a different
+ * kind of fact: depth, volume and age describe what the pool is doing, and this
+ * describes whether it will still be there. The hint is never optional — a
+ * verdict this short is exactly the kind a reader fills in for themselves, and
+ * `burned` in particular has to carry the sentence saying it is not the same as
+ * safe.
+ */
+function LockNote({
+  lock,
+  loading,
+  failed,
+}: {
+  lock: Lock | undefined;
+  loading: boolean;
+  failed: boolean;
+}) {
+  const { t } = useI18n();
+
+  if (loading) {
+    return (
+      <p className="mt-2 text-[11px] text-faint">{`${t("lock.reading")}…`}</p>
+    );
+  }
+  if (failed || !lock) {
+    return <p className="mt-2 text-[11px] text-faint">{t("lock.failed")}</p>;
+  }
+
+  const verdict = verdictOf(lock);
+  const share = shareOf(lock);
+  const rounded = share === undefined ? undefined : Math.round(share);
+
+  return (
+    <div className="mt-2 grid gap-1">
+      <p className="text-[11px] text-dim">
+        {t(`lock.${verdict}Hint` as TKey, { share: rounded ?? 0 })}
+      </p>
+      {/*
+       * Only when the price is known to be outside the burned range. An
+       * unreadable price leaves `backsPrice` undefined, and undefined says
+       * nothing here rather than printing the warning by default.
+       */}
+      {lock.burned > 0n && lock.backsPrice === false && (
+        <p className="text-[11px] warn">{t("lock.outOfRange")}</p>
+      )}
+      {lock.partial && <p className="text-[11px] text-faint">{t("lock.partial")}</p>}
+    </div>
+  );
+}
+
 function PairSheet({
   pair,
   onSnipe,
@@ -177,7 +309,17 @@ function PairSheet({
   onClose: () => void;
 }) {
   const { t } = useI18n();
+  /*
+   * Asked for the pool this row was built from, and only while the sheet is
+   * open — the hook is the most expensive question in the app and a reader
+   * scrolling the list behind this has not asked it.
+   */
+  const { lock, loading: lockLoading, failed: lockFailed } = useLiquidityLock(pair?.pool);
+
   if (!pair) return null;
+
+  const verdict = lock ? verdictOf(lock) : undefined;
+  const share = lock ? shareOf(lock) : undefined;
 
   return (
     <Sheet open title={t("memecoin.pair")} onClose={onClose}>
@@ -221,7 +363,25 @@ function PairSheet({
             k={t("memecoin.token")}
             v={<span className="num">{truncateAddress(pair.token, 8, 6)}</span>}
           />
+          <Row
+            k={t("memecoin.lock")}
+            v={
+              lockLoading ? (
+                <span className="skel inline-block h-[12px] w-[72px] align-middle" />
+              ) : verdict ? (
+                <span className={`num ${LOCK_TONE[verdict]}`}>
+                  {t(lockLabel(verdict), {
+                    share: share === undefined ? 0 : Math.round(share),
+                  })}
+                </span>
+              ) : (
+                <span className="num text-faint">—</span>
+              )
+            }
+          />
         </Panel>
+
+        <LockNote lock={lock} loading={lockLoading} failed={lockFailed} />
 
         {/*
          * The one action on this sheet, above the two places to go and read
@@ -312,11 +472,32 @@ export function Screener() {
   };
   const { launches, loading: pricing } = useLaunches(births, head, true);
 
-  const all = useMemo(() => merge(pairs, launches), [pairs, launches]);
+  /*
+   * Copycats go before the reader's own filters rather than after them. Which
+   * contract holds a ticker is decided against everything the screen knows
+   * about, so a band or a grade that happens to exclude the real one cannot
+   * promote a copy into being the only thing wearing the name.
+   */
+  /*
+   * Copycats go before the reader's own filters rather than after them. Which
+   * contract holds a ticker is decided against everything the screen knows
+   * about, so a band or a grade that happens to exclude the real one cannot
+   * promote a copy into being the only thing wearing the name.
+   */
+  const all = useMemo(() => dropCopycats(merge(pairs, launches)), [pairs, launches]);
   const listed = useMemo(
     () => order(all.filter((pair) => keep(pair, band, grade))),
     [all, band, grade],
   );
+
+  /*
+   * Filled in the background of the list the reader is already reading, and
+   * shared with the sheet — a row checked here is a row the sheet does not have
+   * to check again. See `useLiquidityLocks` for what that costs and why it is
+   * paced rather than fired at once.
+   */
+  const pools = useMemo(() => listed.map((pair) => pair.pool), [listed]);
+  const locks = useLiquidityLocks(pools);
 
   const body = () => {
     /*
@@ -391,9 +572,7 @@ export function Screener() {
                 {pair.age !== undefined && pair.age < FRESH && (
                   <span className="chip chip-xs chip-live ml-1.5">{t("memecoin.fresh")}</span>
                 )}
-                {impersonates(pair.token, pair.symbol) && (
-                  <span className="chip chip-xs chip-warn ml-1.5">{t("memecoin.fake")}</span>
-                )}
+                <LockChip lock={locks.get(pair.pool.toLowerCase())} />
               </span>
               {/*
                * A row nobody has traded has no volume and has not moved, so it
@@ -415,6 +594,7 @@ export function Screener() {
                 <span className={`num ${thin(pair) ? "warn" : ""}`}>{usd(pair.liquidity)}</span>
                 {" · "}
                 <span className="num">{age(pair.age)}</span>
+                <LockWord lock={locks.get(pair.pool.toLowerCase())} />
               </span>
             </span>
             <span className="shrink-0 text-right">

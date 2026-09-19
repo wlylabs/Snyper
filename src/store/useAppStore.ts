@@ -19,6 +19,24 @@ import type { Pair } from "@/hooks/useScreener";
  */
 export type Basis = { spent: number; received: number };
 
+/**
+ * Which wallet's money this was.
+ *
+ * A basis used to be filed under the token alone, which quietly assumed a
+ * browser only ever holds one wallet. This app attracts the opposite: a reader
+ * snipes from a burner and keeps the rest somewhere else, and both connect from
+ * the same browser. Under the old key the second wallet inherited the first
+ * one's spending and the position screen printed a profit on units it had never
+ * bought — the one number on that screen a reader has no way to check.
+ *
+ * So the owner is part of the key. It also makes true the promise the terminal
+ * already makes in prose: that a wallet holding units this app did not buy is
+ * shown no P&L at all rather than somebody else's.
+ */
+export function basisKey(owner: string | undefined, token: string): string | undefined {
+  return owner ? `${owner.toLowerCase()}:${token.toLowerCase()}` : undefined;
+}
+
 export const DEFAULT_SETTINGS: Settings = {
   locale: "en",
   localeChosen: false,
@@ -36,7 +54,7 @@ type AppState = {
    * it survives a reload.
    */
   hidden: string[];
-  /** Cost basis by contract, lowercased. See `Basis`. */
+  /** Cost basis by wallet and contract, lowercased. See `basisKey`. */
   basis: Record<string, Basis>;
   /**
    * A pair handed from one screen to another, on its way to the terminal.
@@ -58,7 +76,12 @@ type AppState = {
 
   setSettings: (patch: Partial<Settings>) => void;
   setHidden: (address: string, hidden: boolean) => void;
-  record: (address: string, side: "spent" | "received", usd: number) => void;
+  record: (
+    owner: string | undefined,
+    address: string,
+    side: "spent" | "received",
+    usd: number,
+  ) => void;
   aim: (pair: Pair | undefined) => void;
   setHydrated: () => void;
 };
@@ -96,11 +119,17 @@ export const useAppStore = create<AppState>()(
        * has one position in it, and the second fill is part of what the first
        * one cost them. A figure that is not a positive number is dropped rather
        * than stored, so a failed conversion cannot quietly corrupt a basis.
+       *
+       * A fill with no wallet behind it is dropped outright. There is no such
+       * thing as a disconnected trade, so this can only be a race between a
+       * receipt landing and the session going away — and a basis filed under
+       * nobody is the very thing the key above exists to prevent.
        */
-      record: (address, side, usd) =>
+      record: (owner, address, side, usd) =>
         set((state) => {
           if (!Number.isFinite(usd) || usd <= 0) return state;
-          const key = address.toLowerCase();
+          const key = basisKey(owner, address);
+          if (!key) return state;
           const held = state.basis[key] ?? { spent: 0, received: 0 };
           return {
             basis: { ...state.basis, [key]: { ...held, [side]: held[side] + usd } },
@@ -114,6 +143,22 @@ export const useAppStore = create<AppState>()(
     {
       name: "snyper.state.v2",
       storage: createJSONStorage(() => localStorage),
+      /*
+       * One version, for one change: the basis key gained an owner.
+       *
+       * The old entries are dropped rather than carried across, and there is no
+       * honest alternative — a figure filed under a token alone does not record
+       * which wallet spent it, and the only way to keep it would be to assign it
+       * to whichever wallet connects next. That is the bug, performed once more
+       * on the way out. What a reader loses is the P&L line on positions opened
+       * before this release; what they gain is that the line is never wrong.
+       */
+      version: 1,
+      migrate: (persisted, from) => {
+        const state = persisted as Partial<AppState> | undefined;
+        if (!state || from >= 1) return state as AppState;
+        return { ...state, basis: {} } as AppState;
+      },
       partialize: (state) => ({
         settings: state.settings,
         hidden: state.hidden,

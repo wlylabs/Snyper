@@ -122,7 +122,6 @@ const en = {
     "The chain is busy — these filters are what emptied the list. Anything already worth more than ten million is never on this screen, and a token whose supply its contract would not report cannot clear a floor, because an unknown size clears nothing.",
   "memecoin.clear": "Clear the filters",
   "memecoin.fresh": "NEW",
-  "memecoin.fake": "NOT THE REAL ONE",
   "memecoin.pair": "Pair",
   "memecoin.mcap": "Market cap",
   "memecoin.fdv": "Fully diluted",
@@ -262,6 +261,38 @@ const en = {
   "wallet.wallets": "Wallets",
   "wallet.wrongNetwork": "Wrong network",
 
+  "memecoin.lock": "Liquidity lock",
+  "lock.tagBurned": "Locked",
+  "lock.tagMixed": "{share}% locked",
+  "lock.tagOpen": "Open",
+  "lock.tagUnread": "Lock unread",
+  "lock.tagEmpty": "Drained",
+  "lock.burned": "Burned",
+  "lock.open": "Withdrawable",
+  "lock.mixed": "{share}% burned",
+  "lock.unread": "Unread",
+  "lock.empty": "Nothing left",
+  "lock.reading": "Reading positions",
+  "lock.failed": "Could not be read",
+  "lock.burnedHint":
+    "Every position under this pool was burned, so no key exists to withdraw it. That is not the same as a safe token — supply, transfer taxes and the sell side are separate questions this does not answer.",
+  "lock.mixedHint":
+    "{share}% of what is in this pool was burned and cannot be pulled. The rest is held by a wallet that can withdraw it at any block.",
+  "lock.openHint":
+    "The liquidity here is held by wallets that can withdraw it at any block. Nothing says they will, and nothing stops them.",
+  "lock.unreadHint":
+    "A contract holds the position. There is no shared locker on this chain to recognise — every holder sampled was a different contract, and some can hand the liquidity back — so this says nothing rather than guessing.",
+  "lock.emptyHint": "Nothing is left in this pool. Every position under it has been closed.",
+  "lock.outOfRange":
+    "The burned part sits outside the price this pool trades at, so it is not holding the current price up.",
+  "lock.partial":
+    "This pool carries more positions than this check reads, so the share is over the ones it read.",
+
+  "error.title": "Something on this screen stopped working.",
+  "error.hint": "Nothing was sent and nothing was signed. Your wallet and everything in it are untouched.",
+  "error.retry": "Try again",
+  "error.home": "Back to Snyper",
+
   "notFound.title": "That route is not part of this app.",
   "notFound.action": "Back to Snyper",
 } as const;
@@ -372,7 +403,6 @@ const id: Record<TKey, string> = {
     "Chain-nya sedang ramai — saringan inilah yang mengosongkan daftarnya. Apa pun yang sudah bernilai di atas sepuluh juta tidak pernah ada di layar ini, dan token yang suplainya tidak dilaporkan kontraknya tidak bisa melewati lantai mana pun, karena ukuran yang tidak diketahui tidak membuktikan apa-apa.",
   "memecoin.clear": "Bersihkan saringan",
   "memecoin.fresh": "BARU",
-  "memecoin.fake": "BUKAN YANG ASLI",
   "memecoin.pair": "Pair",
   "memecoin.mcap": "Kapitalisasi pasar",
   "memecoin.fdv": "Terdilusi penuh",
@@ -511,6 +541,38 @@ const id: Record<TKey, string> = {
   "wallet.wallet": "Dompet",
   "wallet.wallets": "Dompet",
   "wallet.wrongNetwork": "Jaringan salah",
+
+  "memecoin.lock": "Kunci likuiditas",
+  "lock.tagBurned": "Terkunci",
+  "lock.tagMixed": "{share}% terkunci",
+  "lock.tagOpen": "Terbuka",
+  "lock.tagUnread": "Kunci tak terbaca",
+  "lock.tagEmpty": "Terkuras",
+  "lock.burned": "Dibakar",
+  "lock.open": "Bisa ditarik",
+  "lock.mixed": "{share}% dibakar",
+  "lock.unread": "Tak terbaca",
+  "lock.empty": "Sudah kosong",
+  "lock.reading": "Membaca posisi",
+  "lock.failed": "Gagal dibaca",
+  "lock.burnedHint":
+    "Semua posisi di bawah pool ini sudah dibakar, jadi tidak ada kunci untuk menariknya. Itu tidak sama dengan token yang aman — pasokan, pajak transfer, dan sisi jual adalah pertanyaan terpisah yang tidak dijawab di sini.",
+  "lock.mixedHint":
+    "{share}% dari isi pool ini sudah dibakar dan tidak bisa ditarik. Sisanya dipegang dompet yang bisa menariknya pada blok mana pun.",
+  "lock.openHint":
+    "Likuiditas di sini dipegang dompet yang bisa menariknya pada blok mana pun. Tidak ada yang menjamin mereka akan menarik, dan tidak ada yang menghalangi.",
+  "lock.unreadHint":
+    "Posisinya dipegang sebuah kontrak. Tidak ada locker bersama di chain ini yang bisa dikenali — setiap pemegang yang disampel adalah kontrak yang berbeda, dan sebagian bisa mengembalikan likuiditasnya — jadi layar ini diam daripada menebak.",
+  "lock.emptyHint": "Tidak ada yang tersisa di pool ini. Semua posisi di bawahnya sudah ditutup.",
+  "lock.outOfRange":
+    "Bagian yang dibakar berada di luar harga yang diperdagangkan pool ini, jadi tidak menopang harga sekarang.",
+  "lock.partial":
+    "Pool ini punya lebih banyak posisi daripada yang dibaca pemeriksaan ini, jadi persentasenya dihitung atas yang terbaca.",
+
+  "error.title": "Ada bagian layar ini yang berhenti bekerja.",
+  "error.hint": "Tidak ada yang dikirim dan tidak ada yang ditandatangani. Dompet Anda dan seluruh isinya tidak tersentuh.",
+  "error.retry": "Coba lagi",
+  "error.home": "Kembali ke Snyper",
 
   "notFound.title": "Rute itu bukan bagian dari aplikasi ini.",
   "notFound.action": "Kembali ke Snyper",
