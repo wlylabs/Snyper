@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
+import { Figure } from "@/components/ui/Figure";
 import { Icon } from "@/components/ui/Icon";
 import { Empty, Panel, Row, Skeleton } from "@/components/ui/Panel";
 import { Segmented } from "@/components/ui/Segmented";
@@ -332,9 +333,13 @@ function PairSheet({
           <p className="num mt-1 text-[11px] text-faint">{truncateAddress(pair.token, 6, 4)}</p>
         </div>
         <div className="mt-1">
-          <p className="num text-[26px] leading-none">{usd(pair.marketCap)}</p>
+          <p className="num text-[26px] leading-none">
+            <Figure value={usd(pair.marketCap)} />
+          </p>
           <p className="lbl mt-1">{t("memecoin.mcap")}</p>
-          <p className={`lbl mt-2 ${pair.change >= 0 ? "long" : "short"}`}>{signed(pair.change)}</p>
+          <p className={`lbl mt-2 ${pair.change >= 0 ? "long" : "short"}`}>
+            <Figure value={signed(pair.change)} />
+          </p>
         </div>
       </div>
 
@@ -344,17 +349,17 @@ function PairSheet({
         </div>
 
         <Panel>
-          <Row k={t("memecoin.fdv")} v={<span className="num">{usd(pair.fdv)}</span>} />
+          <Row k={t("memecoin.fdv")} v={<Figure className="num" value={usd(pair.fdv)} />} />
           <Row
             k={t("memecoin.volume")}
-            v={<span className="num">{usd(pair.volume)}</span>}
+            v={<Figure className="num" value={usd(pair.volume)} />}
           />
           <Row
             k={t("memecoin.liquidity")}
-            v={<span className="num">{usd(pair.liquidity)}</span>}
+            v={<Figure className="num" value={usd(pair.liquidity)} />}
           />
-          <Row k={t("memecoin.trades")} v={<span className="num">{pair.swaps}</span>} />
-          <Row k={t("memecoin.age")} v={<span className="num">{age(pair.age)}</span>} />
+          <Row k={t("memecoin.trades")} v={<Figure className="num" value={String(pair.swaps)} />} />
+          <Row k={t("memecoin.age")} v={<Figure className="num" value={age(pair.age)} />} />
           <Row
             k={t("memecoin.pool")}
             v={<span className="num">{`${pair.fee / 10_000}%`}</span>}
@@ -584,27 +589,26 @@ export function Screener() {
                 {pair.swaps > 0 && (
                   <>
                     <span className="lbl">{t("memecoin.volShort")}</span>{" "}
-                    <span className="num">{usd(pair.volume)}</span>
+                    <Figure className="num" value={usd(pair.volume)} />
                     {" · "}
                   </>
                 )}
                 <span className={`lbl ${thin(pair) ? "warn" : ""}`}>
                   {t("memecoin.liqShort")}
                 </span>{" "}
-                <span className={`num ${thin(pair) ? "warn" : ""}`}>{usd(pair.liquidity)}</span>
+                <Figure className={`num ${thin(pair) ? "warn" : ""}`} value={usd(pair.liquidity)} />
                 {" · "}
-                <span className="num">{age(pair.age)}</span>
+                <Figure className="num" value={age(pair.age)} />
                 <LockWord lock={locks.get(pair.pool.toLowerCase())} />
               </span>
             </span>
             <span className="shrink-0 text-right">
-              <span className="num block text-[12px]">{usd(pair.marketCap)}</span>
+              <Figure className="num block text-[12px]" value={usd(pair.marketCap)} />
               {pair.swaps > 0 ? (
-                <span
+                <Figure
                   className={`num block text-[11px] font-normal ${pair.change >= 0 ? "long" : "short"}`}
-                >
-                  {signed(pair.change)}
-                </span>
+                  value={signed(pair.change)}
+                />
               ) : (
                 <span className="lbl block">{t("memecoin.mcapShort")}</span>
               )}

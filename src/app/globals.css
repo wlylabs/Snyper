@@ -121,6 +121,20 @@
   --press-drop: 2px;
   --color-plinth: #04060a;
   --ease-strike: cubic-bezier(0.4, 0, 1, 1);
+
+  /*
+   * How a figure changes: how long one character takes to give up its place,
+   * and how far behind its neighbour it starts.
+   *
+   * A touch longer than a control's travel, because this is the app answering
+   * rather than the reader acting — a figure that changed in `--dur-tap` would
+   * be over before the eye reached it, which is the flicker it was put here to
+   * replace. The lag is small enough to read as one figure settling rather than
+   * as digits arriving one at a time; `Figure` caps how many places it applies
+   * to so a long figure never turns into a slow one.
+   */
+  --dur-roll: 260ms;
+  --fig-lag: 18ms;
 }
 
 [data-theme="light"] {
@@ -225,6 +239,84 @@
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.01em;
+  }
+
+  /*
+   * A figure changing place. The component that drives this is `Figure`, which
+   * lays the new figure against the old one and marks only the places where the
+   * two differ; everything below is what those places do.
+   *
+   * The movement is a rise and a fade rather than a masked roll. Clipping each
+   * character to its own box would read as a mechanical wheel, but an
+   * inline-block with `overflow: hidden` aligns its bottom edge to the baseline
+   * instead of its text — the whole figure would drop a couple of pixels the
+   * instant it started moving, on a screen whose numbers sit in dashed rows that
+   * make any vertical shift obvious. Carrying the change on opacity needs no
+   * mask at all: the outgoing character is out of the flow and fading as it
+   * goes, so the two never read as two.
+   *
+   * Every figure in this app is mono and tabular, so a place is the same width
+   * whatever character lands in it and a digit turning moves nothing around it.
+   */
+  .fig {
+    transition: opacity var(--dur-enter) var(--ease-out);
+  }
+
+  /*
+   * The last answer, held while a fresher one is out. Dimmed rather than
+   * cleared: it is a real figure that is no longer current, and the trigger is
+   * already refusing to fire on it.
+   */
+  .fig-pending {
+    opacity: 0.45;
+  }
+
+  .fig-slot {
+    position: relative;
+    display: inline-block;
+    /* A space is a character here like any other, and has to hold its place. */
+    white-space: pre;
+    --fig-delay: calc(var(--fig-step, 0) * var(--fig-lag));
+  }
+
+  .fig-in,
+  .fig-out {
+    display: inline-block;
+  }
+
+  .fig-turn > .fig-in {
+    animation: fig-in var(--dur-roll) var(--ease-settle) var(--fig-delay) both;
+  }
+
+  /* Out of the flow, so what is arriving lays the figure out on its own. */
+  .fig-turn > .fig-out {
+    position: absolute;
+    top: 0;
+    left: 0;
+    animation: fig-out var(--dur-roll) var(--ease-settle) var(--fig-delay) both;
+  }
+
+  /* Forwards, like a wheel: what is new comes up from under what it replaces. */
+  @keyframes fig-in {
+    from {
+      opacity: 0;
+      transform: translateY(0.4em);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes fig-out {
+    from {
+      opacity: 1;
+      transform: none;
+    }
+    to {
+      opacity: 0;
+      transform: translateY(-0.4em);
+    }
   }
 
   /*

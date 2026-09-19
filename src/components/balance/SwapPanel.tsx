@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { formatUnits, parseUnits } from "viem";
+import { Figure } from "@/components/ui/Figure";
 import { Icon } from "@/components/ui/Icon";
 import { Row } from "@/components/ui/Panel";
 import { Segmented } from "@/components/ui/Segmented";
@@ -68,7 +69,7 @@ export function SwapPanel({ row, onSold }: { row: Holding; onSold: () => void })
    * Before anything is typed the whole holding is quoted, which is what finds
    * the exits and their pools; once there is an amount, that amount is quoted.
    */
-  const { bestFor, tradable, asked, loading } = useRoutes(
+  const { bestFor, tradable, asked, loading, stale } = useRoutes(
     row.address,
     settled > 0n ? settled : row.raw,
   );
@@ -93,7 +94,12 @@ export function SwapPanel({ row, onSold }: { row: Holding; onSold: () => void })
   const { approved, approve, approving, send, sending, done, blocked, checking, failure } =
     useSwapAction({
       token: row.address,
-      route: tooMuch || thin ? undefined : route,
+      /*
+       * A held quote is shown and not signed. Its floor belongs to the last
+       * amount asked about, so a sale built on it would carry the wrong
+       * guarantee — the rows above keep it, the transaction waits.
+       */
+      route: tooMuch || thin || stale ? undefined : route,
       amountIn: settled,
       slippageBps: slippage,
       onDone: onSold,
@@ -111,7 +117,7 @@ export function SwapPanel({ row, onSold }: { row: Holding; onSold: () => void })
     );
   }
 
-  const ready = settled > 0n && steady && !tooMuch && !thin && route !== undefined;
+  const ready = settled > 0n && steady && !stale && !tooMuch && !thin && route !== undefined;
 
   return (
     <div className="mt-4">
@@ -159,31 +165,51 @@ export function SwapPanel({ row, onSold }: { row: Holding; onSold: () => void })
           <Row
             k={t("swap.receive")}
             v={
-              <span className="num">
-                {route && chosen
-                  ? `${formatAmount(Number(formatUnits(afterFee(route.amountOut), chosen.decimals)))} ${chosen.symbol}`
-                  : "—"}
-              </span>
+              <Figure
+                className="num"
+                pending={stale}
+                value={
+                  route && chosen
+                    ? `${formatAmount(Number(formatUnits(afterFee(route.amountOut), chosen.decimals)))} ${chosen.symbol}`
+                    : "—"
+                }
+              />
             }
           />
           <Row
             k={t("swap.minimum")}
             v={
-              <span className="num">
-                {route && chosen
-                  ? `${formatAmount(Number(formatUnits(afterFee(floor), chosen.decimals)))} ${chosen.symbol}`
-                  : "—"}
-              </span>
+              <Figure
+                className="num"
+                pending={stale}
+                value={
+                  route && chosen
+                    ? `${formatAmount(Number(formatUnits(afterFee(floor), chosen.decimals)))} ${chosen.symbol}`
+                    : "—"
+                }
+              />
             }
           />
           <Row
             k={t("swap.impact")}
-            v={<span className="num">{route ? `${percent(route.impactBps)}%` : "—"}</span>}
+            v={
+              <Figure
+                className="num"
+                pending={stale}
+                value={route ? `${percent(route.impactBps)}%` : "—"}
+              />
+            }
             tone={route && route.impactBps >= 100 ? "warn" : undefined}
           />
           <Row
             k={t("swap.slippage")}
-            v={<span className="num">{route ? `${percent(slippage)}%` : "—"}</span>}
+            v={
+              <Figure
+                className="num"
+                pending={stale}
+                value={route ? `${percent(slippage)}%` : "—"}
+              />
+            }
           />
           <Row
             k={t("swap.pool")}
