@@ -197,19 +197,18 @@ function TargetSheet({
                   </span>
                   <span className="block truncate text-[11px] font-normal text-faint">
                     <span className="lbl">{t("memecoin.liqShort")}</span>{" "}
-                    <span className="num">{usd(pair.liquidity)}</span>
+                    <Figure className="num" value={usd(pair.liquidity)} />
                     {" · "}
                     <span className="lbl">{t("memecoin.volShort")}</span>{" "}
-                    <span className="num">{usd(pair.volume)}</span>
+                    <Figure className="num" value={usd(pair.volume)} />
                   </span>
                 </span>
                 <span className="shrink-0 text-right">
-                  <span className="num block text-[12px]">{usd(pair.marketCap)}</span>
-                  <span
+                  <Figure className="num block text-[12px]" value={usd(pair.marketCap)} />
+                  <Figure
                     className={`num block text-[11px] font-normal ${pair.change >= 0 ? "long" : "short"}`}
-                  >
-                    {`${pair.change >= 0 ? "+" : ""}${pair.change.toFixed(1)}%`}
-                  </span>
+                    value={`${pair.change >= 0 ? "+" : ""}${pair.change.toFixed(1)}%`}
+                  />
                 </span>
               </button>
             ))}

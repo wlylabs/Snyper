@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Figure } from "@/components/ui/Figure";
 import { Icon } from "@/components/ui/Icon";
 import { Empty, Panel, Row, Skeleton } from "@/components/ui/Panel";
 import { Sheet } from "@/components/ui/Sheet";
@@ -65,8 +66,8 @@ function HoldingRow({
         </span>
       </span>
       <span className="shrink-0 text-right">
-        <span className="num block text-[12px]">{amount}</span>
-        <span className="num block text-[11px] font-normal text-faint">{value}</span>
+        <Figure className="num block text-[12px]" value={amount} />
+        <Figure className="num block text-[11px] font-normal text-faint" value={value} />
       </span>
       {/*
        * A figure the chain would not confirm is marked rather than dropped. The
@@ -141,8 +142,12 @@ function TokenSheet({
           <p className="num mt-1 text-[11px] text-faint">{truncateAddress(row.address, 6, 4)}</p>
         </div>
         <div className="mt-1">
-          <p className="num text-[26px] leading-none">{formatAmount(row.amount)}</p>
-          <p className="lbl mt-2">{usd(row.value)}</p>
+          <p className="num text-[26px] leading-none">
+            <Figure value={formatAmount(row.amount)} />
+          </p>
+          <p className="lbl mt-2">
+            <Figure value={usd(row.value)} />
+          </p>
         </div>
       </div>
 
@@ -167,8 +172,11 @@ function TokenSheet({
             padding of their own, so without its body they sit flush to the
             border and long values run into it. */}
         <Panel>
-          <Row k={t("balance.amount")} v={<span className="num">{formatAmount(row.amount)}</span>} />
-          <Row k={t("balance.worth")} v={<span className="num">{usd(row.value)}</span>} />
+          <Row
+            k={t("balance.amount")}
+            v={<Figure className="num" value={formatAmount(row.amount)} />}
+          />
+          <Row k={t("balance.worth")} v={<Figure className="num" value={usd(row.value)} />} />
           <Row
             k={row.suspicion ? t("balance.nameAsWritten") : t("balance.name")}
             v={row.name || "—"}
@@ -377,7 +385,9 @@ export function Holdings() {
           label={t("balance.total")}
           meta={<span className="lbl">{truncateAddress(address, 6, 4)}</span>}
         >
-          <p className="num text-[30px] leading-none">{usd(total)}</p>
+          <p className="num text-[30px] leading-none">
+            <Figure value={usd(total)} />
+          </p>
         </Panel>
       )}
 
