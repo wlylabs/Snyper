@@ -4,13 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { erc20Abi, formatEther, formatUnits, parseUnits } from "viem";
 import { useAccount, useBalance, useReadContract } from "wagmi";
 import { Figure } from "@/components/ui/Figure";
-import { Icon } from "@/components/ui/Icon";
+import { Icon, type IconName } from "@/components/ui/Icon";
 import { Empty, Panel, Row, Skeleton } from "@/components/ui/Panel";
 import { Segmented } from "@/components/ui/Segmented";
 import { Sheet } from "@/components/ui/Sheet";
 import { CHAIN_ID, chainMeta, explorerTx } from "@/lib/chains";
 import { haptic } from "@/lib/haptics";
 import { formatAmount, formatCompact } from "@/lib/format";
+import { shareOf, verdictOf, type Lock, type Verdict } from "@/lib/lock";
 import { clearsFloor, dropCopycats, underCeiling } from "@/lib/screener";
 import {
   EXITS,
@@ -26,11 +27,13 @@ import {
 import { useCoinUsd } from "@/hooks/useCoinUsd";
 import { useConnectPrompt } from "@/hooks/useConnectPrompt";
 import { useI18n } from "@/hooks/useI18n";
+import { useLiquidityLock } from "@/hooks/useLiquidityLock";
 import { useMounted } from "@/hooks/useMounted";
 import { useScreener, type Pair } from "@/hooks/useScreener";
 import { STAKES, stakeIn, useFire, useShot } from "@/hooks/useSnipe";
 import { useRoutes, useSwapAction } from "@/hooks/useSwap";
 import { basisKey, useAppStore } from "@/store/useAppStore";
+import type { TKey } from "@/lib/i18n";
 
 /**
  * What the wallet keeps back for gas when the reader asks for everything.
@@ -227,6 +230,106 @@ function Notice({ title, hint }: { title: string; hint: string }) {
         <p className="warn text-[12px] font-semibold">{title}</p>
         <p className="mt-1 text-[11px] leading-relaxed text-dim">{hint}</p>
       </div>
+    </div>
+  );
+}
+
+/**
+ * How much of a pool has to be provably burned before this stops objecting.
+ *
+ * Half, and the number matters less than which side of it a reader is on. A
+ * pool that is 5% burned and 95% withdrawable is an open pool wearing a badge,
+ * and reporting it as `mixed` and saying nothing further would be this screen
+ * doing the thing it exists to stop.
+ */
+const MOSTLY_BURNED = 50;
+
+/**
+ * What the lock reads as, in the two things this row prints.
+ *
+ * `unread` is deliberately the dull one — faint, no colour, no notice below it.
+ * It is the commonest answer on this chain by some margin: eight of the
+ * eighteen pools sampled in `lib/lock` were held by eight different contracts,
+ * none of which can be read as a lock and several of which are wrappers rather
+ * than locks. Painting all of those as a warning would put a red mark on most
+ * of the market, and a warning that fires on most of the market is one readers
+ * learn to scroll past — taking the ones that mean something with it.
+ */
+const LOCK_FACE: Record<Verdict, { icon: IconName; tone: string; hint: TKey }> = {
+  burned: { icon: "check", tone: "long", hint: "snipe.lockBurnedHint" },
+  mixed: { icon: "alert", tone: "warn", hint: "snipe.lockMixedHint" },
+  open: { icon: "alert", tone: "short", hint: "snipe.lockOpenHint" },
+  unread: { icon: "alert", tone: "text-faint", hint: "snipe.lockUnreadHint" },
+  empty: { icon: "alert", tone: "short", hint: "snipe.lockEmptyHint" },
+};
+
+/**
+ * Whether the pool will still be there, beside whether it can be sold into.
+ *
+ * The exit check next to this one runs the sale through the pool's own code and
+ * reports what came back, which is the strongest thing any screen can say about
+ * getting out — and it is a statement about this block. The commonest way a
+ * memecoin buyer loses their money is not a token that cannot be sold; it is a
+ * pool that was there when they bought and gone an hour later, and the two are
+ * indistinguishable afterwards. One check answers for now and the other for
+ * later, so they are read together or neither is worth much.
+ *
+ * `backsPrice` is carried because a burn can be bought cheaply. A v3 position
+ * only holds the price up while the price is inside its range, so liquidity
+ * burned in a range nobody trades in is un-withdrawable and also not under
+ * anything. Reported as a green hundred percent, that is the same false comfort
+ * this whole panel exists to remove, so it takes the row down to a warning and
+ * says why underneath.
+ */
+function LockCheck({
+  lock,
+  loading,
+  unbacked,
+}: {
+  lock: Lock | undefined;
+  loading: boolean;
+  unbacked: boolean;
+}) {
+  const { t } = useI18n();
+  const verdict = lock && !loading ? verdictOf(lock) : undefined;
+  const face = verdict ? LOCK_FACE[verdict] : undefined;
+  const share = lock ? shareOf(lock) : undefined;
+  const rounded = share === undefined ? undefined : Math.round(share);
+
+  /* A burn parked outside the traded range is not the good news it scores as. */
+  const tone = face ? (unbacked && face.tone === "long" ? "warn" : face.tone) : "text-faint";
+
+  return (
+    <div className="panel mt-2 flex items-center justify-between gap-3 p-3">
+      <span className="flex min-w-0 items-center gap-2.5">
+        {/*
+         * A trace rather than a verdict while the pools are being read. The
+         * exit check beside this one shows a faint tick in the same state,
+         * which on a row about safety is the wrong shape to hold the place —
+         * a tick that has not been earned is read as one that has.
+         */}
+        <Icon
+          name={loading ? "pulse" : face && !unbacked ? face.icon : "alert"}
+          size={17}
+          className={tone}
+        />
+        <span className="min-w-0">
+          <span className="block text-[12px] font-semibold">{t("snipe.lock")}</span>
+          <span className="block text-[11px] leading-snug text-faint">
+            {loading
+              ? t("snipe.lockAsking")
+              : face
+                ? t(face.hint, { share: rounded ?? 0 })
+                : t("snipe.lockFailed")}
+          </span>
+        </span>
+      </span>
+      <Figure
+        className={`num shrink-0 text-[17px] ${tone}`}
+        value={
+          !face || rounded === undefined ? "—" : `${formatAmount(rounded)}%`
+        }
+      />
     </div>
   );
 }
@@ -625,6 +728,30 @@ export function Terminal() {
   const stale = shot?.stale ?? false;
 
   /*
+   * Who holds the pool this shot goes through.
+   *
+   * The same query the memecoin list fills in the background, on the same key,
+   * so a reader who came here by tapping a row has already paid for this answer
+   * and it arrives on the first frame. One that came straight to the terminal
+   * pays for it once, while they are still choosing a size.
+   */
+  const { lock, loading: lockLoading } = useLiquidityLock(target?.pool);
+  const lockVerdict = lock && !lockLoading ? verdictOf(lock) : undefined;
+  const lockShare = lock ? shareOf(lock) : undefined;
+
+  /*
+   * Withdrawable by somebody, and enough of it to matter. `unread` is not in
+   * here on purpose — see `LOCK_FACE` for why an absence of knowledge does not
+   * get to fire a warning.
+   */
+  const pullable =
+    lockVerdict === "open" ||
+    (lockVerdict === "mixed" && (lockShare ?? 0) < MOSTLY_BURNED);
+
+  /* Burned, and burned somewhere the price this pool trades at cannot reach. */
+  const unbacked = Boolean(lock && lock.burned > 0n && lock.backsPrice === false);
+
+  /*
    * What this shot cost, kept where a stable callback can read it. `useFire`
    * runs its completion from an effect that keeps the callback in its
    * dependencies, so a closure rebuilt on every render would record the same
@@ -936,6 +1063,18 @@ export function Terminal() {
             />
           </div>
 
+          {/*
+           * The second half of the same question, directly under the first.
+           *
+           * The exit check above asks whether this can be sold; this asks
+           * whether the pool it would be sold into can be taken away. They are
+           * the only two lines on the screen that can say do not, they fail in
+           * ways that look identical once the money is gone, and neither one
+           * answers for the other — so they are read as a pair, before the
+           * price rows that describe what the trade merely costs.
+           */}
+          <LockCheck lock={lock} loading={lockLoading} unbacked={unbacked} />
+
           <div className="panel mt-2 p-3">
             <Row
               k={t("snipe.youGet")}
@@ -990,6 +1129,15 @@ export function Terminal() {
             <Notice title={t("snipe.unquotable")} hint={t("snipe.unquotableHint")} />
           )}
           {shot?.trapped && <Notice title={t("snipe.trapped")} hint={t("snipe.trappedHint")} />}
+          {/*
+           * Said out loud rather than left to the row, because the row reads as
+           * one measurement among several and this is the one that empties a
+           * wallet. It does not stop the shot: a withdrawable pool is most of
+           * this chain, and a terminal that refused them would be a terminal
+           * that cannot trade. It is a thing the reader has to have been told.
+           */}
+          {pullable && <Notice title={t("snipe.pullable")} hint={t("snipe.pullableHint")} />}
+          {unbacked && <Notice title={t("snipe.outOfRange")} hint={t("lock.outOfRange")} />}
           {/*
            * A price, not a verdict. The pool charges what it charges for a
            * trade this size and the figure above already has it in — so this

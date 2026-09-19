@@ -12,9 +12,9 @@ import { CHAIN_ID, explorerAddress } from "@/lib/chains";
 import { formatCompact, truncateAddress } from "@/lib/format";
 import {
   CEILING,
+  DEPTH_RATIO,
+  DILUTION_LIMIT,
   FLOOR,
-  HEALTHY_DILUTION,
-  HEALTHY_LIQUIDITY,
   clearsFloor,
   dropCopycats,
   inBand,
@@ -99,19 +99,19 @@ function keep(pair: Pair, band: Band, grade: Grade): boolean {
   if (!inBand(pair.change, band)) return false;
   /* Volume is asked of a row only if that row has trades behind it. */
   if (!clearsFloor(pair, pair.swaps > 0)) return false;
-  return grade === "floor" || healthy(pair);
+  return grade === "floor" || deep(pair);
 }
 
 /** Deep enough for its size, and not mostly supply that has not arrived yet. */
-function healthy(pair: Pair): boolean {
+function deep(pair: Pair): boolean {
   const { marketCap, fdv, liquidity } = pair;
   if (marketCap === undefined || fdv === undefined) return false;
-  return liquidity >= marketCap * HEALTHY_LIQUIDITY && fdv <= marketCap * HEALTHY_DILUTION;
+  return liquidity >= marketCap * DEPTH_RATIO && fdv <= marketCap * DILUTION_LIMIT;
 }
 
 /** Whether the pool behind a row could absorb the position it is quoting. */
 function thin(pair: Pair): boolean {
-  return pair.marketCap !== undefined && pair.liquidity < pair.marketCap * HEALTHY_LIQUIDITY;
+  return pair.marketCap !== undefined && pair.liquidity < pair.marketCap * DEPTH_RATIO;
 }
 
 /**
@@ -652,7 +652,7 @@ export function Screener() {
           <Segmented
             options={[
               { value: "floor", label: t("memecoin.gradeAll") },
-              { value: "healthy", label: t("memecoin.gradeHealthy") },
+              { value: "deep", label: t("memecoin.gradeDeep") },
             ]}
             value={grade}
             onChange={setGrade}
