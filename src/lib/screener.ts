@@ -242,19 +242,27 @@ export const CEILING = 10_000_000;
  *              anything near the price the screen is quoting — which is what a
  *              rug is, before anyone has to be dishonest about it.
  *
- *   fdv        no more than twice the market cap. Under two is called healthy
- *              and means most of the supply is already out; over five is the
- *              danger line, and eight to ten is where roughly nine tenths of
- *              the supply is still waiting to land on whoever bought early.
+ *   fdv        no more than twice the market cap. Under two means most of the
+ *              supply is already out; over five is the danger line, and eight
+ *              to ten is where roughly nine tenths of the supply is still
+ *              waiting to land on whoever bought early.
  *
  * Volume is deliberately a dollar floor and not a ratio. The published ratio is
  * against a day's volume — thirty percent of market cap by one account, a full
  * turn by another — and this window is five minutes. Dividing a daily figure by
  * two hundred and eighty-eight assumes a token trades evenly around the clock,
  * which is the one thing a memecoin never does.
+ *
+ * Both are measurements of the pool's shape at one instant, and neither knows
+ * who holds what is in it. A pool can clear both of these and be emptied in the
+ * next block by the one wallet that owns every position under it — which is the
+ * commonest way a memecoin buyer loses their money, and nothing on this axis
+ * can see it coming. That question is `readLock` in `lib/lock`, and the
+ * terminal asks it before a shot; these two constants must not be read as
+ * though they had.
  */
-export const HEALTHY_LIQUIDITY = 0.1;
-export const HEALTHY_DILUTION = 2;
+export const DEPTH_RATIO = 0.1;
+export const DILUTION_LIMIT = 2;
 
 /**
  * How hard the list is filtered, in one control.
@@ -265,8 +273,17 @@ export const HEALTHY_DILUTION = 2;
  * sounds like breadth and was working as an off switch. Any here means any
  * token that has cleared the floor, not any token at all, and there is no
  * longer a way to switch the floor off.
+ *
+ * The upper one was called `healthy`, and that was the most expensive word in
+ * the app. It tests two ratios about the pool's shape — depth against size, and
+ * supply already out against supply outright — and a reader reasonably heard it
+ * as a verdict on whether the token was safe to buy, which is a question it has
+ * never once asked. Tokens passed it and were rugged the same week, because
+ * being deep is not the same as being un-pullable and the screen was never
+ * claiming it was. `deep` says what the test does, and leaves the safety
+ * question to the check that can actually answer it.
  */
-export type Grade = "floor" | "healthy";
+export type Grade = "floor" | "deep";
 
 /**
  * The reader's bar, applied to all four figures alike.

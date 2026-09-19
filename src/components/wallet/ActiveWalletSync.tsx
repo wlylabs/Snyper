@@ -22,6 +22,15 @@ const RETRY_DELAY = 600;
 const RETRIES = 5;
 
 /**
+ * How long this will go on trying, all told.
+ *
+ * The header reads it so that the two do not drift: what it says about the wait
+ * has to be true for exactly as long as the wait lasts, and a number repeated
+ * in both places is a number that stops matching the first time one is tuned.
+ */
+export const ACTIVATION_BUDGET = RETRY_DELAY * RETRIES;
+
+/**
  * Keeps the address the app reads on the wallet the reader actually connected,
  * and on nothing at all once they disconnect.
  *
