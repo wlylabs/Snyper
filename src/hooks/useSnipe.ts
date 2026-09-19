@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { parseEther } from "viem";
 import {
   useAccount,
@@ -71,6 +71,13 @@ export type Shot = {
   slippageBps: number;
   /** True when the tolerance above is pinned at its cap rather than measured. */
   capped: boolean;
+  /**
+   * True when this is the last size's answer, still on screen while the one for
+   * the size now staked is out. Every figure in it is a real quote and none of
+   * them is current, so it may be read and must not be fired — see the guard in
+   * `useFire`, which is what makes holding it on screen safe.
+   */
+  stale: boolean;
   /**
    * What fraction of the stake comes back if the position is sold again at
    * once, quoted rather than assumed. Undefined while the sell side has not
@@ -163,7 +170,7 @@ export function useShot(pair: Pair | undefined, stake: bigint) {
     query: { enabled: Boolean(road && amountOut), staleTime: 10_000 },
   });
 
-  const shot = useMemo((): Shot | undefined => {
+  const asked = useMemo((): Shot | undefined => {
     if (!amountOut) return undefined;
 
     const small = bought.data?.[1];
@@ -205,11 +212,49 @@ export function useShot(pair: Pair | undefined, stake: bigint) {
       roundTrip:
         returned && stake > 0n ? Number((returned * 10_000n) / stake) / 10_000 : undefined,
       trapped: back.isFetched && returned === undefined,
+      stale: false,
     };
   }, [amountOut, bought.data, back.data, back.isFetched, stake, net]);
 
+  /*
+   * The answer the reader is already looking at, kept until the next one lands.
+   *
+   * A stake is chosen by tapping a rung, and every rung is a different query —
+   * so between the tap and the chain answering there is no data at all, and six
+   * rows that had figures in them turn into six dashes and then into figures
+   * again. That is what the panel breaking looks like: the reader tapped `$50`
+   * and watched it come apart and reassemble, twice if they tapped twice.
+   *
+   * Held whole rather than figure by figure, and that is the point. Every number
+   * in a shot was measured against the same stake through the same pool in the
+   * same call, so keeping the object is keeping a set of figures that agree with
+   * each other; holding them one at a time would let the panel show a round trip
+   * from one size beside an output from another — figures that were each true
+   * once and were never true together.
+   *
+   * Filed under the pool it was asked about, because a shot describes one pair.
+   * A quote held across a change of target would be printed under the new
+   * ticker's symbol, which is not a stale figure but a wrong one.
+   */
+  const [kept, setKept] = useState<{ pool: string; shot: Shot }>();
+  useEffect(() => {
+    if (asked && pair) setKept({ pool: pair.pool, shot: asked });
+  }, [asked, pair]);
+
+  /*
+   * Only while the chain has yet to answer. A quote that came back with nothing
+   * is an answer — this pool cannot fill a trade this size — and holding the
+   * last size's figures under it would leave a panel of numbers standing where
+   * the screen has just been told there are none.
+   */
+  const settling = bought.isFetching || !bought.isFetched;
+  const held =
+    settling && stake > 0n && pair && kept?.pool === pair.pool
+      ? ({ ...kept.shot, stale: true } as const)
+      : undefined;
+
   return {
-    shot,
+    shot: asked ?? held,
     /** No quote at all, which is a pool that cannot fill a trade this size. */
     unquotable: contracts.length > 0 && bought.isFetched && amountOut === undefined,
     loading: bought.isFetching || back.isFetching,
@@ -260,7 +305,14 @@ export function useFire({
    * leg touches the pool.
    */
   const legs = useMemo(() => {
-    if (!pair || !address || !shot) return undefined;
+    /*
+     * A held quote is for reading, never for signing. Its floor was measured
+     * against the last size staked, so a transaction built on it would go out
+     * with the wrong number guarding it — too low to protect the trade if the
+     * stake went up, too high to fill if it went down. The panel shows it; this
+     * waits for the chain.
+     */
+    if (!pair || !address || !shot || shot.stale) return undefined;
     const cut = feeOn(stake);
     const buy = encodeFunctionData({
       abi: routerAbi,

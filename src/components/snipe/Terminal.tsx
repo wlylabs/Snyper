@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { erc20Abi, formatEther, formatUnits, parseUnits } from "viem";
 import { useAccount, useBalance, useReadContract } from "wagmi";
+import { Figure } from "@/components/ui/Figure";
 import { Icon } from "@/components/ui/Icon";
 import { Empty, Panel, Row, Skeleton } from "@/components/ui/Panel";
 import { Segmented } from "@/components/ui/Segmented";
@@ -354,7 +355,12 @@ function Exit({ pair, coinUsd }: { pair: Pair; coinUsd: number | undefined }) {
 
   const { approved, approve, approving, send, sending, done, blocked, checking } = useSwapAction({
     token: pair.token,
-    route,
+    /*
+     * The held quote above is for reading. Its floor was measured against the
+     * last size, so a sale signed on it would go out guarded by the wrong
+     * number — the rows keep it, the transaction waits for the chain.
+     */
+    route: sale.stale ? undefined : route,
     amountIn: position,
     slippageBps: slippage,
     onDone: settle,
@@ -388,26 +394,36 @@ function Exit({ pair, coinUsd }: { pair: Pair; coinUsd: number | undefined }) {
       <Row
         k={t("snipe.held")}
         v={
-          <span className="num">
-            {`${formatAmount(Number(formatUnits(held, pair.decimals)))} ${pair.symbol}`}
-          </span>
+          <Figure
+            className="num"
+            value={`${formatAmount(Number(formatUnits(held, pair.decimals)))} ${pair.symbol}`}
+          />
         }
       />
       <Row
         k={t("snipe.worth")}
-        v={<span className="num">{value === undefined ? "—" : `$${formatCompact(value)}`}</span>}
+        v={
+          <Figure
+            className="num"
+            pending={entire.stale}
+            value={value === undefined ? "—" : `$${formatCompact(value)}`}
+          />
+        }
       />
       {pnl !== undefined && spent !== undefined && (
         <Row
           k={t("snipe.pnl")}
           v={
+            /* Two figures, because the share is set faint beside the money. */
             <span className="num">
-              {signedUsd(pnl)}
-              <span className="text-faint">
-                {` (${pnl >= 0 ? "+" : "-"}${formatAmount(
+              <Figure pending={entire.stale} value={signedUsd(pnl)} />
+              <Figure
+                className="text-faint"
+                pending={entire.stale}
+                value={` (${pnl >= 0 ? "+" : "-"}${formatAmount(
                   Number(((Math.abs(pnl) / spent) * 100).toFixed(1)),
                 )}%)`}
-              </span>
+              />
             </span>
           }
           tone={pnl >= 0 ? "long" : "short"}
@@ -445,14 +461,22 @@ function Exit({ pair, coinUsd }: { pair: Pair; coinUsd: number | undefined }) {
       <div className="mt-3">
         <Row
           k={t("snipe.youGet")}
-          v={<span className="num">{route ? units(afterFee(route.amountOut), chosen) : "—"}</span>}
+          v={
+            <Figure
+              className="num"
+              pending={sale.stale}
+              value={route ? units(afterFee(route.amountOut), chosen) : "—"}
+            />
+          }
         />
         <Row
           k={t("snipe.atLeast")}
           v={
-            <span className="num">
-              {route ? units(afterFee(floorFor(route.amountOut, slippage)), chosen) : "—"}
-            </span>
+            <Figure
+              className="num"
+              pending={sale.stale}
+              value={route ? units(afterFee(floorFor(route.amountOut, slippage)), chosen) : "—"}
+            />
           }
         />
         <Row k={t("snipe.fee")} v={<span className="num">{`${percent(FEE_BIPS)}%`}</span>} />
@@ -473,7 +497,9 @@ function Exit({ pair, coinUsd }: { pair: Pair; coinUsd: number | undefined }) {
       <button
         type="button"
         className="btn btn-short mt-2 w-full"
-        disabled={!route || approving || sending || checking || (approved && !!blocked)}
+        disabled={
+          !route || sale.stale || approving || sending || checking || (approved && !!blocked)
+        }
         onClick={() => (approved ? send() : approve())}
       >
         {done
@@ -592,6 +618,12 @@ export function Terminal() {
   }, [aimed, listed, handed]);
 
   const { shot, unquotable, loading: quoting } = useShot(target, stake);
+  /*
+   * The figures on screen are the last size's, and the chain has not answered
+   * for this one yet. They are dimmed rather than cleared — see `useShot` — and
+   * the trigger is already refusing them, so this is only how they are shown.
+   */
+  const stale = shot?.stale ?? false;
 
   /*
    * What this shot cost, kept where a stable callback can read it. `useFire`
@@ -713,9 +745,16 @@ export function Terminal() {
               <p className="lbl mt-1">{t("memecoin.mcap")}</p>
             </div>
             <div className="mt-1">
-              <p className="num text-[26px] leading-none">{usd(target.marketCap)}</p>
+              {/*
+               * The pair keeps being read while the reader looks at it, so these
+               * two move on their own — which is the other place a figure used
+               * to change by simply being different in the next frame.
+               */}
+              <p className="num text-[26px] leading-none">
+                <Figure value={usd(target.marketCap)} />
+              </p>
               <p className={`lbl mt-1 ${target.change >= 0 ? "long" : "short"}`}>
-                {`${target.change >= 0 ? "+" : ""}${target.change.toFixed(1)}%`}
+                <Figure value={`${target.change >= 0 ? "+" : ""}${target.change.toFixed(1)}%`} />
               </p>
             </div>
           </div>
@@ -834,7 +873,7 @@ export function Terminal() {
            */}
           {stake > 0n && (
             <p className="num mt-1.5 text-right text-[11px] text-faint">
-              {`≈ ${formatAmount(Number(formatEther(stake)))} ${coin}`}
+              <Figure value={`≈ ${formatAmount(Number(formatEther(stake)))} ${coin}`} />
             </p>
           )}
 
@@ -877,7 +916,7 @@ export function Terminal() {
                 </span>
               </span>
             </span>
-            <span
+            <Figure
               className={`num shrink-0 text-[17px] ${
                 shot?.trapped
                   ? "short"
@@ -887,32 +926,52 @@ export function Terminal() {
                       ? "warn"
                       : "long"
               }`}
-            >
-              {shot?.trapped
-                ? t("snipe.exitNone")
-                : shot?.roundTrip !== undefined
-                  ? `${formatAmount(Number((shot.roundTrip * 100).toFixed(1)))}%`
-                  : "—"}
-            </span>
+              pending={stale}
+              value={
+                shot?.trapped
+                  ? t("snipe.exitNone")
+                  : shot?.roundTrip !== undefined
+                    ? `${formatAmount(Number((shot.roundTrip * 100).toFixed(1)))}%`
+                    : "—"
+              }
+            />
           </div>
 
           <div className="panel mt-2 p-3">
             <Row
               k={t("snipe.youGet")}
-              v={<span className="num">{shot ? amount(shot.amountOut) : "—"}</span>}
+              v={
+                <Figure
+                  className="num"
+                  pending={stale}
+                  value={shot ? amount(shot.amountOut) : "—"}
+                />
+              }
             />
             <Row
               k={t("snipe.atLeast")}
-              v={<span className="num">{shot ? amount(shot.floor) : "—"}</span>}
+              v={<Figure className="num" pending={stale} value={shot ? amount(shot.floor) : "—"} />}
             />
             <Row
               k={t("snipe.impact")}
-              v={<span className="num">{shot ? `${percent(shot.impactBps)}%` : "—"}</span>}
+              v={
+                <Figure
+                  className="num"
+                  pending={stale}
+                  value={shot ? `${percent(shot.impactBps)}%` : "—"}
+                />
+              }
               tone={shot && shot.impactBps >= COSTLY ? "warn" : undefined}
             />
             <Row
               k={t("snipe.slippage")}
-              v={<span className="num">{shot ? `${percent(shot.slippageBps)}%` : "—"}</span>}
+              v={
+                <Figure
+                  className="num"
+                  pending={stale}
+                  value={shot ? `${percent(shot.slippageBps)}%` : "—"}
+                />
+              }
               tone={shot?.capped ? "warn" : undefined}
             />
             <Row k={t("snipe.fee")} v={<span className="num">{`${percent(FEE_BIPS)}%`}</span>} />

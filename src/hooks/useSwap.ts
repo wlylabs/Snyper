@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { encodeFunctionData, erc20Abi } from "viem";
 import {
   useAccount,
@@ -99,7 +99,7 @@ export function useRoutes(token: `0x${string}` | undefined, amountIn: bigint) {
     query: { enabled: contracts.length > 0, staleTime: 10_000 },
   });
 
-  const routes = useMemo(() => {
+  const quotes = useMemo(() => {
     const half = contracts.length / 2;
     const out = (index: number): bigint | undefined => {
       const outcome = quoted.data?.[index];
@@ -139,6 +139,31 @@ export function useRoutes(token: `0x${string}` | undefined, amountIn: bigint) {
     return found;
   }, [contracts, quoted.data, exits, amountIn, reference]);
 
+  /*
+   * The quotes the reader is already looking at, kept until the next set lands.
+   *
+   * Every size is its own query, so moving the slice from a quarter to a half
+   * leaves nothing behind it for as long as the chain takes to answer — and the
+   * figures quoted from it go blank and come back, which is a panel that looks
+   * broken rather than one that looks busy. The set is held together, because the
+   * output and the floor under it have to be from the same quote to mean
+   * anything, and filed under the token it was asked about so a held quote can
+   * never be printed against a different one.
+   */
+  const [kept, setKept] = useState<{ token: string; quotes: Route[] }>();
+  useEffect(() => {
+    if (quotes.length > 0 && token) setKept({ token, quotes });
+  }, [quotes, token]);
+
+  /*
+   * Only while the chain has yet to answer. Quotes that came back empty are an
+   * answer — nothing will take this amount — and the screens above say so; held
+   * figures standing in their place would talk over them.
+   */
+  const settling = quoted.isFetching || !quoted.isFetched;
+  const held = settling && token && kept?.token === token ? kept.quotes : undefined;
+  const routes = useMemo(() => (quotes.length > 0 ? quotes : (held ?? [])), [quotes, held]);
+
   /** The deepest pool for a given exit, which is the one worth trading in. */
   const bestFor = useMemo(
     () => (exit: Exit) =>
@@ -161,6 +186,13 @@ export function useRoutes(token: `0x${string}` | undefined, amountIn: bigint) {
     ),
     loading: quoted.isFetching,
     asked: contracts.length > 0 && !quoted.isPending,
+    /**
+     * True when what is on offer is the last size's answer rather than this
+     * one's. Real quotes, none of them current — so they may be read and must
+     * not be signed: every caller keeps them on screen and keeps them out of
+     * `useSwapAction`, which is what makes holding them safe.
+     */
+    stale: quotes.length === 0 && routes.length > 0,
   };
 }
 
