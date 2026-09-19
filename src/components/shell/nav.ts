@@ -8,13 +8,12 @@ export type NavItem = {
 };
 
 /**
- * Four surfaces: the home screen, what the connected wallet holds, where new
- * memecoins are found, and the settings.
+ * Four surfaces, in the order a trade moves through them.
  *
- * Home and memecoin are still empty, and what goes inside them is written
- * next. The other two are not placeholders: balance reads the wallet and sells
- * out of it, and settings configures what the app does with the screen it is
- * read on.
+ * Snyper is the one the app opens on and the one it is for: a target, a size,
+ * and the shot. Memecoin is the wider list to read before choosing a target,
+ * balance is what the wallet came away holding, and settings configures what
+ * the app does with the screen it is read on.
  *
  * The path is the route, not the label. `/memecoin` is named for what the
  * screen lists rather than for either dictionary's word for it — English calls

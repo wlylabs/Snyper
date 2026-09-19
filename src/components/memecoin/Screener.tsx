@@ -13,10 +13,12 @@ import {
   FLOOR,
   HEALTHY_DILUTION,
   HEALTHY_LIQUIDITY,
+  impersonates,
   inBand,
   type Band,
   type Grade,
 } from "@/lib/screener";
+import { useLaunches } from "@/hooks/useLaunches";
 import { useScreener, type Pair } from "@/hooks/useScreener";
 import { useI18n } from "@/hooks/useI18n";
 import { useMounted } from "@/hooks/useMounted";
@@ -73,6 +75,10 @@ function signed(change: number): string {
  * not report has not been shown to clear anything, so it fails every grade
  * above `all` — undefined is not small, it is unknown, and the reason to set a
  * floor is to stop reading rows that have not been shown to be worth reading.
+ *
+ * Liquidity is in the floor and not only in the ratio. Left to the ratio alone
+ * it let a pool holding fifty dollars through: a tenth of a thousand-dollar
+ * market cap is a hundred, and a hundred dollars of depth is not a market.
  */
 function keep(pair: Pair, band: Band, grade: Grade): boolean {
   if (pair.marketCap !== undefined && pair.marketCap > CEILING) return false;
@@ -81,9 +87,30 @@ function keep(pair: Pair, band: Band, grade: Grade): boolean {
 
   const { marketCap, fdv, volume, liquidity } = pair;
   if (marketCap === undefined || fdv === undefined) return false;
-  if (marketCap < FLOOR || fdv < FLOOR || volume < FLOOR) return false;
+  if (marketCap < FLOOR || fdv < FLOOR || volume < FLOOR || liquidity < FLOOR) return false;
   if (grade === "floor") return true;
 
+  return liquidity >= marketCap * HEALTHY_LIQUIDITY && fdv <= marketCap * HEALTHY_DILUTION;
+}
+
+/**
+ * Whether a launch survives, which is a different question from whether a
+ * trade does.
+ *
+ * Volume cannot be in this test. A pool that opened twenty minutes ago and has
+ * not been touched since has no volume by definition, and a floor that tested
+ * it would empty the list of exactly the rows the list exists to show. What
+ * can be asked of a launch is whether there is anything in it to trade against,
+ * so depth is the whole of the floor here, and the ceiling still holds.
+ */
+function keepNew(pair: Pair, grade: Grade): boolean {
+  if (pair.marketCap !== undefined && pair.marketCap > CEILING) return false;
+  if (grade === "all") return true;
+  if (pair.liquidity < FLOOR) return false;
+  if (grade === "floor") return true;
+
+  const { marketCap, fdv, liquidity } = pair;
+  if (marketCap === undefined || fdv === undefined) return false;
   return liquidity >= marketCap * HEALTHY_LIQUIDITY && fdv <= marketCap * HEALTHY_DILUTION;
 }
 
@@ -196,17 +223,34 @@ export function Screener() {
   const mounted = useMounted();
   const { t } = useI18n();
   const [band, setBand] = useState<Band>("all");
-  const [grade, setGrade] = useState<Grade>("all");
+  /*
+   * The screen opens with the floor on.
+   *
+   * It used to open on `all`, which applies no floor at all, and nothing on the
+   * screen said so — so a reader who had been told the list has a thousand
+   * dollar minimum saw four dollars of volume in it and was right to call that
+   * broken. The filter was never leaking; the screen was simply starting with
+   * it switched off. The terminal has always applied the same floor and has no
+   * control to switch it off, and two screens reading one chain to two unstated
+   * standards is the actual defect.
+   */
+  const [grade, setGrade] = useState<Grade>("floor");
   const [opened, setOpened] = useState<string>();
-  const { pairs, loading, error, refetch } = useScreener();
+  const [view, setView] = useState<"trading" | "new">("trading");
+  const { pairs, births, head, loading, error, refetch } = useScreener();
+  const { launches, loading: pricing } = useLaunches(births, head, view === "new");
 
   const listed = useMemo(
-    () => order(pairs.filter((pair) => keep(pair, band, grade))),
-    [pairs, band, grade],
+    () =>
+      view === "new"
+        ? launches.filter((pair) => keepNew(pair, grade))
+        : order(pairs.filter((pair) => keep(pair, band, grade))),
+    [view, launches, pairs, band, grade],
   );
 
   const body = () => {
-    if (!mounted || loading) return <Loading />;
+    if (!mounted || loading || (view === "new" && pricing && launches.length === 0))
+      return <Loading />;
 
     if (error) {
       return (
@@ -229,8 +273,12 @@ export function Screener() {
        * a reader who has narrowed the list to nothing should be told that they
        * did it rather than that the chain went quiet.
        */
-      return pairs.length === 0 ? (
-        <Empty title={t("memecoin.empty")} hint={t("memecoin.emptyHint")} />
+      const nothing = view === "new" ? launches.length === 0 : pairs.length === 0;
+      return nothing ? (
+        <Empty
+          title={t(view === "new" ? "memecoin.noNew" : "memecoin.empty")}
+          hint={t(view === "new" ? "memecoin.noNewHint" : "memecoin.emptyHint")}
+        />
       ) : (
         <Empty
           title={t("memecoin.noMatch")}
@@ -267,11 +315,23 @@ export function Screener() {
                 {pair.age !== undefined && pair.age < FRESH && (
                   <span className="chip chip-xs chip-live ml-1.5">{t("memecoin.fresh")}</span>
                 )}
+                {impersonates(pair.token, pair.symbol) && (
+                  <span className="chip chip-xs chip-warn ml-1.5">{t("memecoin.fake")}</span>
+                )}
               </span>
+              {/*
+               * A launch has no volume and has not moved, so the line says what
+               * it does have — how deep it is and how long it has existed —
+               * rather than printing two zeroes that look like a failed read.
+               */}
               <span className="block truncate text-[11px] font-normal text-faint">
-                <span className="lbl">{t("memecoin.volShort")}</span>{" "}
-                <span className="num">{usd(pair.volume)}</span>
-                {" · "}
+                {view === "trading" && (
+                  <>
+                    <span className="lbl">{t("memecoin.volShort")}</span>{" "}
+                    <span className="num">{usd(pair.volume)}</span>
+                    {" · "}
+                  </>
+                )}
                 <span className={`lbl ${thin(pair) ? "warn" : ""}`}>
                   {t("memecoin.liqShort")}
                 </span>{" "}
@@ -282,11 +342,15 @@ export function Screener() {
             </span>
             <span className="shrink-0 text-right">
               <span className="num block text-[12px]">{usd(pair.marketCap)}</span>
-              <span
-                className={`num block text-[11px] font-normal ${pair.change >= 0 ? "long" : "short"}`}
-              >
-                {signed(pair.change)}
-              </span>
+              {view === "trading" ? (
+                <span
+                  className={`num block text-[11px] font-normal ${pair.change >= 0 ? "long" : "short"}`}
+                >
+                  {signed(pair.change)}
+                </span>
+              ) : (
+                <span className="lbl block">{t("memecoin.mcapShort")}</span>
+              )}
             </span>
           </button>
         ))}
@@ -302,14 +366,30 @@ export function Screener() {
         <div className="mb-3 flex flex-col gap-1.5">
           <Segmented
             options={[
-              { value: "all", label: t("memecoin.bandAll") },
-              { value: "pumping", label: t("memecoin.bandPump") },
-              { value: "flat", label: t("memecoin.bandFlat") },
-              { value: "dumping", label: t("memecoin.bandDump") },
+              { value: "trading", label: t("memecoin.viewTrading") },
+              { value: "new", label: t("memecoin.viewNew") },
             ]}
-            value={band}
-            onChange={setBand}
+            value={view}
+            onChange={setView}
           />
+          {/*
+           * The movement filter belongs to the traded list alone. A launch that
+           * nobody has bought has not pumped, gone flat or dumped — it has done
+           * nothing, and offering to sort it by which would be offering a
+           * control that cannot do anything.
+           */}
+          {view === "trading" && (
+            <Segmented
+              options={[
+                { value: "all", label: t("memecoin.bandAll") },
+                { value: "pumping", label: t("memecoin.bandPump") },
+                { value: "flat", label: t("memecoin.bandFlat") },
+                { value: "dumping", label: t("memecoin.bandDump") },
+              ]}
+              value={band}
+              onChange={setBand}
+            />
+          )}
           <Segmented
             options={[
               { value: "all", label: t("memecoin.gradeAll") },
@@ -323,7 +403,15 @@ export function Screener() {
       )}
 
       <Panel
-        label={t("memecoin.live")}
+        label={
+          view === "new"
+            ? t("memecoin.born", {
+                floor: grade === "all" ? "" : ` · $${formatCompact(FLOOR)}+`,
+              })
+            : grade === "all"
+              ? t("memecoin.liveAny")
+              : t("memecoin.live", { floor: `$${formatCompact(FLOOR)}` })
+        }
         meta={
           mounted && pairs.length > 0 ? (
             <span className="lbl">

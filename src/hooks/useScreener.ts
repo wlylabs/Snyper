@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { erc20Abi, type PublicClient } from "viem";
+import { erc20Abi, type GetLogsReturnType, type PublicClient } from "viem";
 import { usePublicClient } from "wagmi";
 import { CHAIN_ID } from "@/lib/chains";
 import { VENUE, factoryAbi } from "@/lib/venue";
@@ -25,6 +25,14 @@ export type Pair = {
   symbol: string;
   name: string;
   quote: string;
+  /**
+   * The other side of the pool, by address rather than by name.
+   *
+   * The terminal needs it: whether a buy is one hop from the coin or two is
+   * decided by which token this is, and a symbol cannot be packed into a path.
+   */
+  quoteToken: `0x${string}`;
+  decimals: number;
   fee: number;
   /**
    * Everything the token is worth at the price the pool is quoting: supply that
@@ -58,6 +66,29 @@ export type Pair = {
   usdRate: number;
 };
 
+/**
+ * A pool that exists, described by nothing more than the event that made it.
+ *
+ * The screen already reads a day of `PoolCreated` to date the pairs that are
+ * new, and then throws away every launch that did not also trade in the last
+ * five minutes — on a normal day that is four hundred of them against eight
+ * kept. Nothing about that was a deliberate limit; the rows simply had nowhere
+ * to go. This is the shape they go into, and it costs no request at all,
+ * because the event carries both sides, the tier and the block it happened in.
+ *
+ * Pricing one is a separate question and a separate hook: a pool nobody has
+ * traded has no swap to read a price from, so it has to be asked, and it is
+ * only asked when a reader opens the list.
+ */
+export type Birth = {
+  pool: `0x${string}`;
+  token: `0x${string}`;
+  quoteToken: `0x${string}`;
+  baseIsToken0: boolean;
+  fee: number;
+  block: bigint;
+};
+
 type Tally = {
   swaps: number;
   amount0: bigint;
@@ -72,25 +103,83 @@ const ONE_CALL = 0;
 /** Reads per row in the detail call: see the contracts it assembles. */
 const READS = 7;
 
+/** One swap, with its arguments decoded — what `getLogs` hands back. */
+type SwapLog = GetLogsReturnType<typeof swapEvent>[number];
+
+/** How many times the window may be halved before the refusal stands. */
+const SPLITS = 4;
+
+/**
+ * Whether the endpoint refused a query for its size rather than for its shape.
+ *
+ * There is no code to test — chain 4663 answers with -32000, which is the
+ * generic server error every other refusal also uses — so the message is what
+ * distinguishes them. It reads `logs matched by query exceeds limit of 10000`,
+ * and the two words worth matching on are the ones every endpoint that has this
+ * limit writes in some form.
+ */
+function tooManyLogs(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /\blogs?\b/i.test(message) && /\b(exceeds?|limit|too many)\b/i.test(message);
+}
+
+/**
+ * Every swap in a span, however many requests that takes.
+ *
+ * The window is five minutes because that is the market the screen is
+ * describing, and it stays five minutes whatever the chain is doing. What
+ * changes with activity is how many requests it costs: a quiet chain answers
+ * the whole span at once, and a busy one refuses it for size, at which point
+ * the span is cut in half and each half asked for separately — down to sixteen
+ * pieces, which is as far as this is worth taking before the refusal is real.
+ *
+ * Narrowing the window instead would have been one line and a lie. The screen
+ * says five minutes beside every figure it prints, and a screen that quietly
+ * reports ninety seconds under that label is worse than one that says the read
+ * failed. The halves come back in order and are concatenated in order, which is
+ * what the tally below depends on to know a pair's first price from its last.
+ */
+async function swapsIn(
+  client: PublicClient,
+  from: bigint,
+  to: bigint,
+  depth = 0,
+): Promise<SwapLog[]> {
+  try {
+    return await client.getLogs({ event: swapEvent, fromBlock: from, toBlock: to });
+  } catch (error) {
+    if (depth >= SPLITS || to - from < 2n || !tooManyLogs(error)) throw error;
+    const middle = from + (to - from) / 2n;
+    const [older, newer] = await Promise.all([
+      swapsIn(client, from, middle, depth + 1),
+      swapsIn(client, middle + 1n, to, depth + 1),
+    ]);
+    return [...older, ...newer];
+  }
+}
+
 /**
  * Everything trading on this chain, ranked.
  *
  * Four questions, in an order that keeps the expensive ones small. Every swap
- * in the window comes back in one query and is tallied by pool — that alone
- * decides which pairs are worth describing, because a pair nobody traded is not
- * on this screen whatever else is true of it. Only the busiest are then asked
- * about in detail, so the reads that cost per row are spent on rows that will
- * have one.
+ * in the window comes back first — in one query when the chain is quiet enough
+ * to answer it in one, and see `swapsIn` for when it is not — and is tallied by
+ * pool, which alone decides which pairs are worth describing: a pair nobody
+ * traded is not on this screen whatever else is true of it. Only the busiest
+ * are then asked about in detail, so the reads that cost per row are spent on
+ * rows that will have one.
  *
  * Pool creations are fetched beside the swaps rather than after them. They are
  * cheap, they date the pairs that are new, and for those pairs they answer what
  * would otherwise be a contract read each.
  */
-async function read(client: PublicClient): Promise<Pair[]> {
+async function read(
+  client: PublicClient,
+): Promise<{ pairs: Pair[]; births: Birth[]; head: bigint }> {
   const head = await client.getBlockNumber();
 
   const [swaps, created] = await Promise.all([
-    client.getLogs({ event: swapEvent, fromBlock: head - WINDOW, toBlock: head }),
+    swapsIn(client, head - WINDOW, head),
     client.getLogs({
       address: VENUE.factory,
       event: poolCreatedEvent,
@@ -127,10 +216,33 @@ async function read(client: PublicClient): Promise<Pair[]> {
     if (log.args.pool) born.set(log.args.pool.toLowerCase(), { block: log.blockNumber });
   }
 
+  /*
+   * Newest first, and only pairs with one side this app can price — the same
+   * test the traded list applies, for the same reason: two quote tokens is
+   * plumbing rather than a launch, and two unknown ones is a price in units
+   * nothing else on the screen shares.
+   */
+  const births: Birth[] = [];
+  for (let index = created.length - 1; index >= 0; index--) {
+    const log = created[index];
+    const { token0, token1, fee, pool } = log.args;
+    if (!token0 || !token1 || fee === undefined || !pool) continue;
+    const zeroIsQuote = Boolean(quoteFor(token0));
+    if (zeroIsQuote === Boolean(quoteFor(token1))) continue;
+    births.push({
+      pool,
+      token: zeroIsQuote ? token1 : token0,
+      quoteToken: zeroIsQuote ? token0 : token1,
+      baseIsToken0: !zeroIsQuote,
+      fee: Number(fee),
+      block: log.blockNumber,
+    });
+  }
+
   const busiest = [...tally.entries()]
     .sort((a, b) => b[1].swaps - a[1].swaps)
     .slice(0, DEPTH);
-  if (busiest.length === 0) return [];
+  if (busiest.length === 0) return { pairs: [], births, head };
 
   const pools = busiest.map(([pool]) => pool as `0x${string}`);
   const sides = await client.multicall({
@@ -192,7 +304,7 @@ async function read(client: PublicClient): Promise<Pair[]> {
       block: born.get(pool)?.block,
     });
   });
-  if (candidates.length === 0) return [];
+  if (candidates.length === 0) return { pairs: [], births, head };
 
   const detailOffset = referencePool?.status === "success" ? 1 : 0;
   const details = await client.multicall({
@@ -288,6 +400,8 @@ async function read(client: PublicClient): Promise<Pair[]> {
           ? symbol.result
           : "—",
       quote: quote.symbol,
+      quoteToken: entry.quoteToken,
+      decimals: baseDecimals,
       fee: entry.fee,
       marketCap: issued === undefined ? undefined : Math.max(issued - buried, 0) * price,
       fdv: issued === undefined ? undefined : issued * price,
@@ -306,7 +420,7 @@ async function read(client: PublicClient): Promise<Pair[]> {
     } satisfies Pair;
   });
 
-  return fold(rows.filter((row) => !isEquity(row.name)));
+  return { pairs: fold(rows.filter((row) => !isEquity(row.name))), births, head };
 }
 
 /**
@@ -359,7 +473,10 @@ export function useScreener() {
   });
 
   return {
-    pairs: query.data ?? [],
+    pairs: query.data?.pairs ?? [],
+    /** Every pool opened in the last day, unpriced. See `Birth`. */
+    births: query.data?.births ?? [],
+    head: query.data?.head,
     loading: query.isPending,
     error: query.error,
     refetch: query.refetch,
