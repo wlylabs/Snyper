@@ -215,8 +215,8 @@ const en = {
   "settings.referralTitle": "Trade with me there",
   "settings.referralBadge": "10% off",
   "settings.referralHint":
-    "Open Fomo through this link and 10% comes off the fees you pay there.",
-  "settings.referralOpen": "Open Fomo",
+    "The discount is already on this link — every fee you pay on Fomo comes out 10% smaller, from the first trade.",
+  "settings.referralOpen": "Open Fomo · 10% off",
 
   "install.action": "Install app",
   "install.androidHint":
@@ -503,8 +503,8 @@ const id: Record<TKey, string> = {
   "settings.referralTitle": "Trading bareng di sana",
   "settings.referralBadge": "Hemat 10%",
   "settings.referralHint":
-    "Buka Fomo lewat tautan ini dan biaya yang kamu bayar di sana berkurang 10%.",
-  "settings.referralOpen": "Buka Fomo",
+    "Diskonnya sudah menempel di tautan ini — setiap biaya yang kamu bayar di Fomo jadi 10% lebih kecil, sejak transaksi pertama.",
+  "settings.referralOpen": "Buka Fomo · hemat 10%",
 
   "install.action": "Pasang aplikasi",
   "install.androidHint":
