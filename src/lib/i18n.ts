@@ -263,6 +263,11 @@ const en = {
   "wallet.wrongNetwork": "Wrong network",
 
   "memecoin.lock": "Liquidity lock",
+  "lock.tagBurned": "Locked",
+  "lock.tagMixed": "{share}% locked",
+  "lock.tagOpen": "Open",
+  "lock.tagUnread": "Lock unread",
+  "lock.tagEmpty": "Drained",
   "lock.burned": "Burned",
   "lock.open": "Withdrawable",
   "lock.mixed": "{share}% burned",
@@ -540,6 +545,11 @@ const id: Record<TKey, string> = {
   "wallet.wrongNetwork": "Jaringan salah",
 
   "memecoin.lock": "Kunci likuiditas",
+  "lock.tagBurned": "Terkunci",
+  "lock.tagMixed": "{share}% terkunci",
+  "lock.tagOpen": "Terbuka",
+  "lock.tagUnread": "Kunci tak terbaca",
+  "lock.tagEmpty": "Terkuras",
   "lock.burned": "Dibakar",
   "lock.open": "Bisa ditarik",
   "lock.mixed": "{share}% dibakar",

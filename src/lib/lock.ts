@@ -105,6 +105,23 @@ export const poolPositionsAbi = parseAbi([
  */
 export const MAX_POSITIONS = 24;
 
+/**
+ * More funding events than this and the pool is not one this check can read.
+ *
+ * A refusal from the endpoint already says so on its own: it caps a query at
+ * ten thousand logs, so a `Mint` query it will not answer is a pool with more
+ * than ten thousand positions in its history. Splitting the range the way the
+ * market scan does would not rescue that — it would only count them slowly
+ * before arriving at the same answer. The one measured here had 4,527 mints in
+ * five days and refused anything wider.
+ *
+ * This is the same limit expressed for the pools that stay just under it, where
+ * the query returns and the work it implies is still not worth doing. Either
+ * way the answer is that the lock was not read, which is a verdict this already
+ * has a word for.
+ */
+const MAX_MINTS = 2_000;
+
 /** One `eth_call` per multicall, however many reads go into it. */
 const ONE_CALL = 0;
 
@@ -139,12 +156,22 @@ export type Lock = {
   backsPrice?: boolean;
   /** True when there were more positions than `MAX_POSITIONS`. */
   partial: boolean;
+  /**
+   * True when the pool's history is too long to enumerate at all.
+   *
+   * Distinct from holding nothing, and the distinction has to be carried rather
+   * than inferred from the figures: all three totals are zero in both cases,
+   * and one of them means the pool was drained while the other means this check
+   * never got to look. A flag says which.
+   */
+  unreadable?: boolean;
 };
 
 export type Verdict = "burned" | "open" | "mixed" | "unread" | "empty";
 
 /** The one word this reduces to, and the one it refuses to reduce to. */
 export function verdictOf(lock: Lock): Verdict {
+  if (lock.unreadable) return "unread";
   const total = lock.burned + lock.open + lock.unread;
   if (total === 0n) return "empty";
   if (lock.burned === total) return "burned";
@@ -157,6 +184,43 @@ export function shareOf(lock: Lock): number | undefined {
   const total = lock.burned + lock.open + lock.unread;
   if (total === 0n) return undefined;
   return Number((lock.burned * 10_000n) / total) / 100;
+}
+
+/**
+ * Whether the endpoint refused the query for its size rather than failed it.
+ *
+ * The distinction decides whether an answer is worth keeping. A pool with more
+ * history than the endpoint will return is a fact about the pool: it will be
+ * just as unreadable in a minute, so reporting it unread and remembering that
+ * is right. A request that never arrived is a fact about the network, and
+ * remembering "unread" for it would pin that word on a perfectly readable pool
+ * for as long as the cache holds.
+ *
+ * Chain 4663 refuses an oversized `eth_getLogs` with -32602 and the generic
+ * `Missing or invalid parameters`, which viem surfaces as an
+ * `InvalidInputRpcError`; other endpoints say so in words. Both are matched,
+ * and everything else is re-thrown. The generic message is doing more work here
+ * than its wording deserves, and it is trusted only because the query this file
+ * sends is fixed — there is no caller-supplied parameter in it that could be
+ * the invalid one.
+ */
+function refusedForSize(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/\bMissing or invalid parameters\b/i.test(message)) return true;
+  if (/\b-?32602\b/.test(message)) return true;
+  return /\blogs?\b/i.test(message) && /\b(exceeds?|limit|too many)\b/i.test(message);
+}
+
+/** Nothing read, and saying so rather than looking like an empty pool. */
+function unreadable(): Lock {
+  return {
+    burned: 0n,
+    open: 0n,
+    unread: 0n,
+    backsPrice: undefined,
+    partial: true,
+    unreadable: true,
+  };
 }
 
 /** A position as the pool itself keys it: a holder and a range. */
@@ -210,12 +274,28 @@ export async function readLock(
   client: PublicClient,
   pool: `0x${string}`,
 ): Promise<Lock> {
-  const mints = await client.getLogs({
-    address: pool,
-    event: poolMintEvent,
-    fromBlock: 0n,
-    toBlock: "latest",
-  });
+  /*
+   * The whole history, or an admission that there is too much of it.
+   *
+   * A pool's positions can only be discovered through its `Mint` log, and there
+   * is no narrower question to ask: a position opened on the first day is as
+   * live as one opened this morning, so a window would miss exactly the oldest
+   * and largest holdings. So the query is asked over everything, and a pool
+   * whose history will not fit is reported unread rather than half-read.
+   */
+  let mints;
+  try {
+    mints = await client.getLogs({
+      address: pool,
+      event: poolMintEvent,
+      fromBlock: 0n,
+      toBlock: "latest",
+    });
+  } catch (error) {
+    if (!refusedForSize(error)) throw error;
+    return unreadable();
+  }
+  if (mints.length > MAX_MINTS) return unreadable();
 
   /*
    * Mints folded onto the slots the pool actually keeps. A launch that seeds a

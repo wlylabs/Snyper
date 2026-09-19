@@ -23,7 +23,7 @@ import {
 } from "@/lib/screener";
 import { shareOf, verdictOf, type Lock, type Verdict } from "@/lib/lock";
 import { useLaunches } from "@/hooks/useLaunches";
-import { useLiquidityLock } from "@/hooks/useLiquidityLock";
+import { useLiquidityLock, useLiquidityLocks } from "@/hooks/useLiquidityLock";
 import { useScreener, type Pair } from "@/hooks/useScreener";
 import type { TKey } from "@/lib/i18n";
 import { useI18n } from "@/hooks/useI18n";
@@ -189,6 +189,62 @@ const LOCK_TONE: Record<Verdict, string> = {
 
 function lockLabel(verdict: Verdict): TKey {
   return `lock.${verdict}` as TKey;
+}
+
+/**
+ * The same verdict, on a list row, in two registers.
+ *
+ * A chip beside the ticker is loud — it is what `NEW` and `FAKE` already use —
+ * so it is spent only on the answers worth stopping a scroll for: liquidity
+ * that was burned, liquidity that was partly burned, and a pool somebody has
+ * already emptied. Those are rare. Measured across the pools this screen
+ * surfaces, almost every row is either withdrawable or unreadable, and a list
+ * that puts a badge on its own default is a list whose badges stop being read.
+ *
+ * So the ordinary two go in the metadata line instead, in the same dim type as
+ * the depth and the age beside them — which is the pattern this row already
+ * uses for a thin pool. They are still said, because a row that says nothing is
+ * a row a reader cannot tell apart from one that has not been checked yet, and
+ * that ambiguity is the whole reason to print the quiet ones at all.
+ *
+ * A row still being read has neither, which is the honest third thing: no
+ * verdict has arrived. It resolves within a few seconds of the list appearing.
+ */
+const LOCK_CHIP: Partial<Record<Verdict, { key: TKey; tone: string }>> = {
+  burned: { key: "lock.tagBurned", tone: "chip-live" },
+  mixed: { key: "lock.tagMixed", tone: "chip-warn" },
+  empty: { key: "lock.tagEmpty", tone: "chip-short" },
+};
+
+const LOCK_WORD: Partial<Record<Verdict, TKey>> = {
+  open: "lock.tagOpen",
+  unread: "lock.tagUnread",
+};
+
+function LockChip({ lock }: { lock: Lock | undefined }) {
+  const { t } = useI18n();
+  if (!lock) return null;
+  const chip = LOCK_CHIP[verdictOf(lock)];
+  if (!chip) return null;
+  const share = shareOf(lock);
+  return (
+    <span className={`chip chip-xs ml-1.5 ${chip.tone}`}>
+      {t(chip.key, { share: share === undefined ? 0 : Math.round(share) })}
+    </span>
+  );
+}
+
+function LockWord({ lock }: { lock: Lock | undefined }) {
+  const { t } = useI18n();
+  if (!lock) return null;
+  const word = LOCK_WORD[verdictOf(lock)];
+  if (!word) return null;
+  return (
+    <>
+      {" · "}
+      <span className="lbl">{t(word)}</span>
+    </>
+  );
 }
 
 /**
@@ -422,6 +478,15 @@ export function Screener() {
     [all, band, grade],
   );
 
+  /*
+   * Filled in the background of the list the reader is already reading, and
+   * shared with the sheet — a row checked here is a row the sheet does not have
+   * to check again. See `useLiquidityLocks` for what that costs and why it is
+   * paced rather than fired at once.
+   */
+  const pools = useMemo(() => listed.map((pair) => pair.pool), [listed]);
+  const locks = useLiquidityLocks(pools);
+
   const body = () => {
     /*
      * Both reads, not just the first. The launches are priced after the
@@ -498,6 +563,7 @@ export function Screener() {
                 {impersonates(pair.token, pair.symbol) && (
                   <span className="chip chip-xs chip-warn ml-1.5">{t("memecoin.fake")}</span>
                 )}
+                <LockChip lock={locks.get(pair.pool.toLowerCase())} />
               </span>
               {/*
                * A row nobody has traded has no volume and has not moved, so it
@@ -519,6 +585,7 @@ export function Screener() {
                 <span className={`num ${thin(pair) ? "warn" : ""}`}>{usd(pair.liquidity)}</span>
                 {" · "}
                 <span className="num">{age(pair.age)}</span>
+                <LockWord lock={locks.get(pair.pool.toLowerCase())} />
               </span>
             </span>
             <span className="shrink-0 text-right">
