@@ -77,6 +77,9 @@
 :root {
   color-scheme: dark;
   --shell-top: 56px;
+  /* The status strip under the header. Named because three sticky things now
+     measure down from the bottom of it. */
+  --shell-strip: 28px;
   /* Wide enough for the longest nav label — "Pengaturan" — unabbreviated. */
   --shell-rail: 96px;
   --shell-tabs: 60px;
@@ -135,6 +138,7 @@
    */
   --dur-roll: 260ms;
   --fig-lag: 18ms;
+
 }
 
 [data-theme="light"] {
@@ -1660,6 +1664,170 @@
     gap: 10px;
     padding: 20px 16px 18px;
     text-align: center;
+  }
+
+  /* ---------- balance card ---------- */
+
+  /*
+   * The one figure the balance screen exists to answer, given the app's own
+   * mark to sit inside.
+   *
+   * It used to be a `.panel` like everything under it — same fill, same
+   * hairline, same corner — which put the wallet's total and a row for a token
+   * worth four dollars on the same plane, and left the reader to work out which
+   * of the two the screen was about. It is the Snyper mark now, at card scale:
+   * four brackets closing on what they hold, and nothing between them. The
+   * logo's centre block is the figure itself.
+   *
+   * So the card carries no fill at all. It is the one surface in the app that
+   * is not a surface — the page's own ground and its measurement grid read
+   * straight through it, and what separates the card from the list below is
+   * that the accent is locked around it rather than that it sits above it.
+   * That is also why it takes no `.ticked` rail: the frame is the accent, and
+   * two of them on one card would be the app saying the same thing twice.
+   */
+  .saldo {
+    position: relative;
+    border-radius: var(--radius-md);
+    background: transparent;
+    animation: panel-in var(--dur-enter) var(--ease-out) both;
+  }
+
+  /*
+   * The brackets.
+   *
+   * A full rounded border is drawn and then all but its four corners is masked
+   * away, which is what keeps them corners: they take the card's own radius and
+   * its exact geometry at any width, where four separately placed marks would
+   * drift out of the curve the moment the card changed size.
+   *
+   * It closes on mount rather than fading in — a lock-on is a thing that
+   * arrives from outside and stops, and the motion scale's out curve is already
+   * the app's word for arriving. `prefers-reduced-motion` takes it to 1ms at
+   * the foot of this file, with everything else.
+   */
+  .saldo::before {
+    --bracket: 26px;
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    /* Heavier than a hairline. The mark's brackets are a tenth of the glyph
+       wide, and a 1px frame reads as a border that lost its middle rather
+       than as the logo. */
+    border: 2px solid var(--color-accent-line);
+    border-radius: var(--radius-md);
+    -webkit-mask:
+      linear-gradient(#000, #000) 0 0 / var(--bracket) var(--bracket) no-repeat,
+      linear-gradient(#000, #000) 100% 0 / var(--bracket) var(--bracket) no-repeat,
+      linear-gradient(#000, #000) 0 100% / var(--bracket) var(--bracket) no-repeat,
+      linear-gradient(#000, #000) 100% 100% / var(--bracket) var(--bracket) no-repeat;
+    mask:
+      linear-gradient(#000, #000) 0 0 / var(--bracket) var(--bracket) no-repeat,
+      linear-gradient(#000, #000) 100% 0 / var(--bracket) var(--bracket) no-repeat,
+      linear-gradient(#000, #000) 0 100% / var(--bracket) var(--bracket) no-repeat,
+      linear-gradient(#000, #000) 100% 100% / var(--bracket) var(--bracket) no-repeat;
+    animation: lock-on 420ms var(--ease-out) both;
+  }
+
+  @keyframes lock-on {
+    from {
+      opacity: 0;
+      transform: scale(1.06);
+    }
+  }
+
+  .saldo-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    /* One gutter down the whole card: the avatar, the figure and the foot's
+       labels all start on the same line. */
+    padding: 12px 14px 0;
+  }
+
+  .saldo-face {
+    padding: 14px 14px 16px;
+  }
+
+  /*
+   * The figure, at the largest size anything in this app is set — and given the
+   * room to stay that size. A portfolio in the tens of thousands is fifteen
+   * characters of tabular mono, which is wider than a phone at 34px, so the
+   * type steps up with the viewport rather than wrapping the total onto two
+   * lines.
+   */
+  .saldo-figure {
+    /* The height is the figure's, and the cover below is laid into it rather
+       than setting its own — so covering the card moves nothing under it. */
+    display: flex;
+    align-items: center;
+    min-height: 34px;
+    font-size: 34px;
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+
+  @media (min-width: 480px) {
+    .saldo-figure {
+      min-height: 42px;
+      font-size: 42px;
+    }
+  }
+
+  /*
+   * A figure under a cover is not a figure, so it does not pretend to be one:
+   * the dots are dim, set well below the figure's size, and spaced. At the
+   * figure's own 42px they are six black circles across the card — which reads
+   * as a control rather than as something withheld.
+   */
+  .saldo-figure[data-covered="true"] {
+    color: var(--color-faint);
+    font-size: 22px;
+    letter-spacing: 0.24em;
+  }
+
+  /*
+   * The foot carries what the total is made of: the coin that pays for gas, and
+   * how many things are held. Both are rules rather than a second card — the
+   * card is one reading, and these are its parts.
+   *
+   * The rules are drawn short of the card's edges rather than across them.
+   * With no fill to stop at, a full-bleed hairline ends in mid-air next to a
+   * bracket and reads as a border that did not finish; held inside the gutter
+   * it reads as what it is, which is one part of the reading divided from the
+   * next. The brackets are the only thing allowed on the card's edge.
+   */
+  .saldo-foot {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .saldo-foot::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 14px;
+    right: 14px;
+    height: 1px;
+    background: var(--color-line);
+  }
+
+  .saldo-cell {
+    position: relative;
+    min-width: 0;
+    padding: 12px 14px 14px;
+  }
+
+  .saldo-cell + .saldo-cell::before {
+    content: "";
+    position: absolute;
+    top: 4px;
+    bottom: 4px;
+    left: 0;
+    width: 1px;
+    background: var(--color-line);
   }
 
   /* ---------- misc ---------- */

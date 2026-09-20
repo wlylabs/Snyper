@@ -6,9 +6,10 @@ import { Icon } from "@/components/ui/Icon";
 import { Empty, Panel, Row, Skeleton } from "@/components/ui/Panel";
 import { Sheet } from "@/components/ui/Sheet";
 import { CHAIN_ID, chainMeta, explorerAddress } from "@/lib/chains";
-import { formatAmount, formatSignificant, truncateAddress } from "@/lib/format";
+import { formatAmount, truncateAddress, usd } from "@/lib/format";
 import { useConnectPrompt } from "@/hooks/useConnectPrompt";
 import { useHoldings, type Holding } from "@/hooks/useHoldings";
+import { BalanceCard, COVERED } from "./BalanceCard";
 import { SwapPanel } from "./SwapPanel";
 import { useI18n } from "@/hooks/useI18n";
 import { useMounted } from "@/hooks/useMounted";
@@ -30,10 +31,6 @@ import { useAppStore } from "@/store/useAppStore";
  * either, and the tap brings it all back.
  */
 const DOLLAR = 1;
-
-function usd(value: number | undefined): string {
-  return value === undefined ? "—" : `$${formatSignificant(value, 2)}`;
-}
 
 function HoldingRow({
   title,
@@ -120,9 +117,18 @@ function TokenSheet({
 }) {
   const { t } = useI18n();
   const setHidden = useAppStore((state) => state.setHidden);
+  const covered = useAppStore((state) => Boolean(state.settings.masked));
   const [copied, setCopied] = useState(false);
 
   if (!row) return null;
+
+  /*
+   * The cover follows the money and not the token. What it is for is a reader
+   * who does not want the room reading their worth, and a quantity of some
+   * memecoin is not that — a sheet that covered the amount as well would leave
+   * them unable to check the figure they came here to sell against.
+   */
+  const worth = covered && row.value !== undefined ? COVERED : usd(row.value);
 
   const copy = async () => {
     try {
@@ -146,7 +152,7 @@ function TokenSheet({
             <Figure value={formatAmount(row.amount)} />
           </p>
           <p className="lbl mt-2">
-            <Figure value={usd(row.value)} />
+            <Figure value={worth} />
           </p>
         </div>
       </div>
@@ -176,7 +182,7 @@ function TokenSheet({
             k={t("balance.amount")}
             v={<Figure className="num" value={formatAmount(row.amount)} />}
           />
-          <Row k={t("balance.worth")} v={<Figure className="num" value={usd(row.value)} />} />
+          <Row k={t("balance.worth")} v={<Figure className="num" value={worth} />} />
           <Row
             k={row.suspicion ? t("balance.nameAsWritten") : t("balance.name")}
             v={row.name || "—"}
@@ -247,7 +253,9 @@ export function Holdings() {
    * sale would have left the amount above it stale in the same way.
    */
   const [openedToken, setOpenedToken] = useState<string>();
-  const { address, holdings, native, nativeValue, total, loading, error, refetch } = useHoldings();
+  const covered = useAppStore((state) => Boolean(state.settings.masked));
+  const { address, holdings, native, nativeValue, total, loading, verifying, error, refetch } =
+    useHoldings();
 
   const meta = chainMeta(CHAIN_ID);
 
@@ -315,7 +323,7 @@ export function Holdings() {
             title={native.symbol}
             subtitle={meta?.nativeName ?? t("common.network")}
             amount={formatAmount(Number(native.formatted), 5)}
-            value={usd(nativeValue)}
+            value={covered && nativeValue !== undefined ? COVERED : usd(nativeValue)}
           />
         )}
 
@@ -333,7 +341,7 @@ export function Holdings() {
             flagged={Boolean(row.suspicion)}
             dimmed={row.hidden}
             amount={formatAmount(row.amount)}
-            value={usd(row.value)}
+            value={covered && row.value !== undefined ? COVERED : usd(row.value)}
             unconfirmed={row.confirmed ? undefined : t("balance.unconfirmed")}
             onClick={() => setOpenedToken(row.address)}
           />
@@ -380,15 +388,15 @@ export function Holdings() {
       <h1 className="sr-only">{t("page.balance.title")}</h1>
 
       {mounted && address && (
-        <Panel
-          className="mb-3"
-          label={t("balance.total")}
-          meta={<span className="lbl">{truncateAddress(address, 6, 4)}</span>}
-        >
-          <p className="num text-[30px] leading-none">
-            <Figure value={usd(total)} />
-          </p>
-        </Panel>
+        <BalanceCard
+          address={address}
+          total={total}
+          native={native}
+          nativeValue={nativeValue}
+          holdings={holdings}
+          verifying={verifying}
+          onRefresh={refetch}
+        />
       )}
 
       <Panel label={t("balance.holdings")}>{body()}</Panel>

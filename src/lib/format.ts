@@ -35,6 +35,17 @@ export function formatAmount(value: number, maxDecimals = 6): string {
   return formatSignificant(value, 3, numberLocale, 6);
 }
 
+/**
+ * A dollar figure, or a dash where there is no figure to give.
+ *
+ * Here rather than on the screen that first needed it, because the balance card
+ * and the rows under it have to agree: two spellings of the same money on one
+ * screen is the reader checking whether they are the same money.
+ */
+export function usd(value: number | undefined): string {
+  return value === undefined ? "—" : `$${formatSignificant(value, 2)}`;
+}
+
 /** Where a figure stops being read in full, and what it is marked with. */
 const MAGNITUDES = [
   { at: 1e9, mark: "B" },

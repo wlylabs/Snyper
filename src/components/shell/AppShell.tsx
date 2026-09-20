@@ -45,7 +45,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <div className="mx-auto flex max-w-[1480px]">
         <nav
-          className="sticky top-[calc(var(--shell-top)+28px)] hidden h-[calc(100dvh-var(--shell-top)-28px)] shrink-0 flex-col border-r border-line md:flex"
+          className="sticky top-[calc(var(--shell-top)+var(--shell-strip))] hidden h-[calc(100dvh-var(--shell-top)-var(--shell-strip))] shrink-0 flex-col border-r border-line md:flex"
           style={{ width: "var(--shell-rail)" }}
           aria-label={t("a11y.primaryNav")}
         >

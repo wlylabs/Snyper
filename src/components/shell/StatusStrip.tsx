@@ -35,7 +35,7 @@ export function StatusStrip() {
   });
 
   return (
-    <div className="sticky top-[var(--shell-top)] z-30 h-7 border-b border-line bg-base/80 backdrop-blur">
+    <div className="sticky top-[var(--shell-top)] z-30 h-[var(--shell-strip)] border-b border-line bg-base/80 backdrop-blur">
       <div className="mx-auto flex h-full max-w-[1480px] items-center gap-4 overflow-hidden px-3 md:px-4">
         <span className="flex shrink-0 items-center gap-1.5">
           <span className={`dot ${watching ? "dot-live" : ""}`} />
