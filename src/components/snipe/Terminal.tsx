@@ -37,6 +37,23 @@ import { basisKey, useAppStore } from "@/store/useAppStore";
 import type { TKey } from "@/lib/i18n";
 
 /**
+ * The page's own width, and how it splits.
+ *
+ * One column up to `lg`, which is the phone and the tablet and is the shape
+ * the whole screen was built in. Above that the page widens and the targets
+ * take a column of their own: a 768px strip down the centre of a 1440px
+ * monitor is the layout every dapp has, and it spends the two thirds of the
+ * screen it does not use on nothing.
+ *
+ * The strip is fixed rather than fractional so the terminal beside it keeps
+ * the measure it was written for instead of growing with the window — the
+ * rows in it are label-and-figure pairs, and past about 700px they stop being
+ * rows and become a label and a figure at opposite ends of a gap.
+ */
+const SHELL = "mx-auto w-full max-w-3xl lg:max-w-[1160px]";
+const SPLIT = "lg:grid lg:grid-cols-[360px_minmax(0,1fr)] lg:items-start lg:gap-3";
+
+/**
  * What the wallet keeps back for gas when the reader asks for everything.
  *
  * A buy on this chain costs a few cents of gas, and gas comes out of the same
@@ -161,6 +178,84 @@ function signedUsd(value: number): string {
   return `${value >= 0 ? "+" : "-"}$${formatCompact(Math.abs(value))}`;
 }
 
+/**
+ * What there is to shoot at.
+ *
+ * Its own component because the same list is read in two places now: behind a
+ * button on a phone, where there is only ever room for one thing at a time,
+ * and beside the terminal on a wide screen, where there is room for both and
+ * hiding it behind a button was the screen admitting it had nothing to put in
+ * the space. One list, so a target reads the same whichever way it was found.
+ */
+function TargetList({
+  pairs,
+  loading,
+  chosen,
+  onPick,
+}: {
+  pairs: Pair[];
+  loading: boolean;
+  chosen: string | undefined;
+  onPick: (pool: string) => void;
+}) {
+  const { t } = useI18n();
+
+  if (loading && pairs.length === 0) {
+    return (
+      <div className="flex flex-col gap-1.5">
+        {[0, 1, 2, 3, 4].map((row) => (
+          <Skeleton key={row} className="h-[46px] w-full rounded-[var(--radius-xs)]" />
+        ))}
+      </div>
+    );
+  }
+
+  if (pairs.length === 0) {
+    return <Empty title={t("snipe.empty")} hint={t("snipe.emptyHint")} />;
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      {pairs.map((pair) => (
+        <button
+          key={pair.pool}
+          type="button"
+          className="tile"
+          aria-current={pair.pool === chosen}
+          /* The row the shot is being quoted against is lit, not just marked
+             for assistive technology. On the phone the list closes on the tap
+             and there is nothing to light; pinned beside the terminal it stays
+             open, and a list that does not say which row the panel is reading
+             is a list the reader has to remember for. */
+          data-active={pair.pool === chosen ? "true" : undefined}
+          onClick={() => onPick(pair.pool)}
+        >
+          <span className="min-w-0 flex-1">
+            <span className="block truncate">
+              {pair.symbol}
+              <span className="font-normal text-faint">/{pair.quote}</span>
+            </span>
+            <span className="block truncate text-[11px] font-normal text-faint">
+              <span className="lbl">{t("memecoin.liqShort")}</span>{" "}
+              <Figure className="num" value={usd(pair.liquidity)} />
+              {" · "}
+              <span className="lbl">{t("memecoin.volShort")}</span>{" "}
+              <Figure className="num" value={usd(pair.volume)} />
+            </span>
+          </span>
+          <span className="shrink-0 text-right">
+            <Figure className="num block text-[12px]" value={usd(pair.marketCap)} />
+            <Figure
+              className={`num block text-[11px] font-normal ${pair.change >= 0 ? "long" : "short"}`}
+              value={`${pair.change >= 0 ? "+" : ""}${pair.change.toFixed(1)}%`}
+            />
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function TargetSheet({
   open,
   pairs,
@@ -181,51 +276,15 @@ function TargetSheet({
   return (
     <Sheet open={open} title={t("snipe.targets")} onClose={onClose}>
       <div className="p-3">
-        {loading && pairs.length === 0 ? (
-          <div className="flex flex-col gap-1.5">
-            {[0, 1, 2, 3, 4].map((row) => (
-              <Skeleton key={row} className="h-[46px] w-full rounded-[var(--radius-xs)]" />
-            ))}
-          </div>
-        ) : pairs.length === 0 ? (
-          <Empty title={t("snipe.empty")} hint={t("snipe.emptyHint")} />
-        ) : (
-          <div className="flex flex-col gap-1.5">
-            {pairs.map((pair) => (
-              <button
-                key={pair.pool}
-                type="button"
-                className="tile"
-                aria-current={pair.pool === chosen}
-                onClick={() => {
-                  onPick(pair.pool);
-                  onClose();
-                }}
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate">
-                    {pair.symbol}
-                    <span className="font-normal text-faint">/{pair.quote}</span>
-                  </span>
-                  <span className="block truncate text-[11px] font-normal text-faint">
-                    <span className="lbl">{t("memecoin.liqShort")}</span>{" "}
-                    <Figure className="num" value={usd(pair.liquidity)} />
-                    {" · "}
-                    <span className="lbl">{t("memecoin.volShort")}</span>{" "}
-                    <Figure className="num" value={usd(pair.volume)} />
-                  </span>
-                </span>
-                <span className="shrink-0 text-right">
-                  <Figure className="num block text-[12px]" value={usd(pair.marketCap)} />
-                  <Figure
-                    className={`num block text-[11px] font-normal ${pair.change >= 0 ? "long" : "short"}`}
-                    value={`${pair.change >= 0 ? "+" : ""}${pair.change.toFixed(1)}%`}
-                  />
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
+        <TargetList
+          pairs={pairs}
+          loading={loading}
+          chosen={chosen}
+          onPick={(pool) => {
+            onPick(pool);
+            onClose();
+          }}
+        />
       </div>
     </Sheet>
   );
@@ -834,23 +893,62 @@ export function Terminal() {
 
   if (!mounted) {
     return (
-      <div className="mx-auto w-full max-w-3xl">
-        <Skeleton className="h-[86px] w-full rounded-[var(--radius-sm)]" />
+      <div className={SHELL}>
+        <div className={SPLIT}>
+          <div className="hidden lg:block">
+            <Skeleton className="h-[420px] w-full rounded-[var(--radius-sm)]" />
+          </div>
+          <Skeleton className="h-[86px] w-full rounded-[var(--radius-sm)]" />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl">
+    <div className={SHELL}>
       <h1 className="sr-only">{t("page.home.title")}</h1>
 
+      <div className={SPLIT}>
+        {/*
+         * The targets, pinned.
+         *
+         * A sniper screen with nothing aimed at was a single panel in the
+         * middle of an empty desk, and with something aimed at it was the same
+         * column of a phone stretched down the centre of a monitor — the list
+         * of things worth shooting at, which is the only content the screen
+         * has when nothing is chosen, sat behind a button the whole time.
+         *
+         * So on a wide screen it is a column of its own: what there is, beside
+         * what one of them would cost. It stays where it is while the terminal
+         * scrolls, because picking the next target is a thing a reader does
+         * from wherever they got to in the last one. Below `lg` nothing
+         * changes — there is one column, and the list is still a sheet.
+         */}
+        <Panel
+          className="hidden lg:block lg:sticky lg:top-[calc(var(--shell-top)+var(--shell-strip)+16px)]"
+          label={t("snipe.targets")}
+          meta={listed.length > 0 && <span className="lbl">{listed.length}</span>}
+          bodyClassName="panel-body scroll-thin max-h-[calc(100dvh-var(--shell-top)-var(--shell-strip)-96px)] overflow-y-auto"
+        >
+          <TargetList
+            pairs={listed}
+            loading={loading}
+            chosen={aimed}
+            onPick={(pool) => {
+              aim(undefined);
+              setAimed(pool);
+            }}
+          />
+        </Panel>
+
+      <div className="min-w-0">
       <Panel
         label={t("snipe.target")}
         action={
           listed.length > 0 && (
             <button
               type="button"
-              className="btn btn-sm btn-short"
+              className="btn btn-sm btn-short lg:hidden"
               onClick={() => setPicking(true)}
             >
               <Icon name="crosshair" size={13} />
@@ -871,26 +969,61 @@ export function Terminal() {
             }
           />
         ) : target ? (
-          <div className="identity">
-            <div>
-              <p className="text-[19px] leading-tight font-bold">
-                {target.symbol}
-                <span className="text-faint">/{target.quote}</span>
-              </p>
-              <p className="lbl mt-1">{t("memecoin.mcap")}</p>
+          /*
+           * The target, read across the panel rather than stacked down the
+           * middle of it.
+           *
+           * This borrowed `.identity` from the account sheet, which is a
+           * centred column because a sheet is a phone's width and there is
+           * nothing beside it. In a panel it left a block of air either side of
+           * three short lines, and it said only two things about a pair the
+           * list beside it says four about — so picking a target from the list
+           * threw away half of what the reader had just been shown.
+           *
+           * So: who it is on the left, what it is worth on the right, and the
+           * rest of the reading underneath. The figures keep moving while the
+           * reader looks at them, which is what `Figure` is for.
+           */
+          <div className="p-3">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="truncate text-[19px] leading-tight font-bold">
+                  {target.symbol}
+                  <span className="text-faint">/{target.quote}</span>
+                </p>
+                <p className={`num mt-1.5 text-[12px] ${target.change >= 0 ? "long" : "short"}`}>
+                  <Figure
+                    value={`${target.change >= 0 ? "+" : ""}${target.change.toFixed(1)}%`}
+                  />
+                </p>
+              </div>
+              <div className="shrink-0 text-right">
+                <p className="num text-[26px] leading-none">
+                  <Figure value={usd(target.marketCap)} />
+                </p>
+                <p className="lbl mt-2">{t("memecoin.mcap")}</p>
+              </div>
             </div>
-            <div className="mt-1">
-              {/*
-               * The pair keeps being read while the reader looks at it, so these
-               * two move on their own — which is the other place a figure used
-               * to change by simply being different in the next frame.
-               */}
-              <p className="num text-[26px] leading-none">
-                <Figure value={usd(target.marketCap)} />
-              </p>
-              <p className={`lbl mt-1 ${target.change >= 0 ? "long" : "short"}`}>
-                <Figure value={`${target.change >= 0 ? "+" : ""}${target.change.toFixed(1)}%`} />
-              </p>
+
+            <div className="mt-3 grid grid-cols-3 border-t border-line pt-3">
+              <div className="min-w-0 pr-3">
+                <p className="lbl">{t("memecoin.liquidity")}</p>
+                <p className="num mt-1.5 truncate text-[13px]">
+                  <Figure value={usd(target.liquidity)} />
+                </p>
+              </div>
+              <div className="min-w-0 border-l border-line px-3">
+                <p className="lbl">{t("memecoin.volume")}</p>
+                <p className="num mt-1.5 truncate text-[13px]">
+                  <Figure value={usd(target.volume)} />
+                </p>
+              </div>
+              <div className="min-w-0 border-l border-line pl-3">
+                <p className="lbl">{t("memecoin.trades")}</p>
+                <p className="num mt-1.5 truncate text-[13px]">
+                  <Figure value={formatCompact(target.swaps)} />
+                </p>
+              </div>
             </div>
           </div>
         ) : loading ? (
@@ -908,7 +1041,7 @@ export function Terminal() {
             action={
               <button
                 type="button"
-                className="btn btn-accent btn-sm"
+                className="btn btn-accent btn-sm lg:hidden"
                 onClick={() => setPicking(true)}
               >
                 <Icon name="crosshair" size={13} />
@@ -1235,6 +1368,8 @@ export function Terminal() {
       )}
 
       {target && address && <Exit pair={target} coinUsd={coinUsd} />}
+      </div>
+      </div>
 
       <TargetSheet
         open={picking}

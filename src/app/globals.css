@@ -77,6 +77,9 @@
 :root {
   color-scheme: dark;
   --shell-top: 56px;
+  /* The status strip under the header. Named because three sticky things now
+     measure down from the bottom of it. */
+  --shell-strip: 28px;
   /* Wide enough for the longest nav label — "Pengaturan" — unabbreviated. */
   --shell-rail: 96px;
   --shell-tabs: 60px;
