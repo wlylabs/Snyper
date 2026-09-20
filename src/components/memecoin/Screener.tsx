@@ -349,6 +349,17 @@ function SignalWord({ signal }: { signal: Signal }) {
   );
 }
 
+/** What was watched, in one line, saying only what it actually has. */
+function watched(t: (key: TKey, vars?: Record<string, string | number>) => string, drift: Drift | undefined): string {
+  if (!drift) return t("signal.watching");
+  const span = age(drift.span);
+  if (drift.depth === undefined) return t("signal.watchedFlat", { span, samples: drift.samples });
+  const depth = drifted(drift.depth);
+  return drift.trade === undefined
+    ? t("signal.watchedDepth", { span, samples: drift.samples, depth })
+    : t("signal.watched", { span, samples: drift.samples, depth, trade: times(drift.trade) });
+}
+
 /** One reading, drawn as the share of the bar it fills. */
 function Meter({ value }: { value: number }) {
   const filled = Math.round(value * 100);
@@ -402,53 +413,30 @@ function SignalPanel({ signal, drift }: { signal: Signal; drift: Drift | undefin
           />
         ))}
         <Row k={t("signal.quiet")} v={<Meter value={signal.quiet} />} />
+        <Row
+          k={t("signal.read")}
+          v={
+            <span className="num">{`${signal.read} / ${signal.readings.length}`}</span>
+          }
+        />
       </Panel>
 
+      {/*
+       * Three lines under the panel, at most, and each one earns its place: the
+       * span the watched readings were taken over, what the score is and is
+       * not, and — only when it happened — money that has left the pool.
+       *
+       * There were five paragraphs here, which is a wall rather than a note,
+       * and a wall gets skipped exactly like a badge on every row does. The
+       * count of readings that came back moved into the panel as a figure,
+       * where it is read at a glance instead of explained.
+       */}
       <div className="mt-2 grid gap-1">
-        {/*
-         * What the last two readings were taken over, or why they are missing.
-         * A span is printed rather than implied: these are the only figures in
-         * the app that describe something longer than five minutes, and the
-         * only honest way to show one is beside the time it was measured over.
-         */}
-        {drift ? (
-          <>
-            <p className="text-[11px] text-faint">
-              {drift.depth === undefined
-                ? t("signal.watchedFlat", { span: age(drift.span), samples: drift.samples })
-                : t("signal.watched", {
-                    span: age(drift.span),
-                    samples: drift.samples,
-                    depth: drifted(drift.depth),
-                  })}
-            </p>
-            {drift.trade !== undefined && (
-              <p className="text-[11px] text-faint">
-                {t("signal.watchedTrade", { trade: times(drift.trade) })}
-              </p>
-            )}
-          </>
-        ) : (
-          <p className="text-[11px] text-faint">{t("signal.watching")}</p>
-        )}
+        <p className="text-[11px] text-faint">{watched(t, drift)}</p>
+        <p className="text-[11px] text-dim">{t("signal.hint")}</p>
         {leaving(drift) && (
           <p className="text-[11px] warn">
-            {t("signal.leaving", {
-              percent: Math.round((1 - (drift?.depth ?? 1)) * 100),
-              span: age(drift?.span ?? 0),
-            })}
-          </p>
-        )}
-        <p className="text-[11px] text-dim">{t("signal.hint")}</p>
-        {/*
-         * Never optional, for the same reason the burned verdict carries its
-         * own sentence: a number this compact is exactly the kind a reader
-         * fills in for themselves, and what they fill in is a prediction.
-         */}
-        <p className="text-[11px] warn">{t("signal.caveat")}</p>
-        {signal.read < signal.readings.length && (
-          <p className="text-[11px] text-faint">
-            {t("signal.partial", { read: signal.read, of: signal.readings.length })}
+            {t("signal.leaving", { percent: Math.round((1 - (drift?.depth ?? 1)) * 100) })}
           </p>
         )}
       </div>
