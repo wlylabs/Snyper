@@ -23,7 +23,10 @@ import {
   type Grade,
 } from "@/lib/screener";
 import { shareOf, verdictOf, type Lock, type Verdict } from "@/lib/lock";
+import { coiling, filling, leaving, signalOf, type Signal } from "@/lib/signal";
+import { driftOf, type Drift } from "@/lib/memory";
 import { useLaunches } from "@/hooks/useLaunches";
+import { useWatch } from "@/hooks/useWatch";
 import { useLiquidityLock, useLiquidityLocks } from "@/hooks/useLiquidityLock";
 import { useScreener, type Pair } from "@/hooks/useScreener";
 import type { TKey } from "@/lib/i18n";
@@ -66,13 +69,24 @@ function signed(change: number): string {
 }
 
 /**
- * The order the list is read in.
+ * A drift, written as the change it stands for rather than as the ratio it is.
  *
- * Three questions rather than a column to click, because there are only three
- * worth asking of a five-minute window: what is busiest, what is newest, and
- * what has moved furthest. A pair with no creation in the last day has no age,
- * and sorts to the end of `new` rather than to the front — unknown is old here.
+ * The meters above these sentences all read the same way — how much of a
+ * reading a row earned — which is what makes them comparable and is also why
+ * the two watched readings need their figures said again in words. A meter
+ * full at "depth arriving" means the reading was maxed out, and a reader who
+ * took that for "depth doubled" would be reading a different number entirely.
  */
+function drifted(ratio: number): string {
+  const percent = Math.round((ratio - 1) * 100);
+  return `${percent >= 0 ? "+" : ""}${percent}%`;
+}
+
+/** The same for a figure that is naturally read as a multiple. */
+function times(ratio: number): string {
+  return `${ratio >= 10 ? Math.round(ratio) : ratio.toFixed(1)}×`;
+}
+
 /**
  * Whether a row survives the reader's questions.
  *
@@ -88,15 +102,21 @@ function signed(change: number): string {
  * it let a pool holding fifty dollars through: a tenth of a thousand-dollar
  * market cap is a hundred, and a hundred dollars of depth is not a market.
  */
-function keep(pair: Pair, band: Band, grade: Grade): boolean {
+function keep(pair: Pair, score: number, band: Band, grade: Grade): boolean {
   if (!underCeiling(pair)) return false;
   /*
    * A movement filter cannot be answered by something that has not moved. An
-   * untraded pool is not flat, it is silent, and letting it fall into `flat`
-   * would be the screen making up an answer on its behalf.
+   * untraded pool is not rising and is not falling, it is silent, and letting
+   * it fall into either band would be the screen making up an answer on its
+   * behalf.
+   *
+   * The coil band needs no such guard and is the reason the old `flat` band is
+   * gone. It asks whether the tape is filling, which a silent pool answers
+   * honestly — with the two readings it has and a score that cannot reach the
+   * band's bar on them. Nothing is invented and nothing is excluded by rule.
    */
-  if (band !== "all" && pair.swaps === 0) return false;
-  if (!inBand(pair.change, band)) return false;
+  if ((band === "pumping" || band === "dumping") && pair.swaps === 0) return false;
+  if (!inBand(pair.change, band, coiling(score))) return false;
   /* Volume is asked of a row only if that row has trades behind it. */
   if (!clearsFloor(pair, pair.swaps > 0)) return false;
   return grade === "floor" || deep(pair);
@@ -115,18 +135,38 @@ function thin(pair: Pair): boolean {
 }
 
 /**
- * Busiest first, then freshest.
- *
- * One rule rather than a control, and it falls out of the list holding both
- * sources. What is being traded now goes to the top in the order the money
- * went through it; everything nobody has touched has the same volume as
- * everything else nobody has touched, so what separates those is how recently
- * they opened. A pool with no creation in the last day has no age and sits at
- * the end — unknown is old here.
+ * A row, what the chain says about its chances, and what this screen watched
+ * it do to get there. The drift travels beside the signal rather than inside
+ * it because the sheet prints it as figures — a span, a ratio — where the
+ * signal only carries it as two readings out of seven.
  */
-function order(pairs: Pair[]): Pair[] {
-  return [...pairs].sort(
-    (a, b) => b.volume - a.volume || (a.age ?? Infinity) - (b.age ?? Infinity),
+type Scored = { pair: Pair; signal: Signal; drift: Drift | undefined };
+
+/**
+ * Coil first, then busiest, then freshest.
+ *
+ * This used to be volume first, which is what every screener on every chain
+ * does, and it is the one thing this screen should not do. Volume is the wake
+ * a run leaves behind it: a token at the top of a volume column has already
+ * moved, and the entry the reader opened this screen for belonged to whoever
+ * was in the pool while it was still near the bottom of that column. Ranking
+ * by it puts the answer to yesterday's question at the top of today's screen.
+ *
+ * So the first key is the score in `lib/signal` — buying against selling, the
+ * tape's rate against its own rate five minutes ago, hands against trades, all
+ * of it multiplied away as the price catches up. Volume is kept as the second
+ * key rather than dropped, because between two rows the chain says nothing
+ * about, the one money is going through is the better guess; and age settles
+ * the rest, since everything nobody has touched has the same volume as
+ * everything else nobody has touched. A pool with no creation in the last day
+ * has no age and sits at the end — unknown is old here.
+ */
+function order(rows: Scored[]): Scored[] {
+  return [...rows].sort(
+    (a, b) =>
+      b.signal.score - a.signal.score ||
+      b.pair.volume - a.pair.volume ||
+      (a.pair.age ?? Infinity) - (b.pair.age ?? Infinity),
   );
 }
 
@@ -161,11 +201,21 @@ function merge(traded: Pair[], launched: Pair[]): Pair[] {
       continue;
     }
     const youngest = Math.min(held.age ?? Infinity, pair.age ?? Infinity);
+    /*
+     * The figures come from the deepest pool and the flow from the busiest,
+     * which are not always the same pool and must not be forced to be. Depth
+     * is what a price is worth anything at; a tape is only a tape where trades
+     * happened, and the deepest of a token's pools is routinely the one nobody
+     * has touched. Taking the flow from the winner would have thrown away the
+     * whole signal every time a launch out-rested the pool doing the trading.
+     */
+    const busiest = pair.swaps > held.swaps ? pair : held;
     byToken.set(key, {
       ...(pair.liquidity > held.liquidity ? pair : held),
       volume: held.volume + pair.volume,
       swaps: held.swaps + pair.swaps,
       age: youngest === Infinity ? undefined : youngest,
+      flow: busiest.flow,
     });
   }
   return [...byToken.values()];
@@ -249,6 +299,164 @@ function LockWord({ lock }: { lock: Lock | undefined }) {
 }
 
 /**
+ * The score, in the two registers the lock verdict already established.
+ *
+ * A chip beside the ticker is loud, so it is spent only on the answer worth
+ * stopping a scroll for — a tape filling under a price that has not moved yet.
+ * That is rare by construction: depth and youth together cannot reach the bar,
+ * so nothing gets the chip on standing facts alone.
+ *
+ * Every other row carries the same number quietly, at the end of the metadata
+ * line in the same dim type as the depth and the age. It is printed rather
+ * than hidden because the list is now sorted by it, and a reader owed an
+ * explanation for the order should not have to open a sheet to get one.
+ */
+function SignalChip({ signal }: { signal: Signal }) {
+  const { t } = useI18n();
+  if (!coiling(signal.score)) return null;
+  return (
+    <span className="chip chip-xs chip-coil ml-1.5">
+      {t("signal.tag", { score: signal.score })}
+    </span>
+  );
+}
+
+/**
+ * The row's one word about what this screen watched the pool do.
+ *
+ * Only where the coil chip is not, and only upward. See `filling` in
+ * `lib/signal` for why both marks never sit on the same row, and `leaving` for
+ * where the opposite of this is said instead.
+ */
+function FillingChip({ signal, drift }: { signal: Signal; drift: Drift | undefined }) {
+  const { t } = useI18n();
+  if (coiling(signal.score) || !filling(drift)) return null;
+  return (
+    <span className="chip chip-xs chip-coil ml-1.5">
+      {t("signal.tagFilling", { percent: Math.round(((drift?.depth ?? 1) - 1) * 100) })}
+    </span>
+  );
+}
+
+function SignalWord({ signal }: { signal: Signal }) {
+  const { t } = useI18n();
+  if (coiling(signal.score)) return null;
+  return (
+    <>
+      {" · "}
+      <span className="lbl">{t("signal.word", { score: signal.score })}</span>
+    </>
+  );
+}
+
+/** One reading, drawn as the share of the bar it fills. */
+function Meter({ value }: { value: number }) {
+  const filled = Math.round(value * 100);
+  return (
+    <span className="flex items-center gap-2">
+      <span className="meter" aria-hidden>
+        <span style={{ width: `${filled}%` }} />
+      </span>
+      <span className="num w-[34px] text-right">{`${filled}%`}</span>
+    </span>
+  );
+}
+
+/**
+ * Why the row scored what it scored, reading by reading.
+ *
+ * The number on its own would be an oracle, and this app does not ship those:
+ * a reader about to spend money on the strength of a figure is owed the parts
+ * it was made of and the ones that could not be read at all. The five are
+ * printed in the order they are weighted, the quiet multiplier last because it
+ * is the only one that divides rather than adds, and the count underneath says
+ * how much of the evidence actually came back — which is the difference
+ * between a low score and a quiet chain.
+ */
+function SignalPanel({ signal, drift }: { signal: Signal; drift: Drift | undefined }) {
+  const { t } = useI18n();
+
+  return (
+    <>
+      <Panel label={t("signal.title")}>
+        <Row
+          k={t("signal.score")}
+          v={
+            <Figure
+              className={`num ${coiling(signal.score) ? "long" : ""}`}
+              value={String(signal.score)}
+            />
+          }
+        />
+        {signal.readings.map((reading) => (
+          <Row
+            key={reading.key}
+            k={t(`signal.${reading.key}` as TKey)}
+            v={
+              reading.value === undefined ? (
+                <span className="num text-faint">{t("signal.unread")}</span>
+              ) : (
+                <Meter value={reading.value} />
+              )
+            }
+          />
+        ))}
+        <Row k={t("signal.quiet")} v={<Meter value={signal.quiet} />} />
+      </Panel>
+
+      <div className="mt-2 grid gap-1">
+        {/*
+         * What the last two readings were taken over, or why they are missing.
+         * A span is printed rather than implied: these are the only figures in
+         * the app that describe something longer than five minutes, and the
+         * only honest way to show one is beside the time it was measured over.
+         */}
+        {drift ? (
+          <>
+            <p className="text-[11px] text-faint">
+              {drift.depth === undefined
+                ? t("signal.watchedFlat", { span: age(drift.span), samples: drift.samples })
+                : t("signal.watched", {
+                    span: age(drift.span),
+                    samples: drift.samples,
+                    depth: drifted(drift.depth),
+                  })}
+            </p>
+            {drift.trade !== undefined && (
+              <p className="text-[11px] text-faint">
+                {t("signal.watchedTrade", { trade: times(drift.trade) })}
+              </p>
+            )}
+          </>
+        ) : (
+          <p className="text-[11px] text-faint">{t("signal.watching")}</p>
+        )}
+        {leaving(drift) && (
+          <p className="text-[11px] warn">
+            {t("signal.leaving", {
+              percent: Math.round((1 - (drift?.depth ?? 1)) * 100),
+              span: age(drift?.span ?? 0),
+            })}
+          </p>
+        )}
+        <p className="text-[11px] text-dim">{t("signal.hint")}</p>
+        {/*
+         * Never optional, for the same reason the burned verdict carries its
+         * own sentence: a number this compact is exactly the kind a reader
+         * fills in for themselves, and what they fill in is a prediction.
+         */}
+        <p className="text-[11px] warn">{t("signal.caveat")}</p>
+        {signal.read < signal.readings.length && (
+          <p className="text-[11px] text-faint">
+            {t("signal.partial", { read: signal.read, of: signal.readings.length })}
+          </p>
+        )}
+      </div>
+    </>
+  );
+}
+
+/**
  * The one row on this sheet about whether the pool can be taken away.
  *
  * It sits under the figures rather than beside them because it is a different
@@ -301,11 +509,11 @@ function LockNote({
 }
 
 function PairSheet({
-  pair,
+  entry,
   onSnipe,
   onClose,
 }: {
-  pair: Pair | undefined;
+  entry: Scored | undefined;
   onSnipe: (pair: Pair) => void;
   onClose: () => void;
 }) {
@@ -315,9 +523,10 @@ function PairSheet({
    * open — the hook is the most expensive question in the app and a reader
    * scrolling the list behind this has not asked it.
    */
-  const { lock, loading: lockLoading, failed: lockFailed } = useLiquidityLock(pair?.pool);
+  const { lock, loading: lockLoading, failed: lockFailed } = useLiquidityLock(entry?.pair.pool);
 
-  if (!pair) return null;
+  if (!entry) return null;
+  const { pair, signal, drift } = entry;
 
   const verdict = lock ? verdictOf(lock) : undefined;
   const share = lock ? shareOf(lock) : undefined;
@@ -346,6 +555,16 @@ function PairSheet({
       <div className="px-3 pb-4">
         <div className="mb-3">
           <PairChart pair={pair} />
+        </div>
+
+        {/*
+         * Why this row is where it is, before what it is. The chart says what
+         * the price has done and the panel below says how big the thing is;
+         * neither answers the question the reader came to this screen with,
+         * which is whether anybody is arriving yet.
+         */}
+        <div className="mb-3">
+          <SignalPanel signal={signal} drift={drift} />
         </div>
 
         <Panel>
@@ -483,16 +702,32 @@ export function Screener() {
    * about, so a band or a grade that happens to exclude the real one cannot
    * promote a copy into being the only thing wearing the name.
    */
-  /*
-   * Copycats go before the reader's own filters rather than after them. Which
-   * contract holds a ticker is decided against everything the screen knows
-   * about, so a band or a grade that happens to exclude the real one cannot
-   * promote a copy into being the only thing wearing the name.
-   */
   const all = useMemo(() => dropCopycats(merge(pairs, launches)), [pairs, launches]);
+  /*
+   * This reading goes into the record before anything is scored against it.
+   * The screen is the only caller that records — see `useWatch` — because it
+   * is the only one holding both sources merged into one row per token, which
+   * is the shape everything filed under a token has to have been measured in.
+   */
+  const watch = useWatch(all, head);
+
+  /*
+   * Scored once, then filtered and ordered on what came out. The band reads
+   * the score, the order reads the score and both chips read the score, and a
+   * screen that worked it out in three places would eventually work it out
+   * three ways.
+   */
+  const scored = useMemo(
+    () =>
+      all.map((pair) => {
+        const drift = driftOf(watch[pair.token.toLowerCase()]);
+        return { pair, drift, signal: signalOf({ ...pair, drift }) };
+      }),
+    [all, watch],
+  );
   const listed = useMemo(
-    () => order(all.filter((pair) => keep(pair, band, grade))),
-    [all, band, grade],
+    () => order(scored.filter(({ pair, signal }) => keep(pair, signal.score, band, grade))),
+    [scored, band, grade],
   );
 
   /*
@@ -501,7 +736,7 @@ export function Screener() {
    * to check again. See `useLiquidityLocks` for what that costs and why it is
    * paced rather than fired at once.
    */
-  const pools = useMemo(() => listed.map((pair) => pair.pool), [listed]);
+  const pools = useMemo(() => listed.map(({ pair }) => pair.pool), [listed]);
   const locks = useLiquidityLocks(pools);
 
   const body = () => {
@@ -558,7 +793,7 @@ export function Screener() {
 
     return (
       <div className="flex flex-col gap-1.5">
-        {listed.map((pair) => (
+        {listed.map(({ pair, signal, drift }) => (
           /*
            * Two controls, side by side, rather than one inside the other — a
            * button cannot legally contain a button, and the reader is asking
@@ -574,9 +809,22 @@ export function Screener() {
               <span className="block truncate">
                 {pair.symbol}
                 <span className="font-normal text-faint">/{pair.quote}</span>
-                {pair.age !== undefined && pair.age < FRESH && (
-                  <span className="chip chip-xs chip-live ml-1.5">{t("memecoin.fresh")}</span>
-                )}
+                {/*
+                 * One chip about what the row is doing, at most, and then the
+                 * lock. The three are in order of what they claim: a coil is
+                 * the strongest, depth arriving is the part of a coil that can
+                 * stand alone, and NEW is a fact about the calendar. A row
+                 * that has earned a louder one gives up the quieter, and the
+                 * age it would have said is three words along the line below.
+                 */}
+                {pair.age !== undefined &&
+                  pair.age < FRESH &&
+                  !coiling(signal.score) &&
+                  !filling(drift) && (
+                    <span className="chip chip-xs chip-live ml-1.5">{t("memecoin.fresh")}</span>
+                  )}
+                <SignalChip signal={signal} />
+                <FillingChip signal={signal} drift={drift} />
                 <LockChip lock={locks.get(pair.pool.toLowerCase())} />
               </span>
               {/*
@@ -600,6 +848,7 @@ export function Screener() {
                 {" · "}
                 <Figure className="num" value={age(pair.age)} />
                 <LockWord lock={locks.get(pair.pool.toLowerCase())} />
+                <SignalWord signal={signal} />
               </span>
             </span>
             <span className="shrink-0 text-right">
@@ -636,14 +885,21 @@ export function Screener() {
         <div className="mb-3 flex flex-col gap-1.5">
           {/*
            * Asking for a movement narrows the list to rows that have moved,
-           * which is what it has always meant — it now also drops the ones
-           * that have not traded at all, because silence is not a direction.
+           * which is what it has always meant — it also drops the ones that
+           * have not traded at all, because silence is not a direction.
+           *
+           * The first of the three is the odd one and the point of the screen.
+           * It asks for what has not moved yet and has a crowd arriving under
+           * it, which is the only one of these four questions whose answer is
+           * still buyable. It took the place of a band called Flat, which
+           * could not tell a token being accumulated from one nobody had
+           * looked at in five minutes.
            */}
           <Segmented
             options={[
               { value: "all", label: t("memecoin.bandAll") },
+              { value: "coiling", label: t("memecoin.bandCoil") },
               { value: "pumping", label: t("memecoin.bandPump") },
-              { value: "flat", label: t("memecoin.bandFlat") },
               { value: "dumping", label: t("memecoin.bandDump") },
             ]}
             value={band}
@@ -680,7 +936,7 @@ export function Screener() {
       </Panel>
 
       <PairSheet
-        pair={listed.find((pair) => pair.pool === opened)}
+        entry={listed.find(({ pair }) => pair.pool === opened)}
         onSnipe={snipe}
         onClose={() => setOpened(undefined)}
       />

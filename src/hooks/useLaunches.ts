@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { erc20Abi } from "viem";
 import { useReadContracts } from "wagmi";
 import { CHAIN_ID } from "@/lib/chains";
-import { BURNED, isEquity, poolAbi, priceFrom, quoteFor } from "@/lib/screener";
+import { BURNED, PER_MINUTE, isEquity, poolAbi, priceFrom, quoteFor } from "@/lib/screener";
 import { useCoinUsd } from "./useCoinUsd";
 import type { Birth, Pair } from "./useScreener";
 
@@ -25,9 +25,6 @@ const SCANNED = 400;
 
 /** Reads per launch in the second pass: see the contracts it assembles. */
 const READS = 5 + BURNED.length;
-
-/** Blocks per minute on chain 4663, at a hundred milliseconds a block. */
-const PER_MINUTE = 600;
 
 /**
  * The day's launches, priced.
@@ -198,7 +195,10 @@ export function useLaunches(births: Birth[], head: bigint | undefined, enabled: 
           fdv: issued === undefined ? undefined : issued * price,
           /* Nothing traded in the window, so nothing moved and nothing changed
              hands. Reported as the nothing it is rather than left to look like
-             a figure that failed to arrive. */
+             a figure that failed to arrive. The same goes for the flow this
+             row does not carry: a pool with no trades has no tape to read, and
+             the signal scores it on the two standing facts it can answer for
+             rather than on zeroes standing in for a market. */
           change: 0,
           volume: 0,
           swaps: 0,

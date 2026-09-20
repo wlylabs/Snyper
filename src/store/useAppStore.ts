@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
+import { remember, type Watch, type Watchable } from "@/lib/memory";
 import type { Settings } from "@/lib/types";
 import type { Pair } from "@/hooks/useScreener";
 
@@ -72,6 +73,18 @@ type AppState = {
    * a day later.
    */
   aimed?: Pair;
+  /**
+   * What the memecoin screen has seen the chain do, reading by reading.
+   *
+   * The one piece of state here that is about the chain rather than about the
+   * reader, and it is here for the same reason the rest is: it has to survive
+   * a reload. Everything this app can see of the chain is five minutes wide —
+   * see `lib/memory` — and the only way past that is to remember the last
+   * reading before taking the next. A store that forgot on every navigation
+   * would be a screen that never got past five minutes however long it was
+   * left open.
+   */
+  watch: Watch;
   hydrated: boolean;
 
   setSettings: (patch: Partial<Settings>) => void;
@@ -83,6 +96,7 @@ type AppState = {
     usd: number,
   ) => void;
   aim: (pair: Pair | undefined) => void;
+  observe: (rows: readonly Watchable[], head: bigint) => void;
   setHydrated: () => void;
 };
 
@@ -102,6 +116,7 @@ export const useAppStore = create<AppState>()(
       settings: DEFAULT_SETTINGS,
       hidden: [],
       basis: {},
+      watch: {},
       hydrated: false,
 
       setSettings: (patch) =>
@@ -138,6 +153,21 @@ export const useAppStore = create<AppState>()(
 
       aim: (pair) => set({ aimed: pair }),
 
+      /*
+       * Whether this reading is worth keeping is decided inside the update
+       * rather than by the caller, against the readings already held. Two
+       * screens can be reading the same query at once, and the second of them
+       * has to find the window already recorded — which it does, because
+       * `remember` is comparing against state rather than against whatever the
+       * caller captured when its effect was scheduled. When nothing is taken
+       * it hands the same object back and nothing re-renders.
+       */
+      observe: (rows, head) =>
+        set((state) => {
+          const watch = remember(state.watch, rows, head);
+          return watch === state.watch ? state : { watch };
+        }),
+
       setHydrated: () => set({ hydrated: true }),
     }),
     {
@@ -163,6 +193,7 @@ export const useAppStore = create<AppState>()(
         settings: state.settings,
         hidden: state.hidden,
         basis: state.basis,
+        watch: state.watch,
       }),
       onRehydrateStorage: () => (state) => state?.setHydrated(),
     },

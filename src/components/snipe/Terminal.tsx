@@ -13,6 +13,7 @@ import { haptic } from "@/lib/haptics";
 import { formatAmount, formatCompact } from "@/lib/format";
 import { shareOf, verdictOf, type Lock, type Verdict } from "@/lib/lock";
 import { clearsFloor, dropCopycats, underCeiling } from "@/lib/screener";
+import { signalOf } from "@/lib/signal";
 import {
   EXITS,
   FEE_BIPS,
@@ -102,8 +103,14 @@ function usd(value: number | undefined): string {
  * bar is different: everything above the ceiling is somebody else's entry, and
  * everything that has not been shown to have a market — a floor's worth resting
  * in the pool and a floor's worth traded through it — is not a target, it is a
- * pool with a name. Busiest first, because inside those limits the only
- * question left is what is moving now.
+ * pool with a name.
+ *
+ * Coil first inside those limits, which is the memecoin screen's order and now
+ * this one's. The two lists do not have to agree about what they hold and they
+ * do have to agree about what goes at the top: a reader who found a row by its
+ * coil on one screen and then walked to the other to fire was handed a list
+ * sorted by volume, which puts what has already run above what they came for.
+ * Volume still settles the rows the signal cannot separate.
  */
 function targets(pairs: Pair[]): Pair[] {
   /*
@@ -118,7 +125,9 @@ function targets(pairs: Pair[]): Pair[] {
    */
   return dropCopycats(pairs)
     .filter((pair) => underCeiling(pair) && clearsFloor(pair))
-    .sort((a, b) => b.volume - a.volume);
+    .map((pair) => ({ pair, score: signalOf(pair).score }))
+    .sort((a, b) => b.score - a.score || b.pair.volume - a.pair.volume)
+    .map(({ pair }) => pair);
 }
 
 /** How much of a position is being sold, offered rather than typed. */

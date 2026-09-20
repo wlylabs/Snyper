@@ -1144,6 +1144,46 @@
     color: var(--color-warn);
   }
 
+  /*
+   * The coil mark, which is the one chip on a row that is a claim rather than
+   * a fact. It borrows the accent the NEW mark already uses and adds the one
+   * thing that mark does not have — a border in the same colour — because the
+   * two can sit on the same row and the reader has to be able to tell at a
+   * glance which of them is the reason the row is near the top.
+   */
+  .chip-coil {
+    color: var(--color-accent-text);
+    background: var(--color-accent-soft);
+    border-color: color-mix(in srgb, var(--color-accent-text) 45%, transparent);
+  }
+
+  /*
+   * One reading of the coil, as the share of the bar it fills.
+   *
+   * A row of percentages would have been fewer lines and would not have been
+   * readable: five numbers between nought and a hundred, stacked, is a table
+   * nobody reads to the bottom of. The bar is there so the shape of a score —
+   * which readings carried it and which came back empty — is legible without
+   * arithmetic.
+   */
+  .meter {
+    position: relative;
+    width: 64px;
+    height: 4px;
+    border-radius: var(--radius-pill);
+    background: var(--color-line);
+    overflow: hidden;
+  }
+
+  .meter > span {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    border-radius: var(--radius-pill);
+    background: var(--color-accent);
+  }
+
   /* Inline token tags sit inside dense rows, so they run shorter than a chip. */
   .chip-xs {
     height: 18px;

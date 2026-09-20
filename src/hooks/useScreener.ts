@@ -5,10 +5,12 @@ import { erc20Abi, type GetLogsReturnType, type PublicClient } from "viem";
 import { usePublicClient } from "wagmi";
 import { CHAIN_ID } from "@/lib/chains";
 import { VENUE, factoryAbi } from "@/lib/venue";
+import type { Flow } from "@/lib/signal";
 import {
   BURNED,
   CREATED_WINDOW,
   DEPTH,
+  PER_MINUTE,
   REFERENCE_FEE,
   WINDOW,
   poolAbi,
@@ -64,6 +66,12 @@ export type Pair = {
   decimals0: number;
   decimals1: number;
   usdRate: number;
+  /**
+   * The shape of the window's trading, for the pool the figures above came
+   * from. Absent on a pair nobody has traded, which is a launch rather than a
+   * failed read — see `lib/signal` for what is made of it and what is not.
+   */
+  flow?: Flow;
 };
 
 /**
@@ -89,12 +97,38 @@ export type Birth = {
   block: bigint;
 };
 
+/**
+ * One pool's window, tallied as the logs go past.
+ *
+ * The first four fields are what a price and a volume are made of. The rest are
+ * what the swap event was already carrying and this hook used to drop on the
+ * floor: which way each trade went, who received it, which block it landed in,
+ * and which half of the window it fell in. None of it costs a request — it is
+ * in the same logs, read in the same pass — and it is the whole of what
+ * `lib/signal` ranks the screen by.
+ *
+ * Both directions are kept per side rather than a net, because the tally runs
+ * before the multicall says which of the two tokens is the quote, and the buy
+ * side is whichever one that turns out to be.
+ */
 type Tally = {
   swaps: number;
   amount0: bigint;
   amount1: bigint;
   first: bigint;
   last: bigint;
+  /** Quote-side flow, resolved once the sides are known: in is a buy. */
+  in0: bigint;
+  out0: bigint;
+  in1: bigint;
+  out1: bigint;
+  /** Trades that paid each side in, counted the same way. */
+  zeroIn: number;
+  oneIn: number;
+  takers: Set<string>;
+  blocks: Set<bigint>;
+  early: number;
+  late: number;
 };
 
 /** One `eth_call` per multicall, however many reads go into it. */
@@ -188,27 +222,73 @@ async function read(
     }),
   ]);
 
+  /*
+   * Half past the window, by block, so each trade lands in one side or the
+   * other. It is the cheapest form of a rate there is: the same five minutes
+   * the screen already reads, asked whether its second half was busier than
+   * its first. `swapsIn` concatenates its pieces in order, so the logs arrive
+   * in block order however many requests it took to get them.
+   */
+  const midpoint = head - WINDOW / 2n;
+
   const tally = new Map<string, Tally>();
   for (const log of swaps) {
     const key = log.address.toLowerCase();
-    const seen = tally.get(key);
     const amount0 = log.args.amount0 ?? 0n;
     const amount1 = log.args.amount1 ?? 0n;
     const price = log.args.sqrtPriceX96 ?? 0n;
-    if (seen) {
-      seen.swaps++;
-      seen.amount0 += amount0 < 0n ? -amount0 : amount0;
-      seen.amount1 += amount1 < 0n ? -amount1 : amount1;
-      seen.last = price;
-    } else {
-      tally.set(key, {
-        swaps: 1,
-        amount0: amount0 < 0n ? -amount0 : amount0,
-        amount1: amount1 < 0n ? -amount1 : amount1,
+    let seen = tally.get(key);
+    if (!seen) {
+      seen = {
+        swaps: 0,
+        amount0: 0n,
+        amount1: 0n,
         first: price,
         last: price,
-      });
+        in0: 0n,
+        out0: 0n,
+        in1: 0n,
+        out1: 0n,
+        zeroIn: 0,
+        oneIn: 0,
+        takers: new Set<string>(),
+        blocks: new Set<bigint>(),
+        early: 0,
+        late: 0,
+      };
+      tally.set(key, seen);
     }
+
+    seen.swaps++;
+    seen.amount0 += amount0 < 0n ? -amount0 : amount0;
+    seen.amount1 += amount1 < 0n ? -amount1 : amount1;
+    seen.last = price;
+
+    /*
+     * The sign is the direction, read from the pool's side of the trade: a
+     * positive amount is that token arriving in the pool. So the side that
+     * turns out to be the quote arriving is somebody buying, and the same
+     * figure negative is somebody leaving. This is the one reading on the
+     * screen that says which way the money went, and it was in every log the
+     * old tally added up as an absolute value.
+     */
+    if (amount0 > 0n) {
+      seen.in0 += amount0;
+      seen.zeroIn++;
+    } else {
+      seen.out0 += -amount0;
+    }
+    if (amount1 > 0n) {
+      seen.in1 += amount1;
+      seen.oneIn++;
+    } else {
+      seen.out1 += -amount1;
+    }
+
+    if (log.args.recipient) seen.takers.add(log.args.recipient.toLowerCase());
+    seen.blocks.add(log.blockNumber);
+    if (log.blockNumber <= midpoint) seen.early++;
+    else seen.late++;
   }
 
   const born = new Map<string, { block: bigint }>();
@@ -391,6 +471,19 @@ async function read(
     );
     const volumeRaw = entry.baseIsToken0 ? entry.tally.amount1 : entry.tally.amount0;
 
+    /*
+     * The tally's two sides, resolved now that the quote is known. A buy is
+     * the quote token going into the pool, whichever numbered side that is,
+     * and the dollars are the same conversion every other figure on this row
+     * goes through — so the ratio the signal reads is between two quantities
+     * that were measured the same way.
+     */
+    const quoteIn = entry.baseIsToken0 ? entry.tally.in1 : entry.tally.in0;
+    const quoteOut = entry.baseIsToken0 ? entry.tally.out1 : entry.tally.out0;
+    const buys = entry.baseIsToken0 ? entry.tally.oneIn : entry.tally.zeroIn;
+    const inUnits = (amount: bigint) =>
+      (Number(amount) / 10 ** quote.decimals) * rate;
+
     return {
       pool: entry.pool,
       token: entry.token,
@@ -412,11 +505,22 @@ async function read(
         resting?.status === "success" && typeof resting.result === "bigint"
           ? (Number(resting.result) / 10 ** quote.decimals) * rate
           : 0,
-      age: entry.block === undefined ? undefined : Number(head - entry.block) / 600,
+      age: entry.block === undefined ? undefined : Number(head - entry.block) / PER_MINUTE,
       baseIsToken0: entry.baseIsToken0,
       decimals0,
       decimals1,
       usdRate: rate,
+      flow: {
+        swaps: entry.tally.swaps,
+        buys,
+        sells: entry.tally.swaps - buys,
+        bought: inUnits(quoteIn),
+        sold: inUnits(quoteOut),
+        takers: entry.tally.takers.size,
+        blocks: entry.tally.blocks.size,
+        early: entry.tally.early,
+        late: entry.tally.late,
+      },
     } satisfies Pair;
   });
 
@@ -437,6 +541,13 @@ async function read(
  * The adding only works because everything reaching here is already in dollars.
  * Folded in quote units it was nonsense: a token's USDG volume landed on top of
  * its WETH volume under a WETH label.
+ *
+ * The flow is the one figure that is taken whole rather than added, and it
+ * comes with the busiest pool like the price does. Adding it would be the
+ * quiet kind of wrong: distinct recipients across two pools is not the sum of
+ * each pool's, because the same address can be in both, and a rate worked out
+ * over trades that never met in one order book is not a rate. So the signal
+ * describes the pool a trade would actually go through, and says so.
  */
 function fold(rows: Pair[]): Pair[] {
   const byToken = new Map<string, Pair>();
