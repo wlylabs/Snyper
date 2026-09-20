@@ -455,6 +455,50 @@ export function coiling(score: number): boolean {
 export const ARRIVING = 1.25;
 export const LEAVING = 0.8;
 
+/**
+ * A crowd that is already here, rather than one forming under a quiet price.
+ *
+ * This is the closest thing on this chain to "people are talking about it", and
+ * the distance between those two sentences is worth stating plainly, because
+ * nothing in this app can close it. Snyper reads two things: the chain, and the
+ * chain's explorer. It has no account anywhere, no feed, no mentions, no
+ * sentiment. A screen that printed a badge meaning somebody is posting about
+ * this would be printing a figure it had no way to take.
+ *
+ * What the chain does show is the shadow that throws. Distinct hands arriving
+ * faster than they were is what being talked about looks like from underneath,
+ * one block at a time — and both halves of it are already measured, for the
+ * coil, off swap logs the screen was reading anyway.
+ *
+ * It fires where the coil cannot, which is the reason to have it at all. A coil
+ * is multiplied away as the price catches up — see `quietOf` — so the row with
+ * forty hands on it and a price already up eighty percent scores nothing and
+ * wears no chip, and that row is precisely the one a reader means when they ask
+ * what is hot. The coil answers "a crowd is forming and the price has not said
+ * so"; this answers "a crowd is here", and says nothing at all about whether
+ * the entry is still there. The two are nearly disjoint in practice, which is
+ * why they can share the row's single chip slot without fighting over it.
+ *
+ * Both thresholds sit near the top of what this chain actually does, measured
+ * on the same population as every other constant in this file. `CROWD` at 0.6
+ * of the breadth span is a raw half a hand per trade against a median of 0.31
+ * and a ninetieth percentile of 0.53 — so it is the top tenth, and a pool where
+ * one address is trading with itself cannot reach it at any volume. `RUSH` at
+ * 0.5 of the accel span is a raw doubling of the tape against its own older
+ * half, where the middle of the chain is 1.13. Both readings need `MIN_TRADES`
+ * underneath them, so an untouched launch is never hot — it is new, which the
+ * row already has a word for.
+ */
+export const CROWD = 0.6;
+export const RUSH = 0.5;
+
+export function hyped(pair: Measured): boolean {
+  if (!pair.flow) return false;
+  const hands = breadthOf(pair.flow);
+  const rate = accelOf(pair.flow);
+  return hands !== undefined && rate !== undefined && hands >= CROWD && rate >= RUSH;
+}
+
 export function filling(drift: Drift | undefined): boolean {
   return drift?.depth !== undefined && drift.depth >= ARRIVING;
 }
