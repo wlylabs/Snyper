@@ -24,7 +24,7 @@ import {
 } from "@/lib/screener";
 import { shareOf, verdictOf, type Lock } from "@/lib/lock";
 import { riskOf, type Check, type Level, type Risk } from "@/lib/risk";
-import { coiling, filling, leaving, signalOf, type Signal } from "@/lib/signal";
+import { coiling, filling, hyped, leaving, signalOf, type Signal } from "@/lib/signal";
 import { driftOf, type Drift } from "@/lib/memory";
 import { useLaunches } from "@/hooks/useLaunches";
 import { useWatch } from "@/hooks/useWatch";
@@ -117,6 +117,13 @@ function keep(pair: Pair, score: number, band: Band, grade: Grade): boolean {
    * band's bar on them. Nothing is invented and nothing is excluded by rule.
    */
   if ((band === "pumping" || band === "dumping") && pair.swaps === 0) return false;
+  /*
+   * A pool with no creation inside the launches window has no age, and unknown
+   * is not new — it is a pool that opened before yesterday, or one whose
+   * creation this screen could not reach. Either way it is not what a reader
+   * asking for new is asking for.
+   */
+  if (band === "new" && pair.age === undefined) return false;
   if (!inBand(pair.change, band, coiling(score))) return false;
   /* Volume is asked of a row only if that row has trades behind it. */
   if (!clearsFloor(pair, pair.swaps > 0)) return false;
@@ -161,8 +168,22 @@ type Scored = { pair: Pair; signal: Signal; drift: Drift | undefined };
  * the rest, since everything nobody has touched has the same volume as
  * everything else nobody has touched. A pool with no creation in the last day
  * has no age and sits at the end — unknown is old here.
+ *
+ * The `new` band is the one exception, and it is a different question rather
+ * than a different weighting of the same one. A reader asking what just opened
+ * is asking about arrival, and arrival has an order of its own; ranking it by
+ * score would put a pool from nineteen hours ago above one from four minutes
+ * ago and call that the newest thing on screen. So there the age leads, and the
+ * score falls to the tiebreak between two pools born in the same minute.
  */
-function order(rows: Scored[]): Scored[] {
+function order(rows: Scored[], band: Band): Scored[] {
+  if (band === "new") {
+    return [...rows].sort(
+      (a, b) =>
+        (a.pair.age ?? Infinity) - (b.pair.age ?? Infinity) ||
+        b.signal.score - a.signal.score,
+    );
+  }
   return [...rows].sort(
     (a, b) =>
       b.signal.score - a.signal.score ||
@@ -388,15 +409,42 @@ function SignalChip({ signal }: { signal: Signal }) {
 }
 
 /**
+ * What is hot, in the only sense this app is entitled to the word.
+ *
+ * Hands arriving faster than they were — see `hyped` in `lib/signal`, which is
+ * also where it is written down that this is not a reading of anything anybody
+ * said anywhere. Snyper has no feed to read and does not pretend to one; what
+ * it has is the mark a crowd leaves on a pool while it is forming.
+ *
+ * Under the coil and above everything else. A coiling row is making the
+ * stronger claim of the two — the same crowd, under a price that has not caught
+ * up — and in practice the two barely overlap, because the thing that makes a
+ * row hot is usually the thing that has already cost it its coil.
+ */
+function HypeChip({ pair, signal }: { pair: Pair; signal: Signal }) {
+  const { t } = useI18n();
+  if (coiling(signal.score) || !hyped(pair)) return null;
+  return <span className="chip chip-xs chip-hype ml-1.5">{t("signal.tagHype")}</span>;
+}
+
+/**
  * The row's one word about what this screen watched the pool do.
  *
- * Only where the coil chip is not, and only upward. See `filling` in
- * `lib/signal` for why both marks never sit on the same row, and `leaving` for
+ * Only where the coil and heat chips are not, and only upward. See `filling` in
+ * `lib/signal` for why these marks never sit on the same row, and `leaving` for
  * where the opposite of this is said instead.
  */
-function FillingChip({ signal, drift }: { signal: Signal; drift: Drift | undefined }) {
+function FillingChip({
+  pair,
+  signal,
+  drift,
+}: {
+  pair: Pair;
+  signal: Signal;
+  drift: Drift | undefined;
+}) {
   const { t } = useI18n();
-  if (coiling(signal.score) || !filling(drift)) return null;
+  if (coiling(signal.score) || hyped(pair) || !filling(drift)) return null;
   return (
     <span className="chip chip-xs chip-coil ml-1.5">
       {t("signal.tagFilling", { percent: Math.round(((drift?.depth ?? 1) - 1) * 100) })}
@@ -717,7 +765,11 @@ export function Screener() {
     [all, watch],
   );
   const listed = useMemo(
-    () => order(scored.filter(({ pair, signal }) => keep(pair, signal.score, band, grade))),
+    () =>
+      order(
+        scored.filter(({ pair, signal }) => keep(pair, signal.score, band, grade)),
+        band,
+      ),
     [scored, band, grade],
   );
 
@@ -802,20 +854,23 @@ export function Screener() {
                 <span className="font-normal text-faint">/{pair.quote}</span>
                 {/*
                  * One chip about what the row is doing, at most, and then the
-                 * lock. The three are in order of what they claim: a coil is
-                 * the strongest, depth arriving is the part of a coil that can
-                 * stand alone, and NEW is a fact about the calendar. A row
+                 * lock. The four are in order of what they claim: a coil is
+                 * the strongest, heat is the same crowd without the quiet
+                 * price behind it, depth arriving is the part of a coil that
+                 * can stand alone, and NEW is a fact about the calendar. A row
                  * that has earned a louder one gives up the quieter, and the
                  * age it would have said is three words along the line below.
                  */}
                 {pair.age !== undefined &&
                   pair.age < FRESH &&
                   !coiling(signal.score) &&
+                  !hyped(pair) &&
                   !filling(drift) && (
                     <span className="chip chip-xs chip-live ml-1.5">{t("memecoin.fresh")}</span>
                   )}
                 <SignalChip signal={signal} />
-                <FillingChip signal={signal} drift={drift} />
+                <HypeChip pair={pair} signal={signal} />
+                <FillingChip pair={pair} signal={signal} drift={drift} />
               </span>
               {/*
                * A row nobody has traded has no volume and has not moved, so it
@@ -825,6 +880,20 @@ export function Screener() {
                */}
               <span className="block truncate text-[11px] font-normal text-faint">
                 <RiskWord pair={pair} lock={locks.get(pair.pool.toLowerCase())} drift={drift} />
+                {/*
+                 * The age leads under the `new` band and trails everywhere
+                 * else, because it is the sort key there and the line is
+                 * truncated. Left where it normally sits it was the first
+                 * thing the ellipsis ate on a narrow screen — a list ordered
+                 * by a figure it had cut off, which asks the reader to take
+                 * the order on trust.
+                 */}
+                {band === "new" && (
+                  <>
+                    <Figure className="num" value={age(pair.age)} />
+                    {" · "}
+                  </>
+                )}
                 {pair.swaps > 0 && (
                   <>
                     <span className="lbl">{t("memecoin.volShort")}</span>{" "}
@@ -836,8 +905,12 @@ export function Screener() {
                   {t("memecoin.liqShort")}
                 </span>{" "}
                 <Figure className={`num ${thin(pair) ? "warn" : ""}`} value={usd(pair.liquidity)} />
-                {" · "}
-                <Figure className="num" value={age(pair.age)} />
+                {band !== "new" && (
+                  <>
+                    {" · "}
+                    <Figure className="num" value={age(pair.age)} />
+                  </>
+                )}
                 <SignalWord signal={signal} />
               </span>
             </span>
@@ -888,6 +961,7 @@ export function Screener() {
           <Segmented
             options={[
               { value: "all", label: t("memecoin.bandAll") },
+              { value: "new", label: t("memecoin.bandNew") },
               { value: "coiling", label: t("memecoin.bandCoil") },
               { value: "pumping", label: t("memecoin.bandPump") },
               { value: "dumping", label: t("memecoin.bandDump") },
@@ -912,8 +986,15 @@ export function Screener() {
          * of what this screen can see: what traded in the last five minutes,
          * and what opened since yesterday. The floor is always on, so it is
          * always said.
+         *
+         * And so is the order. The header named the coil ranking on every
+         * band, including the one that is not coil ranked — a heading that
+         * said one thing while the list did another, about the only part of a
+         * list a reader cannot check by looking at it.
          */
-        label={t("memecoin.live", { floor: `$${formatCompact(FLOOR)}` })}
+        label={t(band === "new" ? "memecoin.liveNew" : "memecoin.live", {
+          floor: `$${formatCompact(FLOOR)}`,
+        })}
         meta={
           mounted && all.length > 0 ? (
             <span className="lbl">

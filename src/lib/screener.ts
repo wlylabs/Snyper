@@ -225,7 +225,7 @@ export const BURNED = [
  * nobody has looked at in five minutes. Those are the two rows a screen about
  * finding an entry early most needs to keep apart.
  */
-export type Band = "all" | "coiling" | "pumping" | "dumping";
+export type Band = "all" | "new" | "coiling" | "pumping" | "dumping";
 
 export const MOVE = 50;
 
@@ -233,6 +233,11 @@ export function inBand(change: number, band: Band, coiling: boolean): boolean {
   if (band === "coiling") return coiling;
   if (band === "pumping") return change >= MOVE;
   if (band === "dumping") return change <= -MOVE;
+  /*
+   * `new` is a question about the calendar and not about the price, so it is
+   * the one band this function cannot answer — the row's age is what settles
+   * it, and that is done in `keep` where the whole pair is in hand.
+   */
   return true;
 }
 

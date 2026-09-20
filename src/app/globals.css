@@ -1162,6 +1162,22 @@
   }
 
   /*
+   * A crowd already on the row — see `hyped` in `lib/signal`.
+   *
+   * Warm rather than accent, and the choice is the whole point of having two
+   * marks. The accent on a row in this app means still buyable: the coil wears
+   * it because a coil is a tape filling under a price that has not caught up.
+   * Heat is the other half of that sentence — the hands are here and the price
+   * has usually already said so — so it is drawn in the colour the app uses
+   * everywhere else for read this before you act, not for go.
+   */
+  .chip-hype {
+    color: var(--color-warn);
+    background: color-mix(in srgb, var(--color-warn) 14%, transparent);
+    border-color: color-mix(in srgb, var(--color-warn) 45%, transparent);
+  }
+
+  /*
    * One reading of the coil, as the share of the bar it fills.
    *
    * A row of percentages would have been fewer lines and would not have been
