@@ -29,6 +29,7 @@ export type IconName =
   | "link"
   | "arrow-up"
   | "arrow-down"
+  | "eye"
   | "hide";
 
 const PATHS: Record<IconName, string> = {
@@ -60,6 +61,9 @@ const PATHS: Record<IconName, string> = {
   link: "M10.5 13.5a4 4 0 0 0 5.7 0l2.8-2.8a4 4 0 1 0-5.7-5.7L11.9 6.4M13.5 10.5a4 4 0 0 0-5.7 0L5 13.3a4 4 0 1 0 5.7 5.7l1.4-1.4",
   "arrow-up": "M12 19V5M12 5l-6 6M12 5l6 6",
   "arrow-down": "M12 5v14M12 19l-6-6M12 19l6-6",
+  /* The same eye as `hide`, unstruck — the two are one toggle and have to be
+   * the same drawing, or the state change reads as the glyph swapping. */
+  eye: "M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6ZM12 9.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5Z",
   /* An eye, struck through: what this does is stop showing a thing, not end it. */
   hide: "M3 12s3.5-6 9-6c1.4 0 2.7.4 3.8 1M21 12s-3.5 6-9 6c-1.4 0-2.7-.4-3.8-1M9.9 9.9a3 3 0 0 0 4.2 4.2M4 4l16 16",
 };

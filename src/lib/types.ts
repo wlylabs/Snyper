@@ -14,4 +14,17 @@ export type Settings = {
   /** Set once the reader picks a language, which ends browser detection. */
   localeChosen: boolean;
   theme: "dark" | "light";
+  /**
+   * Whether the balance screen covers its dollar figures.
+   *
+   * A setting rather than screen state, because the reason a reader turns it on
+   * is that somebody can see their screen — and that reason does not end when
+   * they navigate away and come back.
+   *
+   * Added after the store's last version, and deliberately without a bump: a
+   * reader whose saved settings predate it has no value here, and the screens
+   * read it as off — which is the default anyway, so there is nothing for a
+   * migration to carry.
+   */
+  masked: boolean;
 };

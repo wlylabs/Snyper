@@ -135,6 +135,13 @@
    */
   --dur-roll: 260ms;
   --fig-lag: 18ms;
+
+  /*
+   * How much accent the balance card catches in its corner. The same alpha is
+   * a glint on black and a stain on white, so like `--grid-opacity` it is a
+   * token the themes disagree about rather than a rule one of them skips.
+   */
+  --card-bloom: 12%;
 }
 
 [data-theme="light"] {
@@ -144,6 +151,8 @@
   --color-plinth: #c0c9d8;
   /* The grid line colour is far weaker against white, so it needs more of it. */
   --grid-opacity: 0.5;
+  /* And the reverse for the card's bloom: olive on white shows at half of it. */
+  --card-bloom: 6%;
 }
 
 @layer base {
@@ -1660,6 +1669,129 @@
     gap: 10px;
     padding: 20px 16px 18px;
     text-align: center;
+  }
+
+  /* ---------- balance card ---------- */
+
+  /*
+   * The one figure the balance screen exists to answer, given a surface of its
+   * own.
+   *
+   * It used to be a `.panel` like everything under it — same fill, same
+   * hairline, same corner — which put the wallet's total and a row for a token
+   * worth four dollars on the same plane, and left the reader to work out which
+   * of the two the screen was about. The card is that answer stated in surface:
+   * one step up, a wider corner, and the only gradient in the app.
+   *
+   * It is still an instrument and not a bank card. The lift comes from the
+   * app's own tokens rather than from a colour invented for it — `raise` falling
+   * into `panel`, which is exactly the step every key on the screen already
+   * stands on — and the accent appears once, as a bloom in the corner the
+   * reading starts from. `.ticked` puts the rail across the top, so the card
+   * plots itself in on mount the way the primary panel on every other screen
+   * does.
+   */
+  .saldo {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-md);
+    background: linear-gradient(
+      152deg,
+      var(--color-raise) 0%,
+      var(--color-panel) 54%,
+      var(--color-panel) 100%
+    );
+    box-shadow: var(--shadow-panel);
+    animation: panel-in var(--dur-enter) var(--ease-out) both;
+  }
+
+  .saldo::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(
+      108% 82% at 100% 0%,
+      color-mix(in srgb, var(--color-accent-line) var(--card-bloom), transparent),
+      transparent 62%
+    );
+  }
+
+  /* The bloom is painted over the card, so the card's contents sit above it. */
+  .saldo > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .saldo-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    /* One gutter down the whole card: the avatar, the figure and the foot's
+       labels all start on the same line. */
+    padding: 12px 14px 0;
+  }
+
+  .saldo-face {
+    padding: 14px 14px 16px;
+  }
+
+  /*
+   * The figure, at the largest size anything in this app is set — and given the
+   * room to stay that size. A portfolio in the tens of thousands is fifteen
+   * characters of tabular mono, which is wider than a phone at 34px, so the
+   * type steps up with the viewport rather than wrapping the total onto two
+   * lines.
+   */
+  .saldo-figure {
+    /* The height is the figure's, and the cover below is laid into it rather
+       than setting its own — so covering the card moves nothing under it. */
+    display: flex;
+    align-items: center;
+    min-height: 34px;
+    font-size: 34px;
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+
+  @media (min-width: 480px) {
+    .saldo-figure {
+      min-height: 42px;
+      font-size: 42px;
+    }
+  }
+
+  /*
+   * A figure under a cover is not a figure, so it does not pretend to be one:
+   * the dots are dim, set well below the figure's size, and spaced. At the
+   * figure's own 42px they are six black circles across the card — which reads
+   * as a control rather than as something withheld.
+   */
+  .saldo-figure[data-covered="true"] {
+    color: var(--color-faint);
+    font-size: 22px;
+    letter-spacing: 0.24em;
+  }
+
+  /*
+   * The foot carries what the total is made of: the coin that pays for gas, and
+   * how many things are held. Both are rules rather than a second card — the
+   * card is one reading, and these are its parts.
+   */
+  .saldo-foot {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-top: 1px solid var(--color-line);
+  }
+
+  .saldo-cell {
+    min-width: 0;
+    padding: 10px 14px 11px;
+  }
+
+  .saldo-cell + .saldo-cell {
+    border-left: 1px solid var(--color-line);
   }
 
   /* ---------- misc ---------- */
