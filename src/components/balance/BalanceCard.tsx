@@ -34,6 +34,11 @@ type Native = { symbol: string; formatted: string } | undefined;
  * top-of-page figure is the "am I okay" answer, and everything below it is
  * detail the reader asked for.
  *
+ * What it does not take from them is a surface. The card is the Snyper mark
+ * at card scale — four brackets and nothing inside them — so the figure sits
+ * on the page's own ground rather than on a panel. See `.saldo` in
+ * `globals.css` for how the frame is drawn.
+ *
  * What the pattern does not get here is a 24-hour change pill, which every one
  * of those references carries. This app cannot know it: nothing stores what
  * this wallet was worth yesterday, and the change pill is the single most
@@ -89,7 +94,7 @@ export function BalanceCard({
   };
 
   return (
-    <section className="saldo ticked mb-3">
+    <section className="saldo mb-3">
       <header className="saldo-head">
         <WalletAvatar address={address} size={26} />
         {/*

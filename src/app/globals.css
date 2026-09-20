@@ -136,12 +136,6 @@
   --dur-roll: 260ms;
   --fig-lag: 18ms;
 
-  /*
-   * How much accent the balance card catches in its corner. The same alpha is
-   * a glint on black and a stain on white, so like `--grid-opacity` it is a
-   * token the themes disagree about rather than a rule one of them skips.
-   */
-  --card-bloom: 12%;
 }
 
 [data-theme="light"] {
@@ -151,8 +145,6 @@
   --color-plinth: #c0c9d8;
   /* The grid line colour is far weaker against white, so it needs more of it. */
   --grid-opacity: 0.5;
-  /* And the reverse for the card's bloom: olive on white shows at half of it. */
-  --card-bloom: 6%;
 }
 
 @layer base {
@@ -1674,54 +1666,72 @@
   /* ---------- balance card ---------- */
 
   /*
-   * The one figure the balance screen exists to answer, given a surface of its
-   * own.
+   * The one figure the balance screen exists to answer, given the app's own
+   * mark to sit inside.
    *
    * It used to be a `.panel` like everything under it — same fill, same
    * hairline, same corner — which put the wallet's total and a row for a token
    * worth four dollars on the same plane, and left the reader to work out which
-   * of the two the screen was about. The card is that answer stated in surface:
-   * one step up, a wider corner, and the only gradient in the app.
+   * of the two the screen was about. It is the Snyper mark now, at card scale:
+   * four brackets closing on what they hold, and nothing between them. The
+   * logo's centre block is the figure itself.
    *
-   * It is still an instrument and not a bank card. The lift comes from the
-   * app's own tokens rather than from a colour invented for it — `raise` falling
-   * into `panel`, which is exactly the step every key on the screen already
-   * stands on — and the accent appears once, as a bloom in the corner the
-   * reading starts from. `.ticked` puts the rail across the top, so the card
-   * plots itself in on mount the way the primary panel on every other screen
-   * does.
+   * So the card carries no fill at all. It is the one surface in the app that
+   * is not a surface — the page's own ground and its measurement grid read
+   * straight through it, and what separates the card from the list below is
+   * that the accent is locked around it rather than that it sits above it.
+   * That is also why it takes no `.ticked` rail: the frame is the accent, and
+   * two of them on one card would be the app saying the same thing twice.
    */
   .saldo {
     position: relative;
-    overflow: hidden;
-    border: 1px solid var(--color-line);
     border-radius: var(--radius-md);
-    background: linear-gradient(
-      152deg,
-      var(--color-raise) 0%,
-      var(--color-panel) 54%,
-      var(--color-panel) 100%
-    );
-    box-shadow: var(--shadow-panel);
+    background: transparent;
     animation: panel-in var(--dur-enter) var(--ease-out) both;
   }
 
-  .saldo::after {
+  /*
+   * The brackets.
+   *
+   * A full rounded border is drawn and then all but its four corners is masked
+   * away, which is what keeps them corners: they take the card's own radius and
+   * its exact geometry at any width, where four separately placed marks would
+   * drift out of the curve the moment the card changed size.
+   *
+   * It closes on mount rather than fading in — a lock-on is a thing that
+   * arrives from outside and stops, and the motion scale's out curve is already
+   * the app's word for arriving. `prefers-reduced-motion` takes it to 1ms at
+   * the foot of this file, with everything else.
+   */
+  .saldo::before {
+    --bracket: 26px;
     content: "";
     position: absolute;
     inset: 0;
     pointer-events: none;
-    background: radial-gradient(
-      108% 82% at 100% 0%,
-      color-mix(in srgb, var(--color-accent-line) var(--card-bloom), transparent),
-      transparent 62%
-    );
+    /* Heavier than a hairline. The mark's brackets are a tenth of the glyph
+       wide, and a 1px frame reads as a border that lost its middle rather
+       than as the logo. */
+    border: 2px solid var(--color-accent-line);
+    border-radius: var(--radius-md);
+    -webkit-mask:
+      linear-gradient(#000, #000) 0 0 / var(--bracket) var(--bracket) no-repeat,
+      linear-gradient(#000, #000) 100% 0 / var(--bracket) var(--bracket) no-repeat,
+      linear-gradient(#000, #000) 0 100% / var(--bracket) var(--bracket) no-repeat,
+      linear-gradient(#000, #000) 100% 100% / var(--bracket) var(--bracket) no-repeat;
+    mask:
+      linear-gradient(#000, #000) 0 0 / var(--bracket) var(--bracket) no-repeat,
+      linear-gradient(#000, #000) 100% 0 / var(--bracket) var(--bracket) no-repeat,
+      linear-gradient(#000, #000) 0 100% / var(--bracket) var(--bracket) no-repeat,
+      linear-gradient(#000, #000) 100% 100% / var(--bracket) var(--bracket) no-repeat;
+    animation: lock-on 420ms var(--ease-out) both;
   }
 
-  /* The bloom is painted over the card, so the card's contents sit above it. */
-  .saldo > * {
-    position: relative;
-    z-index: 1;
+  @keyframes lock-on {
+    from {
+      opacity: 0;
+      transform: scale(1.06);
+    }
   }
 
   .saldo-head {
@@ -1778,20 +1788,43 @@
    * The foot carries what the total is made of: the coin that pays for gas, and
    * how many things are held. Both are rules rather than a second card — the
    * card is one reading, and these are its parts.
+   *
+   * The rules are drawn short of the card's edges rather than across them.
+   * With no fill to stop at, a full-bleed hairline ends in mid-air next to a
+   * bracket and reads as a border that did not finish; held inside the gutter
+   * it reads as what it is, which is one part of the reading divided from the
+   * next. The brackets are the only thing allowed on the card's edge.
    */
   .saldo-foot {
+    position: relative;
     display: grid;
     grid-template-columns: 1fr 1fr;
-    border-top: 1px solid var(--color-line);
+  }
+
+  .saldo-foot::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 14px;
+    right: 14px;
+    height: 1px;
+    background: var(--color-line);
   }
 
   .saldo-cell {
+    position: relative;
     min-width: 0;
-    padding: 10px 14px 11px;
+    padding: 12px 14px 14px;
   }
 
-  .saldo-cell + .saldo-cell {
-    border-left: 1px solid var(--color-line);
+  .saldo-cell + .saldo-cell::before {
+    content: "";
+    position: absolute;
+    top: 4px;
+    bottom: 4px;
+    left: 0;
+    width: 1px;
+    background: var(--color-line);
   }
 
   /* ---------- misc ---------- */
