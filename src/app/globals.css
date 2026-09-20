@@ -1209,6 +1209,19 @@
     background: var(--color-short-line);
   }
 
+  /*
+   * The risk verdict's two other tones. They do not pulse, unlike `dot-live`:
+   * that one marks something happening now and these mark a state a pool is
+   * in, and a list where every row's verdict throbs is a list nobody can read.
+   */
+  .dot-long {
+    background: var(--color-accent-line);
+  }
+
+  .dot-warn {
+    background: var(--color-warn);
+  }
+
   @keyframes pulse {
     0%,
     100% {

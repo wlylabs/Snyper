@@ -22,7 +22,8 @@ import {
   type Band,
   type Grade,
 } from "@/lib/screener";
-import { shareOf, verdictOf, type Lock, type Verdict } from "@/lib/lock";
+import { shareOf, verdictOf, type Lock } from "@/lib/lock";
+import { riskOf, type Check, type Level, type Risk } from "@/lib/risk";
 import { coiling, filling, leaving, signalOf, type Signal } from "@/lib/signal";
 import { driftOf, type Drift } from "@/lib/memory";
 import { useLaunches } from "@/hooks/useLaunches";
@@ -222,78 +223,143 @@ function merge(traded: Pair[], launched: Pair[]): Pair[] {
 }
 
 /**
- * What the lock reduces to on screen, and what it refuses to reduce to.
+ * The verdict, and the colour it is read in.
  *
- * Four verdicts and only one of them is good news, which is roughly the shape
- * of the chain: of eighteen pools sampled that held anything, four were burned
- * outright, four were held by wallets that could empty them, one was 89.8%
- * burned, and five were held by contracts nothing here can read. `unread` is
- * not a hedge — it is the largest honest answer this check has.
+ * Three words and an absence, which is the whole vocabulary. A reader scanning
+ * a list is not weighing a risk score against an opportunity score; they are
+ * deciding whether to open the row, and three words decide that faster than any
+ * number could. `undefined` is the fourth state and is never dressed as one of
+ * the three — a check that has not come back yet is not a pass.
  */
-const LOCK_TONE: Record<Verdict, string> = {
-  burned: "long",
-  mixed: "warn",
-  open: "short",
-  unread: "text-faint",
-  empty: "short",
+const RISK_TONE: Record<Level, string> = {
+  clear: "long",
+  caution: "warn",
+  danger: "short",
 };
 
-function lockLabel(verdict: Verdict): TKey {
-  return `lock.${verdict}` as TKey;
+const RISK_DOT: Record<Level, string> = {
+  clear: "dot-long",
+  caution: "dot-warn",
+  danger: "dot-short",
+};
+
+function riskWord(level: Level | undefined): TKey {
+  return level === undefined ? "risk.unread" : (`risk.${level}` as TKey);
 }
 
 /**
- * The same verdict, on a list row, in two registers.
+ * The verdict at the head of the row's own line, as a dot and a word.
  *
- * A chip beside the ticker is loud — it is what `NEW` and `FAKE` already use —
- * so it is spent only on the answers worth stopping a scroll for: liquidity
- * that was burned, liquidity that was partly burned, and a pool somebody has
- * already emptied. Those are rare. Measured across the pools this screen
- * surfaces, almost every row is either withdrawable or unreadable, and a list
- * that puts a badge on its own default is a list whose badges stop being read.
- *
- * So the ordinary two go in the metadata line instead, in the same dim type as
- * the depth and the age beside them — which is the pattern this row already
- * uses for a thin pool. They are still said, because a row that says nothing is
- * a row a reader cannot tell apart from one that has not been checked yet, and
- * that ambiguity is the whole reason to print the quiet ones at all.
- *
- * A row still being read has neither, which is the honest third thing: no
- * verdict has arrived. It resolves within a few seconds of the list appearing.
+ * It took the place of a chip and a word that used to carry the lock alone.
+ * A chip is the loudest thing a row has and the risk verdict is on every row,
+ * so it would have been a mark that stopped being read within a screenful —
+ * and it was competing for the same corner as the coil, which is the other
+ * half of the sentence and has to survive beside it. A dot is legible at a
+ * glance, costs the row nothing, and is the one element on this screen that
+ * is already used for exactly this: a state, in a colour.
  */
-const LOCK_CHIP: Partial<Record<Verdict, { key: TKey; tone: string }>> = {
-  burned: { key: "lock.tagBurned", tone: "chip-live" },
-  mixed: { key: "lock.tagMixed", tone: "chip-warn" },
-  empty: { key: "lock.tagEmpty", tone: "chip-short" },
-};
-
-const LOCK_WORD: Partial<Record<Verdict, TKey>> = {
-  open: "lock.tagOpen",
-  unread: "lock.tagUnread",
-};
-
-function LockChip({ lock }: { lock: Lock | undefined }) {
+function RiskWord({
+  pair,
+  lock,
+  drift,
+}: {
+  pair: Pair;
+  lock: Lock | undefined;
+  drift: Drift | undefined;
+}) {
   const { t } = useI18n();
-  if (!lock) return null;
-  const chip = LOCK_CHIP[verdictOf(lock)];
-  if (!chip) return null;
-  const share = shareOf(lock);
+  /*
+   * Worked out on the row rather than carried onto it. The checks are pure and
+   * cost nothing, and the lock they need arrives per row and out of order —
+   * see `useLiquidityLocks` for why it is paced — so a verdict computed where
+   * the list is built would have been a verdict computed before its evidence.
+   */
+  const risk = riskOf(pair, lock, drift);
+  const dot = risk.verdict === undefined ? "" : RISK_DOT[risk.verdict];
+  const tone = risk.verdict === undefined ? "text-faint" : RISK_TONE[risk.verdict];
   return (
-    <span className={`chip chip-xs ml-1.5 ${chip.tone}`}>
-      {t(chip.key, { share: share === undefined ? 0 : Math.round(share) })}
-    </span>
+    <>
+      <span className={`dot mr-1 inline-block align-middle ${dot}`} />
+      <span className={`lbl ${tone}`}>{t(riskWord(risk.verdict))}</span>
+      {" · "}
+    </>
   );
 }
 
-function LockWord({ lock }: { lock: Lock | undefined }) {
+/**
+ * What each check found, in the check's own unit.
+ *
+ * A level decides the colour and a figure fills the line, because a reader
+ * looking at five checks wants what was found rather than what was concluded:
+ * "4% of mcap" says more than "caution" does, and the colour has already said
+ * the caution part. The lock is the exception and keeps its own word — a
+ * share of a pool burned is not a figure anybody reads as one, and the screen
+ * already had the five words for it.
+ */
+function reading(check: Check, lock: Lock | undefined): string {
+  if (check.key === "lock") return "";
+  if (check.value === undefined) return "";
+  if (check.key === "exit") return `${(check.value * 100).toFixed(0)}% MC`;
+  if (check.key === "supply") return `${check.value.toFixed(1)}× MC`;
+  if (check.key === "market") return usd(check.value);
+  return drifted(check.value);
+}
+
+function CheckRow({ check, lock }: { check: Check; lock: Lock | undefined }) {
   const { t } = useI18n();
-  if (!lock) return null;
-  const word = LOCK_WORD[verdictOf(lock)];
-  if (!word) return null;
+  const tone = check.level === undefined ? "text-faint" : RISK_TONE[check.level];
+
+  if (check.level === undefined) {
+    return (
+      <Row k={t(`risk.${check.key}` as TKey)} v={<span className="num text-faint">—</span>} />
+    );
+  }
+
+  /* The lock says which of its five answers it gave; the rest say a figure. */
+  const said =
+    check.key === "lock" && lock
+      ? t(`lock.${verdictOf(lock)}` as TKey, {
+          share: Math.round(shareOf(lock) ?? 0),
+        })
+      : reading(check, lock);
+
+  return <Row k={t(`risk.${check.key}` as TKey)} v={<span className={`num ${tone}`}>{said}</span>} />;
+}
+
+/**
+ * The rug check, as the reader already knows the shape of it.
+ *
+ * Five named checks and the worst of them at the top. There is deliberately no
+ * total: a risk score invites a reader to average a pool that can be pulled
+ * against one that is merely thin, and those two do not average — one of them
+ * ends at zero. The worst check is the verdict because the worst check is what
+ * happens to you.
+ */
+function RiskPanel({ risk, lock, loading }: { risk: Risk; lock: Lock | undefined; loading: boolean }) {
+  const { t } = useI18n();
+
   return (
     <>
-      {" · "}
-      <span className="lbl">{t(word)}</span>
+      <Panel label={t("risk.title")}>
+        <Row
+          k={t("risk.verdict")}
+          v={
+            loading && risk.verdict === undefined ? (
+              <span className="skel inline-block h-[12px] w-[72px] align-middle" />
+            ) : (
+              <span
+                className={`num ${risk.verdict === undefined ? "text-faint" : RISK_TONE[risk.verdict]}`}
+              >
+                {t(riskWord(risk.verdict))}
+              </span>
+            )
+          }
+        />
+        {risk.checks.map((check) => (
+          <CheckRow key={check.key} check={check} lock={lock} />
+        ))}
+      </Panel>
+      <p className="mt-2 text-[11px] text-dim">{t("risk.hint")}</p>
     </>
   );
 }
@@ -349,6 +415,17 @@ function SignalWord({ signal }: { signal: Signal }) {
   );
 }
 
+/** What was watched, in one line, saying only what it actually has. */
+function watched(t: (key: TKey, vars?: Record<string, string | number>) => string, drift: Drift | undefined): string {
+  if (!drift) return t("signal.watching");
+  const span = age(drift.span);
+  if (drift.depth === undefined) return t("signal.watchedFlat", { span, samples: drift.samples });
+  const depth = drifted(drift.depth);
+  return drift.trade === undefined
+    ? t("signal.watchedDepth", { span, samples: drift.samples, depth })
+    : t("signal.watched", { span, samples: drift.samples, depth, trade: times(drift.trade) });
+}
+
 /** One reading, drawn as the share of the bar it fills. */
 function Meter({ value }: { value: number }) {
   const filled = Math.round(value * 100);
@@ -402,109 +479,34 @@ function SignalPanel({ signal, drift }: { signal: Signal; drift: Drift | undefin
           />
         ))}
         <Row k={t("signal.quiet")} v={<Meter value={signal.quiet} />} />
+        <Row
+          k={t("signal.read")}
+          v={
+            <span className="num">{`${signal.read} / ${signal.readings.length}`}</span>
+          }
+        />
       </Panel>
 
+      {/*
+       * Three lines under the panel, at most, and each one earns its place: the
+       * span the watched readings were taken over, what the score is and is
+       * not, and — only when it happened — money that has left the pool.
+       *
+       * There were five paragraphs here, which is a wall rather than a note,
+       * and a wall gets skipped exactly like a badge on every row does. The
+       * count of readings that came back moved into the panel as a figure,
+       * where it is read at a glance instead of explained.
+       */}
       <div className="mt-2 grid gap-1">
-        {/*
-         * What the last two readings were taken over, or why they are missing.
-         * A span is printed rather than implied: these are the only figures in
-         * the app that describe something longer than five minutes, and the
-         * only honest way to show one is beside the time it was measured over.
-         */}
-        {drift ? (
-          <>
-            <p className="text-[11px] text-faint">
-              {drift.depth === undefined
-                ? t("signal.watchedFlat", { span: age(drift.span), samples: drift.samples })
-                : t("signal.watched", {
-                    span: age(drift.span),
-                    samples: drift.samples,
-                    depth: drifted(drift.depth),
-                  })}
-            </p>
-            {drift.trade !== undefined && (
-              <p className="text-[11px] text-faint">
-                {t("signal.watchedTrade", { trade: times(drift.trade) })}
-              </p>
-            )}
-          </>
-        ) : (
-          <p className="text-[11px] text-faint">{t("signal.watching")}</p>
-        )}
+        <p className="text-[11px] text-faint">{watched(t, drift)}</p>
+        <p className="text-[11px] text-dim">{t("signal.hint")}</p>
         {leaving(drift) && (
           <p className="text-[11px] warn">
-            {t("signal.leaving", {
-              percent: Math.round((1 - (drift?.depth ?? 1)) * 100),
-              span: age(drift?.span ?? 0),
-            })}
-          </p>
-        )}
-        <p className="text-[11px] text-dim">{t("signal.hint")}</p>
-        {/*
-         * Never optional, for the same reason the burned verdict carries its
-         * own sentence: a number this compact is exactly the kind a reader
-         * fills in for themselves, and what they fill in is a prediction.
-         */}
-        <p className="text-[11px] warn">{t("signal.caveat")}</p>
-        {signal.read < signal.readings.length && (
-          <p className="text-[11px] text-faint">
-            {t("signal.partial", { read: signal.read, of: signal.readings.length })}
+            {t("signal.leaving", { percent: Math.round((1 - (drift?.depth ?? 1)) * 100) })}
           </p>
         )}
       </div>
     </>
-  );
-}
-
-/**
- * The one row on this sheet about whether the pool can be taken away.
- *
- * It sits under the figures rather than beside them because it is a different
- * kind of fact: depth, volume and age describe what the pool is doing, and this
- * describes whether it will still be there. The hint is never optional — a
- * verdict this short is exactly the kind a reader fills in for themselves, and
- * `burned` in particular has to carry the sentence saying it is not the same as
- * safe.
- */
-function LockNote({
-  lock,
-  loading,
-  failed,
-}: {
-  lock: Lock | undefined;
-  loading: boolean;
-  failed: boolean;
-}) {
-  const { t } = useI18n();
-
-  if (loading) {
-    return (
-      <p className="mt-2 text-[11px] text-faint">{`${t("lock.reading")}…`}</p>
-    );
-  }
-  if (failed || !lock) {
-    return <p className="mt-2 text-[11px] text-faint">{t("lock.failed")}</p>;
-  }
-
-  const verdict = verdictOf(lock);
-  const share = shareOf(lock);
-  const rounded = share === undefined ? undefined : Math.round(share);
-
-  return (
-    <div className="mt-2 grid gap-1">
-      <p className="text-[11px] text-dim">
-        {t(`lock.${verdict}Hint` as TKey, { share: rounded ?? 0 })}
-      </p>
-      {/*
-       * Only when the price is known to be outside the burned range. An
-       * unreadable price leaves `backsPrice` undefined, and undefined says
-       * nothing here rather than printing the warning by default.
-       */}
-      {lock.burned > 0n && lock.backsPrice === false && (
-        <p className="text-[11px] warn">{t("lock.outOfRange")}</p>
-      )}
-      {lock.partial && <p className="text-[11px] text-faint">{t("lock.partial")}</p>}
-    </div>
   );
 }
 
@@ -527,9 +529,7 @@ function PairSheet({
 
   if (!entry) return null;
   const { pair, signal, drift } = entry;
-
-  const verdict = lock ? verdictOf(lock) : undefined;
-  const share = lock ? shareOf(lock) : undefined;
+  const risk = riskOf(pair, lock, drift);
 
   return (
     <Sheet open title={t("memecoin.pair")} onClose={onClose}>
@@ -587,25 +587,16 @@ function PairSheet({
             k={t("memecoin.token")}
             v={<span className="num">{truncateAddress(pair.token, 8, 6)}</span>}
           />
-          <Row
-            k={t("memecoin.lock")}
-            v={
-              lockLoading ? (
-                <span className="skel inline-block h-[12px] w-[72px] align-middle" />
-              ) : verdict ? (
-                <span className={`num ${LOCK_TONE[verdict]}`}>
-                  {t(lockLabel(verdict), {
-                    share: share === undefined ? 0 : Math.round(share),
-                  })}
-                </span>
-              ) : (
-                <span className="num text-faint">—</span>
-              )
-            }
-          />
         </Panel>
 
-        <LockNote lock={lock} loading={lockLoading} failed={lockFailed} />
+        {/*
+         * Under the figures rather than beside them, because it is a different
+         * kind of fact: everything above describes what the pool is doing, and
+         * this describes whether it will still be there.
+         */}
+        <div className="mt-3">
+          <RiskPanel risk={risk} lock={lock} loading={lockLoading && !lockFailed} />
+        </div>
 
         {/*
          * The one action on this sheet, above the two places to go and read
@@ -825,7 +816,6 @@ export function Screener() {
                   )}
                 <SignalChip signal={signal} />
                 <FillingChip signal={signal} drift={drift} />
-                <LockChip lock={locks.get(pair.pool.toLowerCase())} />
               </span>
               {/*
                * A row nobody has traded has no volume and has not moved, so it
@@ -834,6 +824,7 @@ export function Screener() {
                * failed call. Decided per row, since both kinds share one list.
                */}
               <span className="block truncate text-[11px] font-normal text-faint">
+                <RiskWord pair={pair} lock={locks.get(pair.pool.toLowerCase())} drift={drift} />
                 {pair.swaps > 0 && (
                   <>
                     <span className="lbl">{t("memecoin.volShort")}</span>{" "}
@@ -847,7 +838,6 @@ export function Screener() {
                 <Figure className={`num ${thin(pair) ? "warn" : ""}`} value={usd(pair.liquidity)} />
                 {" · "}
                 <Figure className="num" value={age(pair.age)} />
-                <LockWord lock={locks.get(pair.pool.toLowerCase())} />
                 <SignalWord signal={signal} />
               </span>
             </span>

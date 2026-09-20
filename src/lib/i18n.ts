@@ -154,19 +154,28 @@ const en = {
   "signal.tag": "COIL {score}",
   "signal.word": "Coil {score}",
   "signal.tagFilling": "LIQ +{percent}%",
-  "signal.watched": "Watched for {span}, across {samples} readings — depth {depth} across it.",
-  "signal.watchedFlat": "Watched for {span}, across {samples} readings.",
-  "signal.watchedTrade": "This window traded {trade} what the earlier ones typically did.",
-  "signal.watching":
-    "The last two readings need ten minutes of this screen being open before they say anything. They are the only figures in this app that are not on the chain — five minutes is all chain 4663 will serve in one answer, so the hour has to be remembered a reading at a time, and nothing else on this chain keeps it.",
-  "signal.leaving":
-    "Depth has left this pool since this screen started watching: {percent}% of what was resting in it is gone, over {span}. Nothing here says who took it or why, only that it is no longer behind the price.",
+  "signal.read": "Readings",
+  "signal.watched": "Watched {span} · {samples} readings · depth {depth} · traded {trade}",
+  "signal.watchedDepth": "Watched {span} · {samples} readings · depth {depth}",
+  "signal.watchedFlat": "Watched {span} · {samples} readings",
+  "signal.watching": "The last two readings need ten minutes of watching.",
+  "signal.leaving": "{percent}% of this pool's depth has left since watching began.",
   "signal.hint":
-    "Every other screener ranks by volume, which is what a run leaves behind it. This ranks what comes before one: more buying than selling, arriving faster than it was, from more than one pair of hands — all of it counted for less as the price catches up, because a token that has already moved is no longer an early entry. The first five readings come off the same swap logs the list is built from and cost no extra request. The last two are what this screen watched happen while it was open, and they can push a score up but never down.",
-  "signal.partial":
-    "{read} of the {of} readings came back. A pool with fewer than eight trades in the window has no rate and no crowd to measure; a token whose pool was not opened in the last day has no age; and the last two need ten minutes of watching. All of them are left unread rather than guessed, which is why a row can score low for having been looked at early rather than for being poor.",
-  "signal.caveat":
-    "This says a crowd is forming, not that the token will run. Crowds form around tokens about to be sold into as readily as around ones about to rise, and whether the pool can be emptied under you is the separate question above.",
+    "Ranked by what comes before a run rather than the volume it leaves behind. A crowd forming is not a token that will run.",
+
+  "risk.title": "Risk",
+  "risk.verdict": "Verdict",
+  "risk.clear": "Good",
+  "risk.caution": "Caution",
+  "risk.danger": "Danger",
+  "risk.unread": "Unread",
+  "risk.lock": "Liquidity lock",
+  "risk.exit": "Room to sell",
+  "risk.supply": "Supply still to come",
+  "risk.market": "Depth in the pool",
+  "risk.drain": "Depth since watching",
+  "risk.hint":
+    "Five checks, and the worst one stands for the row. A check that could not be read is never counted as a pass.",
 
   "snipe.target": "Target",
   "snipe.targets": "Targets",
@@ -314,32 +323,14 @@ const en = {
   "wallet.wallets": "Wallets",
   "wallet.wrongNetwork": "Wrong network",
 
-  "memecoin.lock": "Liquidity lock",
-  "lock.tagBurned": "Locked",
-  "lock.tagMixed": "{share}% locked",
-  "lock.tagOpen": "Open",
-  "lock.tagUnread": "Lock unread",
-  "lock.tagEmpty": "Drained",
   "lock.burned": "Burned",
   "lock.open": "Withdrawable",
   "lock.mixed": "{share}% burned",
   "lock.unread": "Unread",
   "lock.empty": "Nothing left",
-  "lock.reading": "Reading positions",
-  "lock.failed": "Could not be read",
-  "lock.burnedHint":
-    "Every position under this pool was burned, so no key exists to withdraw it. That is not the same as a safe token — supply, transfer taxes and the sell side are separate questions this does not answer.",
-  "lock.mixedHint":
-    "{share}% of what is in this pool was burned and cannot be pulled. The rest is held by a wallet that can withdraw it at any block.",
-  "lock.openHint":
-    "The liquidity here is held by wallets that can withdraw it at any block. Nothing says they will, and nothing stops them.",
-  "lock.unreadHint":
-    "A contract holds the position. There is no shared locker on this chain to recognise — every holder sampled was a different contract, and some can hand the liquidity back — so this says nothing rather than guessing.",
-  "lock.emptyHint": "Nothing is left in this pool. Every position under it has been closed.",
+  /* The one lock string with a reader left: the terminal's own notice. */
   "lock.outOfRange":
     "The burned part sits outside the price this pool trades at, so it is not holding the current price up.",
-  "lock.partial":
-    "This pool carries more positions than this check reads, so the share is over the ones it read.",
 
   "error.title": "Something on this screen stopped working.",
   "error.hint": "Nothing was sent and nothing was signed. Your wallet and everything in it are untouched.",
@@ -488,19 +479,28 @@ const id: Record<TKey, string> = {
   "signal.tag": "COIL {score}",
   "signal.word": "Coil {score}",
   "signal.tagFilling": "LIK +{percent}%",
-  "signal.watched": "Diamati selama {span}, dari {samples} bacaan — kedalaman {depth} sepanjang itu.",
-  "signal.watchedFlat": "Diamati selama {span}, dari {samples} bacaan.",
-  "signal.watchedTrade": "Jendela ini memperdagangkan {trade} dari yang biasanya di jendela-jendela sebelumnya.",
-  "signal.watching":
-    "Dua bacaan terakhir butuh layar ini terbuka sepuluh menit sebelum bisa mengatakan apa pun. Keduanya satu-satunya angka di aplikasi ini yang tidak ada di chain — chain 4663 hanya melayani lima menit dalam satu jawaban, jadi satu jam harus diingat satu bacaan demi satu bacaan, dan tidak ada layar lain di chain ini yang menyimpannya.",
-  "signal.leaving":
-    "Kedalaman sudah keluar dari pool ini sejak layar ini mulai mengamati: {percent}% dari yang tadinya mengendap sudah hilang, dalam {span}. Tidak ada yang bisa dikatakan di sini soal siapa yang menariknya atau kenapa, hanya bahwa ia tidak lagi menopang harga.",
+  "signal.read": "Bacaan",
+  "signal.watched": "Diamati {span} · {samples} bacaan · kedalaman {depth} · transaksi {trade}",
+  "signal.watchedDepth": "Diamati {span} · {samples} bacaan · kedalaman {depth}",
+  "signal.watchedFlat": "Diamati {span} · {samples} bacaan",
+  "signal.watching": "Dua bacaan terakhir butuh sepuluh menit pengamatan.",
+  "signal.leaving": "{percent}% kedalaman pool ini sudah keluar sejak mulai diamati.",
   "signal.hint":
-    "Screener lain mengurutkan berdasarkan volume, dan volume adalah jejak yang ditinggalkan sebuah run. Layar ini mengurutkan apa yang mendahuluinya: beli lebih banyak dari jual, datang lebih cepat dari sebelumnya, dari lebih dari satu tangan — semuanya dinilai makin kecil begitu harga mulai menyusul, karena token yang sudah bergerak bukan lagi entry awal. Lima bacaan pertama diambil dari log swap yang sama yang membangun daftar ini, tanpa satu pun permintaan tambahan. Dua terakhir adalah apa yang layar ini lihat terjadi selama ia terbuka, dan keduanya hanya bisa menaikkan skor, tidak pernah menurunkannya.",
-  "signal.partial":
-    "{read} dari {of} bacaan berhasil diambil. Pool dengan kurang dari delapan transaksi dalam jendela ini tidak punya laju dan tidak punya kerumunan untuk diukur; token yang pool-nya tidak dibuka dalam sehari terakhir tidak punya umur; dan dua bacaan terakhir butuh sepuluh menit pengamatan. Semuanya dibiarkan kosong daripada ditebak — jadi skor rendah bisa berarti baru dilihat, bukan berarti jelek.",
-  "signal.caveat":
-    "Ini mengatakan ada kerumunan yang sedang terbentuk, bukan bahwa tokennya akan naik. Kerumunan sama mudahnya terbentuk di sekitar token yang sebentar lagi dijual habis, dan apakah pool-nya bisa dikuras dari bawah Anda adalah pertanyaan terpisah di atas.",
+    "Diurut dari apa yang mendahului run, bukan dari volume yang ditinggalkannya. Kerumunan yang terbentuk bukan berarti tokennya akan naik.",
+
+  "risk.title": "Risiko",
+  "risk.verdict": "Vonis",
+  "risk.clear": "Aman",
+  "risk.caution": "Waspada",
+  "risk.danger": "Bahaya",
+  "risk.unread": "Tak terbaca",
+  "risk.lock": "Kunci likuiditas",
+  "risk.exit": "Ruang untuk jual",
+  "risk.supply": "Suplai yang belum keluar",
+  "risk.market": "Kedalaman pool",
+  "risk.drain": "Kedalaman sejak diamati",
+  "risk.hint":
+    "Lima pemeriksaan, dan yang terburuk mewakili barisnya. Pemeriksaan yang tidak terbaca tidak pernah dihitung lulus.",
 
   "snipe.target": "Target",
   "snipe.targets": "Target",
@@ -648,32 +648,14 @@ const id: Record<TKey, string> = {
   "wallet.wallets": "Dompet",
   "wallet.wrongNetwork": "Jaringan salah",
 
-  "memecoin.lock": "Kunci likuiditas",
-  "lock.tagBurned": "Terkunci",
-  "lock.tagMixed": "{share}% terkunci",
-  "lock.tagOpen": "Terbuka",
-  "lock.tagUnread": "Kunci tak terbaca",
-  "lock.tagEmpty": "Terkuras",
   "lock.burned": "Dibakar",
   "lock.open": "Bisa ditarik",
   "lock.mixed": "{share}% dibakar",
   "lock.unread": "Tak terbaca",
   "lock.empty": "Sudah kosong",
-  "lock.reading": "Membaca posisi",
-  "lock.failed": "Gagal dibaca",
-  "lock.burnedHint":
-    "Semua posisi di bawah pool ini sudah dibakar, jadi tidak ada kunci untuk menariknya. Itu tidak sama dengan token yang aman — pasokan, pajak transfer, dan sisi jual adalah pertanyaan terpisah yang tidak dijawab di sini.",
-  "lock.mixedHint":
-    "{share}% dari isi pool ini sudah dibakar dan tidak bisa ditarik. Sisanya dipegang dompet yang bisa menariknya pada blok mana pun.",
-  "lock.openHint":
-    "Likuiditas di sini dipegang dompet yang bisa menariknya pada blok mana pun. Tidak ada yang menjamin mereka akan menarik, dan tidak ada yang menghalangi.",
-  "lock.unreadHint":
-    "Posisinya dipegang sebuah kontrak. Tidak ada locker bersama di chain ini yang bisa dikenali — setiap pemegang yang disampel adalah kontrak yang berbeda, dan sebagian bisa mengembalikan likuiditasnya — jadi layar ini diam daripada menebak.",
-  "lock.emptyHint": "Tidak ada yang tersisa di pool ini. Semua posisi di bawahnya sudah ditutup.",
+  /* The one lock string with a reader left: the terminal's own notice. */
   "lock.outOfRange":
     "Bagian yang dibakar berada di luar harga yang diperdagangkan pool ini, jadi tidak menopang harga sekarang.",
-  "lock.partial":
-    "Pool ini punya lebih banyak posisi daripada yang dibaca pemeriksaan ini, jadi persentasenya dihitung atas yang terbaca.",
 
   "error.title": "Ada bagian layar ini yang berhenti bekerja.",
   "error.hint": "Tidak ada yang dikirim dan tidak ada yang ditandatangani. Dompet Anda dan seluruh isinya tidak tersentuh.",
