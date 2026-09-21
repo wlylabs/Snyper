@@ -75,7 +75,19 @@ export function useLaunches(births: Birth[], head: bigint | undefined, enabled: 
     ),
     allowFailure: true,
     batchSize: ONE_CALL,
-    query: { enabled: enabled && scanned.length > 0, staleTime: 30_000 },
+    /*
+     * A minute, where the tape gets thirty seconds.
+     *
+     * This pass is one call and the one below is forty rows of five reads, so
+     * they are the expensive half of the screen and they are also the half
+     * that changes slowest: a pool's depth moves when somebody trades into it,
+     * and the pools on this list are mostly ones nobody has. The launches
+     * themselves arrive faster than this and do not wait for it — a pool that
+     * opens is a new `PoolCreated` log, `useScreener` reads those every thirty
+     * seconds, and a change in what it hands over re-keys both reads here
+     * immediately. This timer is for the figures, not for the arrivals.
+     */
+    query: { enabled: enabled && scanned.length > 0, staleTime: 30_000, refetchInterval: 60_000 },
   });
 
   /*
@@ -135,7 +147,7 @@ export function useLaunches(births: Birth[], head: bigint | undefined, enabled: 
     contracts,
     allowFailure: true,
     batchSize: ONE_CALL,
-    query: { enabled: enabled && contracts.length > 0, staleTime: 30_000 },
+    query: { enabled: enabled && contracts.length > 0, staleTime: 30_000, refetchInterval: 60_000 },
   });
 
   const launches = useMemo((): Pair[] => {

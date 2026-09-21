@@ -15,7 +15,9 @@ import {
   DEPTH_RATIO,
   DILUTION_LIMIT,
   FLOOR,
+  LAUNCH_FLOOR,
   clearsFloor,
+  clearsLaunchFloor,
   dropCopycats,
   inBand,
   underCeiling,
@@ -103,7 +105,7 @@ function times(ratio: number): string {
  * it let a pool holding fifty dollars through: a tenth of a thousand-dollar
  * market cap is a hundred, and a hundred dollars of depth is not a market.
  */
-function keep(pair: Pair, score: number, band: Band, grade: Grade): boolean {
+function keep(pair: Pair, score: number, band: Band, grade: Grade, view: View): boolean {
   if (!underCeiling(pair)) return false;
   /*
    * A movement filter cannot be answered by something that has not moved. An
@@ -118,9 +120,22 @@ function keep(pair: Pair, score: number, band: Band, grade: Grade): boolean {
    */
   if ((band === "pumping" || band === "dumping") && pair.swaps === 0) return false;
   if (!inBand(pair.change, band, coiling(score))) return false;
-  /* Volume is asked of a row only if that row has trades behind it. */
-  if (!clearsFloor(pair, pair.swaps > 0)) return false;
-  return grade === "floor" || deep(pair);
+  /*
+   * Which floor, and it is the view that decides rather than the row. A pool
+   * that opened an hour ago is the same pool whether the reader found it under
+   * New or under Trending, but the two lists are asking different questions of
+   * it — one whether it can be entered, the other whether it is worth entering
+   * now — and a bar set for the second answers the first by refusing almost
+   * everything. See `LAUNCH_FLOOR` for what that cost in rows.
+   *
+   * Deep escalates both of them to the same place. It is the thousand-dollar
+   * bar plus the ratio, on either list, so nothing the launches are let off
+   * here is out of the reader's reach — it is one tap away and always was.
+   *
+   * Volume is asked of a row only if that row has trades behind it.
+   */
+  if (grade === "deep") return clearsFloor(pair, pair.swaps > 0) && deep(pair);
+  return view === "new" ? clearsLaunchFloor(pair) : clearsFloor(pair, pair.swaps > 0);
 }
 
 /** Deep enough for its size, and not mostly supply that has not arrived yet. */
@@ -796,7 +811,7 @@ export function Screener() {
    */
   const listed = useMemo(() => {
     const kept = inView.filter(({ pair, signal }) =>
-      keep(pair, signal.score, view === "new" ? "all" : band, grade),
+      keep(pair, signal.score, view === "new" ? "all" : band, grade, view),
     );
     return view === "new" ? newest(kept) : order(kept);
   }, [inView, band, grade, view]);
@@ -1035,10 +1050,18 @@ export function Screener() {
          * the least surprising one — the tab is called New, every row prints
          * its own age in hours, and the empty state says the day outright —
          * and the label is one line on a phone before it truncates.
+         *
+         * The figure follows the grade and not only the view, because Deep
+         * escalates the launches back to the thousand — see `keep`. A header
+         * left saying the launch floor under a list the reader had just
+         * narrowed past it would be naming a bar that had stopped running, in
+         * the one place on the screen whose whole job is to name the bar.
          */
         label={
           view === "new"
-            ? t("launchpad.opened", { floor: `$${formatCompact(FLOOR)}` })
+            ? t("launchpad.opened", {
+                floor: `$${formatCompact(grade === "deep" ? FLOOR : LAUNCH_FLOOR)}`,
+              })
             : t("launchpad.live", { floor: `$${formatCompact(FLOOR)}` })
         }
         meta={

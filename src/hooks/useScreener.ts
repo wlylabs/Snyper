@@ -581,6 +581,23 @@ export function useScreener() {
     // The window is five minutes; refetching faster than this only re-reads it.
     staleTime: 30_000,
     refetchOnWindowFocus: true,
+    /*
+     * And on a timer, not only when the reader comes back to the tab.
+     *
+     * Focus was the only trigger, which meant the screen showed whatever the
+     * chain was doing at the moment it was opened and then stopped. A reader
+     * watching this list for five minutes was reading a five-minute-old
+     * photograph of a five-minute window, and a pool that opened while they
+     * watched did not appear until they tabbed away and came back — which is
+     * the one thing a screen about what is opening now must not do.
+     *
+     * Thirty seconds, matching the staleness above so the two cannot disagree.
+     * React Query does not poll a hidden tab, so a screen nobody is looking at
+     * costs nothing, and `isPending` is false once there is data — a refetch
+     * in the background swaps rows in rather than dropping the list back to
+     * skeletons under the reader's thumb.
+     */
+    refetchInterval: 30_000,
   });
 
   return {

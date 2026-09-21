@@ -352,3 +352,48 @@ export function clearsFloor(pair: Sized, traded = true): boolean {
   if (marketCap < FLOOR || fdv < FLOOR || liquidity < FLOOR) return false;
   return !traded || volume >= FLOOR;
 }
+
+/**
+ * A quarter of it, for the one list where the floor above was the whole filter.
+ *
+ * This is the second standard the comment above warns against, and it is here
+ * on purpose rather than by drift — so it is written down, it is shown on the
+ * header of the list it governs, and it applies to exactly one screen.
+ *
+ * The reason is measured. Of thirty-nine pools opened in a day, the floor
+ * above kept six. Four more were refused by the ceiling and none at all by the
+ * size tests: every launch reported its supply, and every one of them cleared
+ * a thousand dollars of market cap and of fully diluted value. Twenty-nine
+ * were refused by depth alone. The floor was not judging the launches on four
+ * figures, it was judging them on one, and a bar that a pool has to have been
+ * traded into for twenty minutes to clear is not a bar for a screen about
+ * pools that opened five minutes ago.
+ *
+ * A quarter rather than a tenth, and that is the argument above conceded
+ * rather than overturned: a hundred dollars of depth is not a market anybody
+ * can leave, and nothing here claims otherwise. Two hundred and fifty is not
+ * one either. What it is, is enough that a position can be opened at all —
+ * which is the only claim a launch list makes — and the screen says the rest
+ * in the two places built to say it, the thin marker on the depth figure and
+ * the risk word beside it. Below it the day's readings stop being pools with a
+ * little in them and start being pools with nothing in them: under a hundred
+ * dollars the same day held seventeen rows, six of which were empty to the
+ * cent.
+ *
+ * The thousand is not gone. It is what `deep` escalates to on this screen as
+ * on every other, one tap away, which is where a bar about leaving belongs —
+ * under the reader's thumb rather than in front of the list.
+ */
+export const LAUNCH_FLOOR = FLOOR / 4;
+
+/**
+ * What a pool has to hold before a launch list will print it.
+ *
+ * Depth only, and deliberately. The other three figures are already tested by
+ * the ceiling and by `deep`, and the measurement says they refuse nothing here
+ * anyway — a launch that reports no supply has no market cap to price and is
+ * dropped for want of a price long before this.
+ */
+export function clearsLaunchFloor(pair: Sized): boolean {
+  return pair.liquidity >= LAUNCH_FLOOR;
+}
