@@ -77,13 +77,13 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   /**
    * The screen this app finds targets on was called Memes and lived at
-   * `/memecoin`. It is Launchpad now, and an installed app, a bookmark or a
+   * `/memecoin`. It is Launches now, and an installed app, a bookmark or a
    * shared link still pointing at the old path should land on the screen that
    * replaced it rather than on `not-found` — which, being permanent, is also
    * what tells a crawler the two are one page and not a rename that lost one.
    */
   async redirects() {
-    return [{ source: "/memecoin", destination: "/launchpad", permanent: true }];
+    return [{ source: "/memecoin", destination: "/launches", permanent: true }];
   },
   async headers() {
     return [

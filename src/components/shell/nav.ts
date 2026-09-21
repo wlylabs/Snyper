@@ -11,22 +11,31 @@ export type NavItem = {
  * Four surfaces, in the order a trade moves through them.
  *
  * Snyper is the one the app opens on and the one it is for: a target, a size,
- * and the shot. Launchpad is where a target is found before it is chosen,
+ * and the shot. Launches is where a target is found before it is chosen,
  * balance is what the wallet came away holding, and settings configures what
  * the app does with the screen it is read on.
  *
- * It used to be called Memes, which named a genre where the other three name
- * jobs — and it could not be said once either: English called it Memes,
- * Indonesian called it Memecoin, and a single route cannot be both, so the
- * path disagreed with the label in one of the two languages whatever was
- * chosen. Launchpad is the same word in both, and it names what the screen is
- * for rather than what the tokens on it are: the pools that opened today,
- * which is the only part of this market still early enough to shoot at.
+ * It was called Memes, which named a genre where the other three name jobs,
+ * and it could not be said once: English called it Memes, Indonesian called it
+ * Memecoin — two different things, not one thing twice — so no single route
+ * could be right for both.
+ *
+ * It was briefly called Launchpad, and that was the same defect wearing a
+ * better word. In this market a launchpad is where a token is *issued*: you
+ * arrive at one expecting to deploy something. This screen reads pools other
+ * people opened and cannot deploy anything, so the name promised a button that
+ * was never going to be under it, to every reader who had seen the word used
+ * the ordinary way.
+ *
+ * Launches is what the screen actually holds. It translates rather than
+ * splits — Peluncuran is the same noun in Indonesian, where Memes and Memecoin
+ * were two — so `/launches` names the same thing the label does in either
+ * dictionary, and it claims exactly as much as the screen delivers.
  */
 export const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "nav.home", icon: "crosshair" },
   { href: "/balance", label: "nav.balance", icon: "stack" },
-  { href: "/launchpad", label: "nav.launchpad", icon: "pulse" },
+  { href: "/launches", label: "nav.launches", icon: "pulse" },
   { href: "/settings", label: "nav.settings", icon: "sliders" },
 ];
 

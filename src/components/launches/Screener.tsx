@@ -592,7 +592,7 @@ function PairSheet({
   const risk = riskOf(pair, lock, drift);
 
   return (
-    <Sheet open title={t("launchpad.pair")} onClose={onClose}>
+    <Sheet open title={t("launches.pair")} onClose={onClose}>
       <div className="identity">
         <div>
           <p className="text-[19px] leading-tight font-bold">
@@ -605,7 +605,7 @@ function PairSheet({
           <p className="num text-[26px] leading-none">
             <Figure value={usd(pair.marketCap)} />
           </p>
-          <p className="lbl mt-1">{t("launchpad.mcap")}</p>
+          <p className="lbl mt-1">{t("launches.mcap")}</p>
           <p className={`lbl mt-2 ${pair.change >= 0 ? "long" : "short"}`}>
             <Figure value={signed(pair.change)} />
           </p>
@@ -628,23 +628,23 @@ function PairSheet({
         </div>
 
         <Panel>
-          <Row k={t("launchpad.fdv")} v={<Figure className="num" value={usd(pair.fdv)} />} />
+          <Row k={t("launches.fdv")} v={<Figure className="num" value={usd(pair.fdv)} />} />
           <Row
-            k={t("launchpad.volume")}
+            k={t("launches.volume")}
             v={<Figure className="num" value={usd(pair.volume)} />}
           />
           <Row
-            k={t("launchpad.liquidity")}
+            k={t("launches.liquidity")}
             v={<Figure className="num" value={usd(pair.liquidity)} />}
           />
-          <Row k={t("launchpad.trades")} v={<Figure className="num" value={String(pair.swaps)} />} />
-          <Row k={t("launchpad.age")} v={<Figure className="num" value={age(pair.age)} />} />
+          <Row k={t("launches.trades")} v={<Figure className="num" value={String(pair.swaps)} />} />
+          <Row k={t("launches.age")} v={<Figure className="num" value={age(pair.age)} />} />
           <Row
-            k={t("launchpad.pool")}
+            k={t("launches.pool")}
             v={<span className="num">{`${pair.fee / 10_000}%`}</span>}
           />
           <Row
-            k={t("launchpad.token")}
+            k={t("launches.token")}
             v={<span className="num">{truncateAddress(pair.token, 8, 6)}</span>}
           />
         </Panel>
@@ -670,7 +670,7 @@ function PairSheet({
           onClick={() => onSnipe(pair)}
         >
           <Icon name="crosshair" size={14} />
-          {t("launchpad.snipe", { symbol: pair.symbol })}
+          {t("launches.snipe", { symbol: pair.symbol })}
         </button>
 
         <div className="mt-2 grid grid-cols-2 gap-2">
@@ -695,7 +695,7 @@ function PairSheet({
             className="tile justify-center"
           >
             <Icon name="candles" size={14} className="text-dim" />
-            {t("launchpad.dexscreener")}
+            {t("launches.dexscreener")}
           </a>
         </div>
       </div>
@@ -837,8 +837,8 @@ export function Screener() {
     if (error) {
       return (
         <Empty
-          title={t("launchpad.failed")}
-          hint={t("launchpad.failedHint")}
+          title={t("launches.failed")}
+          hint={t("launches.failedHint")}
           action={
             <button type="button" className="btn btn-sm btn-short" onClick={() => void refetch()}>
               <Icon name="refresh" size={13} />
@@ -857,13 +857,13 @@ export function Screener() {
        */
       return inView.length === 0 ? (
         <Empty
-          title={t(view === "new" ? "launchpad.emptyNew" : "launchpad.empty")}
-          hint={t(view === "new" ? "launchpad.emptyNewHint" : "launchpad.emptyHint")}
+          title={t(view === "new" ? "launches.emptyNew" : "launches.empty")}
+          hint={t(view === "new" ? "launches.emptyNewHint" : "launches.emptyHint")}
         />
       ) : (
         <Empty
-          title={t("launchpad.noMatch")}
-          hint={t("launchpad.noMatchHint")}
+          title={t("launches.noMatch")}
+          hint={t("launches.noMatchHint")}
           action={
             <button
               type="button"
@@ -873,7 +873,7 @@ export function Screener() {
                 setGrade("floor");
               }}
             >
-              {t("launchpad.clear")}
+              {t("launches.clear")}
             </button>
           }
         />
@@ -910,7 +910,7 @@ export function Screener() {
                   pair.age < FRESH &&
                   !coiling(signal.score) &&
                   !filling(drift) && (
-                    <span className="chip chip-xs chip-live ml-1.5">{t("launchpad.fresh")}</span>
+                    <span className="chip chip-xs chip-live ml-1.5">{t("launches.fresh")}</span>
                   )}
                 <SignalChip signal={signal} />
                 <FillingChip signal={signal} drift={drift} />
@@ -925,13 +925,13 @@ export function Screener() {
                 <RiskWord pair={pair} lock={locks.get(pair.pool.toLowerCase())} drift={drift} />
                 {pair.swaps > 0 && (
                   <>
-                    <span className="lbl">{t("launchpad.volShort")}</span>{" "}
+                    <span className="lbl">{t("launches.volShort")}</span>{" "}
                     <Figure className="num" value={usd(pair.volume)} />
                     {" · "}
                   </>
                 )}
                 <span className={`lbl ${thin(pair) ? "warn" : ""}`}>
-                  {t("launchpad.liqShort")}
+                  {t("launches.liqShort")}
                 </span>{" "}
                 <Figure className={`num ${thin(pair) ? "warn" : ""}`} value={usd(pair.liquidity)} />
                 {" · "}
@@ -947,14 +947,14 @@ export function Screener() {
                   value={signed(pair.change)}
                 />
               ) : (
-                <span className="lbl block">{t("launchpad.mcapShort")}</span>
+                <span className="lbl block">{t("launches.mcapShort")}</span>
               )}
             </span>
           </button>
           <button
             type="button"
             className="tile aim w-[46px] shrink-0 justify-center px-0 text-accent"
-            aria-label={t("launchpad.snipe", { symbol: pair.symbol })}
+            aria-label={t("launches.snipe", { symbol: pair.symbol })}
             onClick={() => snipe(pair)}
           >
             <Icon name="crosshair" size={16} />
@@ -967,7 +967,7 @@ export function Screener() {
 
   return (
     <div className="mx-auto w-full max-w-3xl">
-      <h1 className="sr-only">{t("page.launchpad.title")}</h1>
+      <h1 className="sr-only">{t("page.launches.title")}</h1>
 
       {mounted && (
         <div className="mb-3 flex flex-col gap-1.5">
@@ -980,8 +980,8 @@ export function Screener() {
            */}
           <Segmented
             options={[
-              { value: "new", label: t("launchpad.viewNew") },
-              { value: "trending", label: t("launchpad.viewTrending") },
+              { value: "new", label: t("launches.viewNew") },
+              { value: "trending", label: t("launches.viewTrending") },
             ]}
             value={view}
             onChange={setView}
@@ -1009,10 +1009,10 @@ export function Screener() {
           {view === "trending" && (
             <Segmented
               options={[
-                { value: "all", label: t("launchpad.bandAll") },
-                { value: "coiling", label: t("launchpad.bandCoil") },
-                { value: "pumping", label: t("launchpad.bandPump") },
-                { value: "dumping", label: t("launchpad.bandDump") },
+                { value: "all", label: t("launches.bandAll") },
+                { value: "coiling", label: t("launches.bandCoil") },
+                { value: "pumping", label: t("launches.bandPump") },
+                { value: "dumping", label: t("launches.bandDump") },
               ]}
               value={band}
               onChange={setBand}
@@ -1020,8 +1020,8 @@ export function Screener() {
           )}
           <Segmented
             options={[
-              { value: "floor", label: t("launchpad.gradeAll") },
-              { value: "deep", label: t("launchpad.gradeDeep") },
+              { value: "floor", label: t("launches.gradeAll") },
+              { value: "deep", label: t("launches.gradeDeep") },
             ]}
             value={grade}
             onChange={setGrade}
@@ -1059,15 +1059,15 @@ export function Screener() {
          */
         label={
           view === "new"
-            ? t("launchpad.opened", {
+            ? t("launches.opened", {
                 floor: `$${formatCompact(grade === "deep" ? FLOOR : LAUNCH_FLOOR)}`,
               })
-            : t("launchpad.live", { floor: `$${formatCompact(FLOOR)}` })
+            : t("launches.live", { floor: `$${formatCompact(FLOOR)}` })
         }
         meta={
           mounted && inView.length > 0 ? (
             <span className="lbl">
-              {t("launchpad.showing", { shown: listed.length, total: inView.length })}
+              {t("launches.showing", { shown: listed.length, total: inView.length })}
             </span>
           ) : undefined
         }
