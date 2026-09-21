@@ -391,17 +391,6 @@ function FillingChip({ signal, drift }: { signal: Signal; drift: Drift | undefin
   );
 }
 
-function SignalWord({ signal }: { signal: Signal }) {
-  const { t } = useI18n();
-  if (coiling(signal.score)) return null;
-  return (
-    <>
-      {" · "}
-      <span className="lbl">{t("signal.word", { score: signal.score })}</span>
-    </>
-  );
-}
-
 /** What was watched, in one line, saying only what it actually has. */
 function watched(t: (key: TKey, vars?: Record<string, string | number>) => string, drift: Drift | undefined): string {
   if (!drift) return t("signal.watching");
@@ -782,27 +771,46 @@ export function Screener() {
                 <FillingChip signal={signal} drift={drift} />
               </span>
               {/*
-               * A row nobody has traded has no volume and has not moved, so it
-               * says what it does have — how deep it is and how long it has
-               * existed — rather than printing two zeroes that read as a
-               * failed call. Decided per row, since both kinds share one list.
+               * A verdict and one figure, because five of them did not fit.
+               *
+               * This line carried the risk word, volume, depth, age and the
+               * coil score, and on a phone the last two were cut off mid-word
+               * by `truncate` — so the row ended in an ellipsis and the reader
+               * got four facts and a hint that something was missing. Five
+               * facts nobody can read are worth less than two they can.
+               *
+               * The verdict is the one that survives on merit: it is not a
+               * figure competing with the others but the reading of them, and
+               * `risk` already bands depth against size and supply against
+               * supply outright into it. What was cut is not gone either — the
+               * sheet behind the row prints all of it, which is what the sheet
+               * is for.
+               *
+               * The figure beside it is volume where there is volume. A pool
+               * that opened and has not traded has none by construction, and
+               * printing a zero there would read as a failed call rather than
+               * as the silence it is, so it shows the one number it does have:
+               * what is resting in it, in the warning colour when that is thin
+               * for the size it is claiming.
                */}
               <span className="block truncate text-[11px] font-normal text-faint">
                 <RiskWord pair={pair} lock={locks.get(pair.pool.toLowerCase())} drift={drift} />
-                {pair.swaps > 0 && (
+                {pair.swaps > 0 ? (
                   <>
                     <span className="lbl">{t("launches.volShort")}</span>{" "}
                     <Figure className="num" value={usd(pair.volume)} />
-                    {" · "}
+                  </>
+                ) : (
+                  <>
+                    <span className={`lbl ${thin(pair) ? "warn" : ""}`}>
+                      {t("launches.liqShort")}
+                    </span>{" "}
+                    <Figure
+                      className={`num ${thin(pair) ? "warn" : ""}`}
+                      value={usd(pair.liquidity)}
+                    />
                   </>
                 )}
-                <span className={`lbl ${thin(pair) ? "warn" : ""}`}>
-                  {t("launches.liqShort")}
-                </span>{" "}
-                <Figure className={`num ${thin(pair) ? "warn" : ""}`} value={usd(pair.liquidity)} />
-                {" · "}
-                <Figure className="num" value={age(pair.age)} />
-                <SignalWord signal={signal} />
               </span>
             </span>
             <span className="shrink-0 text-right">
