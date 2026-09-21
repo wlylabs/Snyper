@@ -52,7 +52,7 @@ export type Risk = {
 
 /**
  * Below a thirtieth of its own size, a pool is not a discount, it is a door
- * that does not open. Above a tenth is the bar the screen already grades by —
+ * that does not open. Above a tenth is the bar the app already measures by —
  * see `DEPTH_RATIO` — so this only has to name the floor under it.
  */
 const STRANDED = 0.03;

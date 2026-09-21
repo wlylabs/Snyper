@@ -6,23 +6,16 @@ import dynamic from "next/dynamic";
 import { Figure } from "@/components/ui/Figure";
 import { Icon } from "@/components/ui/Icon";
 import { Empty, Panel, Row, Skeleton } from "@/components/ui/Panel";
-import { Segmented } from "@/components/ui/Segmented";
 import { Sheet } from "@/components/ui/Sheet";
 import { CHAIN_ID, explorerAddress } from "@/lib/chains";
 import { formatCompact, truncateAddress } from "@/lib/format";
 import {
   CEILING,
   DEPTH_RATIO,
-  DILUTION_LIMIT,
-  FLOOR,
   LAUNCH_FLOOR,
-  clearsFloor,
   clearsLaunchFloor,
   dropCopycats,
-  inBand,
   underCeiling,
-  type Band,
-  type Grade,
 } from "@/lib/screener";
 import { shareOf, verdictOf, type Lock } from "@/lib/lock";
 import { riskOf, type Check, type Level, type Risk } from "@/lib/risk";
@@ -91,58 +84,29 @@ function times(ratio: number): string {
 }
 
 /**
- * Whether a row survives the reader's questions.
+ * Whether a row belongs on the list at all.
  *
- * The ceiling comes first and is not theirs to move: a token already worth more
- * than ten million is not an early entry whatever else is true of it.
+ * This used to take a band, a grade and a view, and answer four different
+ * questions with them. It answers one now, because the screen asks one: these
+ * are the pools that opened, and a reader looking at them wants to know which
+ * ones can be bought — not which ones match a filter they set three taps ago.
  *
- * The floor is proof rather than size. A token whose supply the contract would
- * not report has not been shown to clear anything, so it fails every grade
- * above `all` — undefined is not small, it is unknown, and the reason to set a
- * floor is to stop reading rows that have not been shown to be worth reading.
+ * The ceiling comes first and was never the reader's to move: a token already
+ * worth more than ten million is not an early entry whatever else is true of
+ * it. The floor is `LAUNCH_FLOOR`, which is depth and only depth; the reading
+ * behind that number, and why the other three figures refuse nothing here, is
+ * written where the number is.
  *
- * Liquidity is in the floor and not only in the ratio. Left to the ratio alone
- * it let a pool holding fifty dollars through: a tenth of a thousand-dollar
- * market cap is a hundred, and a hundred dollars of depth is not a market.
+ * What the grade used to add is not lost, it has moved. `deep` asked whether a
+ * pool was backed for its size and whether its supply was mostly still to
+ * come, and both are now read on every row rather than filtered on some of
+ * them: the depth ratio marks the figure thin and turns it the warning colour,
+ * and `risk` bands those same two ratios into the word beside it. A fact on
+ * the row beats a filter over the list, because the row is where the reader is
+ * looking.
  */
-function keep(pair: Pair, score: number, band: Band, grade: Grade, view: View): boolean {
-  if (!underCeiling(pair)) return false;
-  /*
-   * A movement filter cannot be answered by something that has not moved. An
-   * untraded pool is not rising and is not falling, it is silent, and letting
-   * it fall into either band would be the screen making up an answer on its
-   * behalf.
-   *
-   * The coil band needs no such guard and is the reason the old `flat` band is
-   * gone. It asks whether the tape is filling, which a silent pool answers
-   * honestly — with the two readings it has and a score that cannot reach the
-   * band's bar on them. Nothing is invented and nothing is excluded by rule.
-   */
-  if ((band === "pumping" || band === "dumping") && pair.swaps === 0) return false;
-  if (!inBand(pair.change, band, coiling(score))) return false;
-  /*
-   * Which floor, and it is the view that decides rather than the row. A pool
-   * that opened an hour ago is the same pool whether the reader found it under
-   * New or under Trending, but the two lists are asking different questions of
-   * it — one whether it can be entered, the other whether it is worth entering
-   * now — and a bar set for the second answers the first by refusing almost
-   * everything. See `LAUNCH_FLOOR` for what that cost in rows.
-   *
-   * Deep escalates both of them to the same place. It is the thousand-dollar
-   * bar plus the ratio, on either list, so nothing the launches are let off
-   * here is out of the reader's reach — it is one tap away and always was.
-   *
-   * Volume is asked of a row only if that row has trades behind it.
-   */
-  if (grade === "deep") return clearsFloor(pair, pair.swaps > 0) && deep(pair);
-  return view === "new" ? clearsLaunchFloor(pair) : clearsFloor(pair, pair.swaps > 0);
-}
-
-/** Deep enough for its size, and not mostly supply that has not arrived yet. */
-function deep(pair: Pair): boolean {
-  const { marketCap, fdv, liquidity } = pair;
-  if (marketCap === undefined || fdv === undefined) return false;
-  return liquidity >= marketCap * DEPTH_RATIO && fdv <= marketCap * DILUTION_LIMIT;
+function keep(pair: Pair): boolean {
+  return underCeiling(pair) && clearsLaunchFloor(pair);
 }
 
 /** Whether the pool behind a row could absorb the position it is quoting. */
@@ -157,43 +121,6 @@ function thin(pair: Pair): boolean {
  * signal only carries it as two readings out of seven.
  */
 type Scored = { pair: Pair; signal: Signal; drift: Drift | undefined };
-
-/**
- * Coil first, then busiest, then freshest.
- *
- * This used to be volume first, which is what every screener on every chain
- * does, and it is the one thing this screen should not do. Volume is the wake
- * a run leaves behind it: a token at the top of a volume column has already
- * moved, and the entry the reader opened this screen for belonged to whoever
- * was in the pool while it was still near the bottom of that column. Ranking
- * by it puts the answer to yesterday's question at the top of today's screen.
- *
- * So the first key is the score in `lib/signal` — buying against selling, the
- * tape's rate against its own rate five minutes ago, hands against trades, all
- * of it multiplied away as the price catches up. Volume is kept as the second
- * key rather than dropped, because between two rows the chain says nothing
- * about, the one money is going through is the better guess; and age settles
- * the rest, since everything nobody has touched has the same volume as
- * everything else nobody has touched. A pool with no creation in the last day
- * has no age and sits at the end — unknown is old here.
- */
-function order(rows: Scored[]): Scored[] {
-  return [...rows].sort(
-    (a, b) =>
-      b.signal.score - a.signal.score ||
-      b.pair.volume - a.pair.volume ||
-      (a.pair.age ?? Infinity) - (b.pair.age ?? Infinity),
-  );
-}
-
-/**
- * Which of the screen's two windows the reader is looking through.
- *
- * They are two questions, not one list with a filter on it. New asks what
- * opened in the last day; trending asks what is moving in the last five
- * minutes. The app is named for the first and opens on it.
- */
-type View = "new" | "trending";
 
 /**
  * Whether the pool behind a row opened inside the creation window.
@@ -716,35 +643,6 @@ function Loading() {
 export function Screener() {
   const mounted = useMounted();
   const { t } = useI18n();
-  /*
-   * The screen opens on the launches.
-   *
-   * This is the whole point of the rename. Both lists were merged into one and
-   * ranked together, and ranking is exactly what a launch cannot survive: it
-   * has no volume and no trades by construction, so it lost the second and
-   * third keys of `order` to anything that had traded at all, and it could
-   * only ever win on a coil score read off a tape it does not have. The most
-   * valuable rows on the screen were the hardest ones to see on it.
-   *
-   * So they get the screen, and the merged list keeps its order under the
-   * other tab. The merge itself stays — a token that opened today and has been
-   * traded since is one row with both sets of figures, and it belongs in both
-   * views.
-   */
-  const [view, setView] = useState<View>("new");
-  const [band, setBand] = useState<Band>("all");
-  /*
-   * The screen opens with the floor on.
-   *
-   * It used to open on `all`, which applies no floor at all, and nothing on the
-   * screen said so — so a reader who had been told the list has a thousand
-   * dollar minimum saw four dollars of volume in it and was right to call that
-   * broken. The filter was never leaking; the screen was simply starting with
-   * it switched off. The terminal has always applied the same floor and has no
-   * control to switch it off, and two screens reading one chain to two unstated
-   * standards is the actual defect.
-   */
-  const [grade, setGrade] = useState<Grade>("floor");
   const [opened, setOpened] = useState<string>();
   const { pairs, births, head, loading, error, refetch } = useScreener();
   const router = useRouter();
@@ -766,8 +664,8 @@ export function Screener() {
   /*
    * Copycats go before the reader's own filters rather than after them. Which
    * contract holds a ticker is decided against everything the screen knows
-   * about, so a band or a grade that happens to exclude the real one cannot
-   * promote a copy into being the only thing wearing the name.
+   * about, so neither the ceiling nor the floor can drop the real holder of a
+   * ticker and leave a copy as the only thing on screen wearing the name.
    */
   const all = useMemo(() => dropCopycats(merge(pairs, launches)), [pairs, launches]);
   /*
@@ -793,28 +691,18 @@ export function Screener() {
     [all, watch],
   );
   /*
-   * The view narrows first, because it is not one of the reader's filters. The
-   * band and the grade are questions about a row; this is a question about
-   * which of the chain's two windows is on screen, and the counts under the
-   * header have to be counts of that window rather than of both.
+   * The day's launches, the ones that can be bought, newest first.
+   *
+   * Three steps where there were five, and both that went were the reader's
+   * own filters. Nothing narrows this list that the reader has to remember
+   * setting, which is the whole reason the controls came off: a screen with a
+   * filter on it has to be read twice, once for the market and once for what
+   * is hiding the rest of it.
    */
-  const inView = useMemo(
-    () => (view === "new" ? scored.filter(({ pair }) => launched(pair)) : scored),
-    [scored, view],
+  const listed = useMemo(
+    () => newest(scored.filter(({ pair }) => launched(pair) && keep(pair))),
+    [scored],
   );
-  /*
-   * The band is not asked of the launches at all, and that is stronger than
-   * hiding its control. A segmented row left on Pumping and then taken off
-   * screen is a filter the reader can neither see nor clear — so the new view
-   * answers as though it were All, and the trending view reads it back exactly
-   * where it was left.
-   */
-  const listed = useMemo(() => {
-    const kept = inView.filter(({ pair, signal }) =>
-      keep(pair, signal.score, view === "new" ? "all" : band, grade, view),
-    );
-    return view === "new" ? newest(kept) : order(kept);
-  }, [inView, band, grade, view]);
 
   /*
    * Filled in the background of the list the reader is already reading, and
@@ -849,35 +737,13 @@ export function Screener() {
       );
     }
 
+    /*
+     * One way to be empty, now that nothing the reader sets can empty it. The
+     * screen used to have to tell a quiet chain apart from a filter narrowed
+     * to nothing, and that second failure no longer exists.
+     */
     if (listed.length === 0) {
-      /*
-       * An empty five minutes and an empty filter are different failures, and
-       * a reader who has narrowed the list to nothing should be told that they
-       * did it rather than that the chain went quiet.
-       */
-      return inView.length === 0 ? (
-        <Empty
-          title={t(view === "new" ? "launches.emptyNew" : "launches.empty")}
-          hint={t(view === "new" ? "launches.emptyNewHint" : "launches.emptyHint")}
-        />
-      ) : (
-        <Empty
-          title={t("launches.noMatch")}
-          hint={t("launches.noMatchHint")}
-          action={
-            <button
-              type="button"
-              className="btn btn-sm btn-short"
-              onClick={() => {
-                setBand("all");
-                setGrade("floor");
-              }}
-            >
-              {t("launches.clear")}
-            </button>
-          }
-        />
-      );
+      return <Empty title={t("launches.emptyNew")} hint={t("launches.emptyNewHint")} />;
     }
 
     return (
@@ -969,106 +835,24 @@ export function Screener() {
     <div className="mx-auto w-full max-w-3xl">
       <h1 className="sr-only">{t("page.launches.title")}</h1>
 
-      {mounted && (
-        <div className="mb-3 flex flex-col gap-1.5">
-          {/*
-           * Two windows, named for what each one can see rather than for how
-           * it is sorted. New is the day's pool creations, priced off what is
-           * resting in them; trending is the last five minutes of swaps. The
-           * app opens on the first because that is the only one of the two
-           * still holding entries nobody has taken.
-           */}
-          <Segmented
-            options={[
-              { value: "new", label: t("launches.viewNew") },
-              { value: "trending", label: t("launches.viewTrending") },
-            ]}
-            value={view}
-            onChange={setView}
-          />
-          {/*
-           * Asking for a movement narrows the list to rows that have moved,
-           * which is what it has always meant — it also drops the ones that
-           * have not traded at all, because silence is not a direction.
-           *
-           * The first of the three is the odd one and the point of the screen.
-           * It asks for what has not moved yet and has a crowd arriving under
-           * it, which is the only one of these four questions whose answer is
-           * still buyable. It took the place of a band called Flat, which
-           * could not tell a token being accumulated from one nobody had
-           * looked at in five minutes.
-           *
-           * And it is gone under the launches, because almost none of them can
-           * answer it — which is the same rule as the one above, taken to its
-           * conclusion. A pool that opened and has not traded is silent on all
-           * four counts, so three of these options would empty that list and
-           * the fourth is the only one ever in force. A control whose every
-           * setting but one is a dead end is worse than no control. Depth,
-           * below, every launch can answer, so depth stays on both.
-           */}
-          {view === "trending" && (
-            <Segmented
-              options={[
-                { value: "all", label: t("launches.bandAll") },
-                { value: "coiling", label: t("launches.bandCoil") },
-                { value: "pumping", label: t("launches.bandPump") },
-                { value: "dumping", label: t("launches.bandDump") },
-              ]}
-              value={band}
-              onChange={setBand}
-            />
-          )}
-          <Segmented
-            options={[
-              { value: "floor", label: t("launches.gradeAll") },
-              { value: "deep", label: t("launches.gradeDeep") },
-            ]}
-            value={grade}
-            onChange={setGrade}
-          />
-        </div>
-      )}
-
       <Panel
         /*
-         * The header names the window the reader is in, and how it is ordered.
-         * It used to name both windows at once because there was only ever one
-         * list; now that they are two, a header still saying `coil ranked`
-         * over a list ordered by age would be describing the other tab.
-         *
-         * Both labels say both bars, because both bars are on in both views.
-         * The floor is one figure short under the launches rather than absent
-         * — `clearsFloor` asks it of the market cap, the fully diluted figure
-         * and the depth either way, and only lets a row off the volume leg if
-         * nothing has traded — and a header that quietly dropped it there
-         * would be understating what emptied the list. A measured reading:
-         * thirty-nine pools opened in the day, five of them clear a thousand
-         * dollars, and a reader looking at five rows deserves to know which
-         * number took the other thirty-four.
+         * The header is the only line of chrome left, so it carries what the
+         * controls used to say. Both bars are still on and neither is
+         * switchable now, which makes naming them more important rather than
+         * less: a reader who cannot see a control cannot infer the rule behind
+         * it, and an unnamed filter is the defect this screen was already
+         * fixed for once.
          *
          * What the window is stays off the line. It is the longest fact and
-         * the least surprising one — the tab is called New, every row prints
-         * its own age in hours, and the empty state says the day outright —
-         * and the label is one line on a phone before it truncates.
-         *
-         * The figure follows the grade and not only the view, because Deep
-         * escalates the launches back to the thousand — see `keep`. A header
-         * left saying the launch floor under a list the reader had just
-         * narrowed past it would be naming a bar that had stopped running, in
-         * the one place on the screen whose whole job is to name the bar.
+         * the least surprising one — every row prints its own age in hours and
+         * the empty state says the day outright — and the label is one line on
+         * a phone before it truncates.
          */
-        label={
-          view === "new"
-            ? t("launches.opened", {
-                floor: `$${formatCompact(grade === "deep" ? FLOOR : LAUNCH_FLOOR)}`,
-              })
-            : t("launches.live", { floor: `$${formatCompact(FLOOR)}` })
-        }
+        label={t("launches.opened", { floor: `$${formatCompact(LAUNCH_FLOOR)}` })}
         meta={
-          mounted && inView.length > 0 ? (
-            <span className="lbl">
-              {t("launches.showing", { shown: listed.length, total: inView.length })}
-            </span>
+          mounted && listed.length > 0 ? (
+            <span className="lbl">{t("launches.count", { shown: listed.length })}</span>
           ) : undefined
         }
       >

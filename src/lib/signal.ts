@@ -329,9 +329,9 @@ const span = (value: number, low: number, high: number): number =>
 const YOUNG = Number(CREATED_WINDOW) / PER_MINUTE;
 
 /**
- * Depth worth full marks, against the ratio the screen already grades by.
+ * Depth worth full marks, against the ratio the app already measures depth by.
  *
- * Twice `DEPTH_RATIO`, so the grade's own bar — a tenth of the market cap
+ * Twice `DEPTH_RATIO`, so the app's own depth bar — a tenth of the market cap
  * resting in the pool — scores half here rather than everything. Clearing the
  * bar is the floor of this reading, not the top of it.
  */
