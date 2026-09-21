@@ -119,7 +119,7 @@ export function PairChart({ pair }: { pair: Pair }) {
   if (error || candles.length === 0) {
     return (
       <div className="panel" style={{ height: TALL }}>
-        <Empty title={t("memecoin.noChart")} />
+        <Empty title={t("launchpad.noChart")} />
       </div>
     );
   }

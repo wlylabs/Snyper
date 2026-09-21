@@ -172,6 +172,51 @@ function order(rows: Scored[]): Scored[] {
 }
 
 /**
+ * Which of the screen's two windows the reader is looking through.
+ *
+ * They are two questions, not one list with a filter on it. New asks what
+ * opened in the last day; trending asks what is moving in the last five
+ * minutes. The app is named for the first and opens on it.
+ */
+type View = "new" | "trending";
+
+/**
+ * Whether the pool behind a row opened inside the creation window.
+ *
+ * An age is only ever set from a `PoolCreated` log, and that read covers a day
+ * — see `CREATED_WINDOW`. So a row with an age is a row this screen watched
+ * open, and a row without one is older than the window rather than unmeasured.
+ */
+function launched(pair: Pair): boolean {
+  return pair.age !== undefined;
+}
+
+/**
+ * Freshest first, then deepest.
+ *
+ * The other order ranks by the coil score and is right to, but it cannot rank
+ * this list: a pool that opened and has not traded carries no tape, so the
+ * signal scores it on the two standing facts it can answer for and every
+ * untraded row lands on nearly the same number. Ordering the launches that way
+ * put them in an order that looked considered and was mostly arbitrary, and it
+ * buried the ten-minute-old pool under the twenty-hour-old one that had a
+ * little volume behind it — which is the entry this screen exists to find.
+ *
+ * Age is the only key that means anything here, and depth settles the ties,
+ * because between two pools opened in the same minute the one with money in it
+ * is the one that can actually be bought from. Nothing needs a floor on top:
+ * the day's launches are overwhelmingly empty pools, and `useLaunches` has
+ * already kept only the forty deepest of them.
+ */
+function newest(rows: Scored[]): Scored[] {
+  return [...rows].sort(
+    (a, b) =>
+      (a.pair.age ?? Infinity) - (b.pair.age ?? Infinity) ||
+      b.pair.liquidity - a.pair.liquidity,
+  );
+}
+
+/**
  * The two sources, as one list, one row per token.
  *
  * Per token and not per pool, which is the distinction that bit. A token can
@@ -532,7 +577,7 @@ function PairSheet({
   const risk = riskOf(pair, lock, drift);
 
   return (
-    <Sheet open title={t("memecoin.pair")} onClose={onClose}>
+    <Sheet open title={t("launchpad.pair")} onClose={onClose}>
       <div className="identity">
         <div>
           <p className="text-[19px] leading-tight font-bold">
@@ -545,7 +590,7 @@ function PairSheet({
           <p className="num text-[26px] leading-none">
             <Figure value={usd(pair.marketCap)} />
           </p>
-          <p className="lbl mt-1">{t("memecoin.mcap")}</p>
+          <p className="lbl mt-1">{t("launchpad.mcap")}</p>
           <p className={`lbl mt-2 ${pair.change >= 0 ? "long" : "short"}`}>
             <Figure value={signed(pair.change)} />
           </p>
@@ -568,23 +613,23 @@ function PairSheet({
         </div>
 
         <Panel>
-          <Row k={t("memecoin.fdv")} v={<Figure className="num" value={usd(pair.fdv)} />} />
+          <Row k={t("launchpad.fdv")} v={<Figure className="num" value={usd(pair.fdv)} />} />
           <Row
-            k={t("memecoin.volume")}
+            k={t("launchpad.volume")}
             v={<Figure className="num" value={usd(pair.volume)} />}
           />
           <Row
-            k={t("memecoin.liquidity")}
+            k={t("launchpad.liquidity")}
             v={<Figure className="num" value={usd(pair.liquidity)} />}
           />
-          <Row k={t("memecoin.trades")} v={<Figure className="num" value={String(pair.swaps)} />} />
-          <Row k={t("memecoin.age")} v={<Figure className="num" value={age(pair.age)} />} />
+          <Row k={t("launchpad.trades")} v={<Figure className="num" value={String(pair.swaps)} />} />
+          <Row k={t("launchpad.age")} v={<Figure className="num" value={age(pair.age)} />} />
           <Row
-            k={t("memecoin.pool")}
+            k={t("launchpad.pool")}
             v={<span className="num">{`${pair.fee / 10_000}%`}</span>}
           />
           <Row
-            k={t("memecoin.token")}
+            k={t("launchpad.token")}
             v={<span className="num">{truncateAddress(pair.token, 8, 6)}</span>}
           />
         </Panel>
@@ -610,7 +655,7 @@ function PairSheet({
           onClick={() => onSnipe(pair)}
         >
           <Icon name="crosshair" size={14} />
-          {t("memecoin.snipe", { symbol: pair.symbol })}
+          {t("launchpad.snipe", { symbol: pair.symbol })}
         </button>
 
         <div className="mt-2 grid grid-cols-2 gap-2">
@@ -635,7 +680,7 @@ function PairSheet({
             className="tile justify-center"
           >
             <Icon name="candles" size={14} className="text-dim" />
-            {t("memecoin.dexscreener")}
+            {t("launchpad.dexscreener")}
           </a>
         </div>
       </div>
@@ -656,6 +701,22 @@ function Loading() {
 export function Screener() {
   const mounted = useMounted();
   const { t } = useI18n();
+  /*
+   * The screen opens on the launches.
+   *
+   * This is the whole point of the rename. Both lists were merged into one and
+   * ranked together, and ranking is exactly what a launch cannot survive: it
+   * has no volume and no trades by construction, so it lost the second and
+   * third keys of `order` to anything that had traded at all, and it could
+   * only ever win on a coil score read off a tape it does not have. The most
+   * valuable rows on the screen were the hardest ones to see on it.
+   *
+   * So they get the screen, and the merged list keeps its order under the
+   * other tab. The merge itself stays — a token that opened today and has been
+   * traded since is one row with both sets of figures, and it belongs in both
+   * views.
+   */
+  const [view, setView] = useState<View>("new");
   const [band, setBand] = useState<Band>("all");
   /*
    * The screen opens with the floor on.
@@ -716,10 +777,29 @@ export function Screener() {
       }),
     [all, watch],
   );
-  const listed = useMemo(
-    () => order(scored.filter(({ pair, signal }) => keep(pair, signal.score, band, grade))),
-    [scored, band, grade],
+  /*
+   * The view narrows first, because it is not one of the reader's filters. The
+   * band and the grade are questions about a row; this is a question about
+   * which of the chain's two windows is on screen, and the counts under the
+   * header have to be counts of that window rather than of both.
+   */
+  const inView = useMemo(
+    () => (view === "new" ? scored.filter(({ pair }) => launched(pair)) : scored),
+    [scored, view],
   );
+  /*
+   * The band is not asked of the launches at all, and that is stronger than
+   * hiding its control. A segmented row left on Pumping and then taken off
+   * screen is a filter the reader can neither see nor clear — so the new view
+   * answers as though it were All, and the trending view reads it back exactly
+   * where it was left.
+   */
+  const listed = useMemo(() => {
+    const kept = inView.filter(({ pair, signal }) =>
+      keep(pair, signal.score, view === "new" ? "all" : band, grade),
+    );
+    return view === "new" ? newest(kept) : order(kept);
+  }, [inView, band, grade, view]);
 
   /*
    * Filled in the background of the list the reader is already reading, and
@@ -742,8 +822,8 @@ export function Screener() {
     if (error) {
       return (
         <Empty
-          title={t("memecoin.failed")}
-          hint={t("memecoin.failedHint")}
+          title={t("launchpad.failed")}
+          hint={t("launchpad.failedHint")}
           action={
             <button type="button" className="btn btn-sm btn-short" onClick={() => void refetch()}>
               <Icon name="refresh" size={13} />
@@ -760,12 +840,15 @@ export function Screener() {
        * a reader who has narrowed the list to nothing should be told that they
        * did it rather than that the chain went quiet.
        */
-      return all.length === 0 ? (
-        <Empty title={t("memecoin.empty")} hint={t("memecoin.emptyHint")} />
+      return inView.length === 0 ? (
+        <Empty
+          title={t(view === "new" ? "launchpad.emptyNew" : "launchpad.empty")}
+          hint={t(view === "new" ? "launchpad.emptyNewHint" : "launchpad.emptyHint")}
+        />
       ) : (
         <Empty
-          title={t("memecoin.noMatch")}
-          hint={t("memecoin.noMatchHint")}
+          title={t("launchpad.noMatch")}
+          hint={t("launchpad.noMatchHint")}
           action={
             <button
               type="button"
@@ -775,7 +858,7 @@ export function Screener() {
                 setGrade("floor");
               }}
             >
-              {t("memecoin.clear")}
+              {t("launchpad.clear")}
             </button>
           }
         />
@@ -812,7 +895,7 @@ export function Screener() {
                   pair.age < FRESH &&
                   !coiling(signal.score) &&
                   !filling(drift) && (
-                    <span className="chip chip-xs chip-live ml-1.5">{t("memecoin.fresh")}</span>
+                    <span className="chip chip-xs chip-live ml-1.5">{t("launchpad.fresh")}</span>
                   )}
                 <SignalChip signal={signal} />
                 <FillingChip signal={signal} drift={drift} />
@@ -827,13 +910,13 @@ export function Screener() {
                 <RiskWord pair={pair} lock={locks.get(pair.pool.toLowerCase())} drift={drift} />
                 {pair.swaps > 0 && (
                   <>
-                    <span className="lbl">{t("memecoin.volShort")}</span>{" "}
+                    <span className="lbl">{t("launchpad.volShort")}</span>{" "}
                     <Figure className="num" value={usd(pair.volume)} />
                     {" · "}
                   </>
                 )}
                 <span className={`lbl ${thin(pair) ? "warn" : ""}`}>
-                  {t("memecoin.liqShort")}
+                  {t("launchpad.liqShort")}
                 </span>{" "}
                 <Figure className={`num ${thin(pair) ? "warn" : ""}`} value={usd(pair.liquidity)} />
                 {" · "}
@@ -849,14 +932,14 @@ export function Screener() {
                   value={signed(pair.change)}
                 />
               ) : (
-                <span className="lbl block">{t("memecoin.mcapShort")}</span>
+                <span className="lbl block">{t("launchpad.mcapShort")}</span>
               )}
             </span>
           </button>
           <button
             type="button"
             className="tile aim w-[46px] shrink-0 justify-center px-0 text-accent"
-            aria-label={t("memecoin.snipe", { symbol: pair.symbol })}
+            aria-label={t("launchpad.snipe", { symbol: pair.symbol })}
             onClick={() => snipe(pair)}
           >
             <Icon name="crosshair" size={16} />
@@ -869,10 +952,25 @@ export function Screener() {
 
   return (
     <div className="mx-auto w-full max-w-3xl">
-      <h1 className="sr-only">{t("page.memecoin.title")}</h1>
+      <h1 className="sr-only">{t("page.launchpad.title")}</h1>
 
       {mounted && (
         <div className="mb-3 flex flex-col gap-1.5">
+          {/*
+           * Two windows, named for what each one can see rather than for how
+           * it is sorted. New is the day's pool creations, priced off what is
+           * resting in them; trending is the last five minutes of swaps. The
+           * app opens on the first because that is the only one of the two
+           * still holding entries nobody has taken.
+           */}
+          <Segmented
+            options={[
+              { value: "new", label: t("launchpad.viewNew") },
+              { value: "trending", label: t("launchpad.viewTrending") },
+            ]}
+            value={view}
+            onChange={setView}
+          />
           {/*
            * Asking for a movement narrows the list to rows that have moved,
            * which is what it has always meant — it also drops the ones that
@@ -884,21 +982,31 @@ export function Screener() {
            * still buyable. It took the place of a band called Flat, which
            * could not tell a token being accumulated from one nobody had
            * looked at in five minutes.
+           *
+           * And it is gone under the launches, because almost none of them can
+           * answer it — which is the same rule as the one above, taken to its
+           * conclusion. A pool that opened and has not traded is silent on all
+           * four counts, so three of these options would empty that list and
+           * the fourth is the only one ever in force. A control whose every
+           * setting but one is a dead end is worse than no control. Depth,
+           * below, every launch can answer, so depth stays on both.
            */}
+          {view === "trending" && (
+            <Segmented
+              options={[
+                { value: "all", label: t("launchpad.bandAll") },
+                { value: "coiling", label: t("launchpad.bandCoil") },
+                { value: "pumping", label: t("launchpad.bandPump") },
+                { value: "dumping", label: t("launchpad.bandDump") },
+              ]}
+              value={band}
+              onChange={setBand}
+            />
+          )}
           <Segmented
             options={[
-              { value: "all", label: t("memecoin.bandAll") },
-              { value: "coiling", label: t("memecoin.bandCoil") },
-              { value: "pumping", label: t("memecoin.bandPump") },
-              { value: "dumping", label: t("memecoin.bandDump") },
-            ]}
-            value={band}
-            onChange={setBand}
-          />
-          <Segmented
-            options={[
-              { value: "floor", label: t("memecoin.gradeAll") },
-              { value: "deep", label: t("memecoin.gradeDeep") },
+              { value: "floor", label: t("launchpad.gradeAll") },
+              { value: "deep", label: t("launchpad.gradeDeep") },
             ]}
             value={grade}
             onChange={setGrade}
@@ -908,16 +1016,35 @@ export function Screener() {
 
       <Panel
         /*
-         * One list, one header, and it names both windows — they are the whole
-         * of what this screen can see: what traded in the last five minutes,
-         * and what opened since yesterday. The floor is always on, so it is
-         * always said.
+         * The header names the window the reader is in, and how it is ordered.
+         * It used to name both windows at once because there was only ever one
+         * list; now that they are two, a header still saying `coil ranked`
+         * over a list ordered by age would be describing the other tab.
+         *
+         * Both labels say both bars, because both bars are on in both views.
+         * The floor is one figure short under the launches rather than absent
+         * — `clearsFloor` asks it of the market cap, the fully diluted figure
+         * and the depth either way, and only lets a row off the volume leg if
+         * nothing has traded — and a header that quietly dropped it there
+         * would be understating what emptied the list. A measured reading:
+         * thirty-nine pools opened in the day, five of them clear a thousand
+         * dollars, and a reader looking at five rows deserves to know which
+         * number took the other thirty-four.
+         *
+         * What the window is stays off the line. It is the longest fact and
+         * the least surprising one — the tab is called New, every row prints
+         * its own age in hours, and the empty state says the day outright —
+         * and the label is one line on a phone before it truncates.
          */
-        label={t("memecoin.live", { floor: `$${formatCompact(FLOOR)}` })}
+        label={
+          view === "new"
+            ? t("launchpad.opened", { floor: `$${formatCompact(FLOOR)}` })
+            : t("launchpad.live", { floor: `$${formatCompact(FLOOR)}` })
+        }
         meta={
-          mounted && all.length > 0 ? (
+          mounted && inView.length > 0 ? (
             <span className="lbl">
-              {t("memecoin.showing", { shown: listed.length, total: all.length })}
+              {t("launchpad.showing", { shown: listed.length, total: inView.length })}
             </span>
           ) : undefined
         }
