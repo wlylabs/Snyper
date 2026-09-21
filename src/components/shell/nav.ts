@@ -11,18 +11,31 @@ export type NavItem = {
  * Four surfaces, in the order a trade moves through them.
  *
  * Snyper is the one the app opens on and the one it is for: a target, a size,
- * and the shot. Memecoin is the wider list to read before choosing a target,
+ * and the shot. Launches is where a target is found before it is chosen,
  * balance is what the wallet came away holding, and settings configures what
  * the app does with the screen it is read on.
  *
- * The path is the route, not the label. `/memecoin` is named for what the
- * screen lists rather than for either dictionary's word for it — English calls
- * it Memes and Indonesian calls it Memecoin, and a URL cannot be both.
+ * It was called Memes, which named a genre where the other three name jobs,
+ * and it could not be said once: English called it Memes, Indonesian called it
+ * Memecoin — two different things, not one thing twice — so no single route
+ * could be right for both.
+ *
+ * It was briefly called Launchpad, and that was the same defect wearing a
+ * better word. In this market a launchpad is where a token is *issued*: you
+ * arrive at one expecting to deploy something. This screen reads pools other
+ * people opened and cannot deploy anything, so the name promised a button that
+ * was never going to be under it, to every reader who had seen the word used
+ * the ordinary way.
+ *
+ * Launches is what the screen actually holds. It translates rather than
+ * splits — Peluncuran is the same noun in Indonesian, where Memes and Memecoin
+ * were two — so `/launches` names the same thing the label does in either
+ * dictionary, and it claims exactly as much as the screen delivers.
  */
 export const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "nav.home", icon: "crosshair" },
   { href: "/balance", label: "nav.balance", icon: "stack" },
-  { href: "/memecoin", label: "nav.memecoin", icon: "pulse" },
+  { href: "/launches", label: "nav.launches", icon: "pulse" },
   { href: "/settings", label: "nav.settings", icon: "sliders" },
 ];
 

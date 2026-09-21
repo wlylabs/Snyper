@@ -75,6 +75,16 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   /** The framework and its version are not a reader's business. */
   poweredByHeader: false,
+  /**
+   * The screen this app finds targets on was called Memes and lived at
+   * `/memecoin`. It is Launches now, and an installed app, a bookmark or a
+   * shared link still pointing at the old path should land on the screen that
+   * replaced it rather than on `not-found` — which, being permanent, is also
+   * what tells a crawler the two are one page and not a rename that lost one.
+   */
+  async redirects() {
+    return [{ source: "/memecoin", destination: "/launches", permanent: true }];
+  },
   async headers() {
     return [
       {

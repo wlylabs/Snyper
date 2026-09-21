@@ -206,37 +206,6 @@ export const BURNED = [
 ] as const;
 
 /**
- * What the last five minutes did to a token.
- *
- * Three of the bands describe the window and nothing wider. A token that is
- * pumping here has been pumping for five minutes, which is not a claim about
- * hours, and hours are what this endpoint will not serve.
- *
- * Fifty percent either way is the line for the two that read the price, because
- * on this chain it is an ordinary five minutes: the screen routinely carries a
- * token up three hundred percent beside one down forty. A band drawn at ten
- * would hold everything.
- *
- * `coiling` is the odd one and the reason this screen exists in its new shape.
- * It does not read the price at all — it reads whether the tape under the price
- * is filling, which is `lib/signal`, and the caller passes the answer in. It
- * took the place of a band called `flat`, which asked a weaker version of the
- * same question and could not tell a token being quietly accumulated from one
- * nobody has looked at in five minutes. Those are the two rows a screen about
- * finding an entry early most needs to keep apart.
- */
-export type Band = "all" | "coiling" | "pumping" | "dumping";
-
-export const MOVE = 50;
-
-export function inBand(change: number, band: Band, coiling: boolean): boolean {
-  if (band === "coiling") return coiling;
-  if (band === "pumping") return change >= MOVE;
-  if (band === "dumping") return change <= -MOVE;
-  return true;
-}
-
-/**
  * The size past which a token is no longer an early entry.
  *
  * This screen exists to find a position before the run rather than after it, so
@@ -282,33 +251,13 @@ export const DEPTH_RATIO = 0.1;
 export const DILUTION_LIMIT = 2;
 
 /**
- * How hard the list is filtered, in one control.
- *
- * Two settings, and the lower one is still a floor. There used to be a third
- * below it that let everything through, which meant the screen could be sitting
- * on four dollars of volume while the control above it read "Any" — a word that
- * sounds like breadth and was working as an off switch. Any here means any
- * token that has cleared the floor, not any token at all, and there is no
- * longer a way to switch the floor off.
- *
- * The upper one was called `healthy`, and that was the most expensive word in
- * the app. It tests two ratios about the pool's shape — depth against size, and
- * supply already out against supply outright — and a reader reasonably heard it
- * as a verdict on whether the token was safe to buy, which is a question it has
- * never once asked. Tokens passed it and were rugged the same week, because
- * being deep is not the same as being un-pullable and the screen was never
- * claiming it was. `deep` says what the test does, and leaves the safety
- * question to the check that can actually answer it.
- */
-export type Grade = "floor" | "deep";
-
-/**
  * The reader's bar, applied to all four figures alike.
  *
- * Liquidity included. It was left out at first on the grounds that the healthy
- * ratio already covered it, which was wrong twice over: the ratio does not
- * apply at the `floor` grade at all, and at the smallest market caps it clears
- * at a hundred dollars of depth, which is not a market anybody can leave.
+ * Liquidity included. It was left out at first on the grounds that a ratio
+ * against the market cap already covered it, which was wrong twice over: that
+ * ratio was not applied at this bar at all, and at the smallest market caps it
+ * clears at a hundred dollars of depth, which is not a market anybody can
+ * leave.
  */
 export const FLOOR = 1_000;
 
@@ -351,4 +300,52 @@ export function clearsFloor(pair: Sized, traded = true): boolean {
   if (marketCap === undefined || fdv === undefined) return false;
   if (marketCap < FLOOR || fdv < FLOOR || liquidity < FLOOR) return false;
   return !traded || volume >= FLOOR;
+}
+
+/**
+ * A quarter of it, for the one list where the floor above was the whole filter.
+ *
+ * This is the second standard the comment above warns against, and it is here
+ * on purpose rather than by drift — so it is written down, it is shown on the
+ * header of the list it governs, and it applies to exactly one screen.
+ *
+ * The reason is measured. Of thirty-nine pools opened in a day, the floor
+ * above kept six. Four more were refused by the ceiling and none at all by the
+ * size tests: every launch reported its supply, and every one of them cleared
+ * a thousand dollars of market cap and of fully diluted value. Twenty-nine
+ * were refused by depth alone. The floor was not judging the launches on four
+ * figures, it was judging them on one, and a bar that a pool has to have been
+ * traded into for twenty minutes to clear is not a bar for a screen about
+ * pools that opened five minutes ago.
+ *
+ * A quarter rather than a tenth, and that is the argument above conceded
+ * rather than overturned: a hundred dollars of depth is not a market anybody
+ * can leave, and nothing here claims otherwise. Two hundred and fifty is not
+ * one either. What it is, is enough that a position can be opened at all —
+ * which is the only claim a launch list makes — and the screen says the rest
+ * in the two places built to say it, the thin marker on the depth figure and
+ * the risk word beside it. Below it the day's readings stop being pools with a
+ * little in them and start being pools with nothing in them: under a hundred
+ * dollars the same day held seventeen rows, six of which were empty to the
+ * cent.
+ *
+ * The thousand is not gone from the app: it is what `clearsFloor` still asks
+ * of the terminal's target list, where a reader is picking something to shoot
+ * at rather than reading what opened. This screen does not ask it, and does
+ * not offer a control to — the ratios that a bar about leaving is really made
+ * of are read per row instead, by the thin marker on the depth figure and by
+ * `risk`, which is where a reader looking at one pool is looking.
+ */
+export const LAUNCH_FLOOR = FLOOR / 4;
+
+/**
+ * What a pool has to hold before a launch list will print it.
+ *
+ * Depth only, and deliberately. The ceiling already tests the one figure that
+ * can be wrong in the dangerous direction, and the measurement says the rest
+ * refuse nothing here anyway — a launch that reports no supply has no market
+ * cap to price and is dropped for want of a price long before this.
+ */
+export function clearsLaunchFloor(pair: Sized): boolean {
+  return pair.liquidity >= LAUNCH_FLOOR;
 }

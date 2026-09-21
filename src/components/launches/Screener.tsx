@@ -6,21 +6,16 @@ import dynamic from "next/dynamic";
 import { Figure } from "@/components/ui/Figure";
 import { Icon } from "@/components/ui/Icon";
 import { Empty, Panel, Row, Skeleton } from "@/components/ui/Panel";
-import { Segmented } from "@/components/ui/Segmented";
 import { Sheet } from "@/components/ui/Sheet";
 import { CHAIN_ID, explorerAddress } from "@/lib/chains";
 import { formatCompact, truncateAddress } from "@/lib/format";
 import {
   CEILING,
   DEPTH_RATIO,
-  DILUTION_LIMIT,
-  FLOOR,
-  clearsFloor,
+  LAUNCH_FLOOR,
+  clearsLaunchFloor,
   dropCopycats,
-  inBand,
   underCeiling,
-  type Band,
-  type Grade,
 } from "@/lib/screener";
 import { shareOf, verdictOf, type Lock } from "@/lib/lock";
 import { riskOf, type Check, type Level, type Risk } from "@/lib/risk";
@@ -89,45 +84,29 @@ function times(ratio: number): string {
 }
 
 /**
- * Whether a row survives the reader's questions.
+ * Whether a row belongs on the list at all.
  *
- * The ceiling comes first and is not theirs to move: a token already worth more
- * than ten million is not an early entry whatever else is true of it.
+ * This used to take a band, a grade and a view, and answer four different
+ * questions with them. It answers one now, because the screen asks one: these
+ * are the pools that opened, and a reader looking at them wants to know which
+ * ones can be bought — not which ones match a filter they set three taps ago.
  *
- * The floor is proof rather than size. A token whose supply the contract would
- * not report has not been shown to clear anything, so it fails every grade
- * above `all` — undefined is not small, it is unknown, and the reason to set a
- * floor is to stop reading rows that have not been shown to be worth reading.
+ * The ceiling comes first and was never the reader's to move: a token already
+ * worth more than ten million is not an early entry whatever else is true of
+ * it. The floor is `LAUNCH_FLOOR`, which is depth and only depth; the reading
+ * behind that number, and why the other three figures refuse nothing here, is
+ * written where the number is.
  *
- * Liquidity is in the floor and not only in the ratio. Left to the ratio alone
- * it let a pool holding fifty dollars through: a tenth of a thousand-dollar
- * market cap is a hundred, and a hundred dollars of depth is not a market.
+ * What the grade used to add is not lost, it has moved. `deep` asked whether a
+ * pool was backed for its size and whether its supply was mostly still to
+ * come, and both are now read on every row rather than filtered on some of
+ * them: the depth ratio marks the figure thin and turns it the warning colour,
+ * and `risk` bands those same two ratios into the word beside it. A fact on
+ * the row beats a filter over the list, because the row is where the reader is
+ * looking.
  */
-function keep(pair: Pair, score: number, band: Band, grade: Grade): boolean {
-  if (!underCeiling(pair)) return false;
-  /*
-   * A movement filter cannot be answered by something that has not moved. An
-   * untraded pool is not rising and is not falling, it is silent, and letting
-   * it fall into either band would be the screen making up an answer on its
-   * behalf.
-   *
-   * The coil band needs no such guard and is the reason the old `flat` band is
-   * gone. It asks whether the tape is filling, which a silent pool answers
-   * honestly — with the two readings it has and a score that cannot reach the
-   * band's bar on them. Nothing is invented and nothing is excluded by rule.
-   */
-  if ((band === "pumping" || band === "dumping") && pair.swaps === 0) return false;
-  if (!inBand(pair.change, band, coiling(score))) return false;
-  /* Volume is asked of a row only if that row has trades behind it. */
-  if (!clearsFloor(pair, pair.swaps > 0)) return false;
-  return grade === "floor" || deep(pair);
-}
-
-/** Deep enough for its size, and not mostly supply that has not arrived yet. */
-function deep(pair: Pair): boolean {
-  const { marketCap, fdv, liquidity } = pair;
-  if (marketCap === undefined || fdv === undefined) return false;
-  return liquidity >= marketCap * DEPTH_RATIO && fdv <= marketCap * DILUTION_LIMIT;
+function keep(pair: Pair): boolean {
+  return underCeiling(pair) && clearsLaunchFloor(pair);
 }
 
 /** Whether the pool behind a row could absorb the position it is quoting. */
@@ -144,30 +123,38 @@ function thin(pair: Pair): boolean {
 type Scored = { pair: Pair; signal: Signal; drift: Drift | undefined };
 
 /**
- * Coil first, then busiest, then freshest.
+ * Whether the pool behind a row opened inside the creation window.
  *
- * This used to be volume first, which is what every screener on every chain
- * does, and it is the one thing this screen should not do. Volume is the wake
- * a run leaves behind it: a token at the top of a volume column has already
- * moved, and the entry the reader opened this screen for belonged to whoever
- * was in the pool while it was still near the bottom of that column. Ranking
- * by it puts the answer to yesterday's question at the top of today's screen.
- *
- * So the first key is the score in `lib/signal` — buying against selling, the
- * tape's rate against its own rate five minutes ago, hands against trades, all
- * of it multiplied away as the price catches up. Volume is kept as the second
- * key rather than dropped, because between two rows the chain says nothing
- * about, the one money is going through is the better guess; and age settles
- * the rest, since everything nobody has touched has the same volume as
- * everything else nobody has touched. A pool with no creation in the last day
- * has no age and sits at the end — unknown is old here.
+ * An age is only ever set from a `PoolCreated` log, and that read covers a day
+ * — see `CREATED_WINDOW`. So a row with an age is a row this screen watched
+ * open, and a row without one is older than the window rather than unmeasured.
  */
-function order(rows: Scored[]): Scored[] {
+function launched(pair: Pair): boolean {
+  return pair.age !== undefined;
+}
+
+/**
+ * Freshest first, then deepest.
+ *
+ * The other order ranks by the coil score and is right to, but it cannot rank
+ * this list: a pool that opened and has not traded carries no tape, so the
+ * signal scores it on the two standing facts it can answer for and every
+ * untraded row lands on nearly the same number. Ordering the launches that way
+ * put them in an order that looked considered and was mostly arbitrary, and it
+ * buried the ten-minute-old pool under the twenty-hour-old one that had a
+ * little volume behind it — which is the entry this screen exists to find.
+ *
+ * Age is the only key that means anything here, and depth settles the ties,
+ * because between two pools opened in the same minute the one with money in it
+ * is the one that can actually be bought from. Nothing needs a floor on top:
+ * the day's launches are overwhelmingly empty pools, and `useLaunches` has
+ * already kept only the forty deepest of them.
+ */
+function newest(rows: Scored[]): Scored[] {
   return [...rows].sort(
     (a, b) =>
-      b.signal.score - a.signal.score ||
-      b.pair.volume - a.pair.volume ||
-      (a.pair.age ?? Infinity) - (b.pair.age ?? Infinity),
+      (a.pair.age ?? Infinity) - (b.pair.age ?? Infinity) ||
+      b.pair.liquidity - a.pair.liquidity,
   );
 }
 
@@ -404,17 +391,6 @@ function FillingChip({ signal, drift }: { signal: Signal; drift: Drift | undefin
   );
 }
 
-function SignalWord({ signal }: { signal: Signal }) {
-  const { t } = useI18n();
-  if (coiling(signal.score)) return null;
-  return (
-    <>
-      {" · "}
-      <span className="lbl">{t("signal.word", { score: signal.score })}</span>
-    </>
-  );
-}
-
 /** What was watched, in one line, saying only what it actually has. */
 function watched(t: (key: TKey, vars?: Record<string, string | number>) => string, drift: Drift | undefined): string {
   if (!drift) return t("signal.watching");
@@ -532,7 +508,7 @@ function PairSheet({
   const risk = riskOf(pair, lock, drift);
 
   return (
-    <Sheet open title={t("memecoin.pair")} onClose={onClose}>
+    <Sheet open title={t("launches.pair")} onClose={onClose}>
       <div className="identity">
         <div>
           <p className="text-[19px] leading-tight font-bold">
@@ -545,7 +521,7 @@ function PairSheet({
           <p className="num text-[26px] leading-none">
             <Figure value={usd(pair.marketCap)} />
           </p>
-          <p className="lbl mt-1">{t("memecoin.mcap")}</p>
+          <p className="lbl mt-1">{t("launches.mcap")}</p>
           <p className={`lbl mt-2 ${pair.change >= 0 ? "long" : "short"}`}>
             <Figure value={signed(pair.change)} />
           </p>
@@ -568,23 +544,23 @@ function PairSheet({
         </div>
 
         <Panel>
-          <Row k={t("memecoin.fdv")} v={<Figure className="num" value={usd(pair.fdv)} />} />
+          <Row k={t("launches.fdv")} v={<Figure className="num" value={usd(pair.fdv)} />} />
           <Row
-            k={t("memecoin.volume")}
+            k={t("launches.volume")}
             v={<Figure className="num" value={usd(pair.volume)} />}
           />
           <Row
-            k={t("memecoin.liquidity")}
+            k={t("launches.liquidity")}
             v={<Figure className="num" value={usd(pair.liquidity)} />}
           />
-          <Row k={t("memecoin.trades")} v={<Figure className="num" value={String(pair.swaps)} />} />
-          <Row k={t("memecoin.age")} v={<Figure className="num" value={age(pair.age)} />} />
+          <Row k={t("launches.trades")} v={<Figure className="num" value={String(pair.swaps)} />} />
+          <Row k={t("launches.age")} v={<Figure className="num" value={age(pair.age)} />} />
           <Row
-            k={t("memecoin.pool")}
+            k={t("launches.pool")}
             v={<span className="num">{`${pair.fee / 10_000}%`}</span>}
           />
           <Row
-            k={t("memecoin.token")}
+            k={t("launches.token")}
             v={<span className="num">{truncateAddress(pair.token, 8, 6)}</span>}
           />
         </Panel>
@@ -610,7 +586,7 @@ function PairSheet({
           onClick={() => onSnipe(pair)}
         >
           <Icon name="crosshair" size={14} />
-          {t("memecoin.snipe", { symbol: pair.symbol })}
+          {t("launches.snipe", { symbol: pair.symbol })}
         </button>
 
         <div className="mt-2 grid grid-cols-2 gap-2">
@@ -635,7 +611,7 @@ function PairSheet({
             className="tile justify-center"
           >
             <Icon name="candles" size={14} className="text-dim" />
-            {t("memecoin.dexscreener")}
+            {t("launches.dexscreener")}
           </a>
         </div>
       </div>
@@ -656,19 +632,6 @@ function Loading() {
 export function Screener() {
   const mounted = useMounted();
   const { t } = useI18n();
-  const [band, setBand] = useState<Band>("all");
-  /*
-   * The screen opens with the floor on.
-   *
-   * It used to open on `all`, which applies no floor at all, and nothing on the
-   * screen said so — so a reader who had been told the list has a thousand
-   * dollar minimum saw four dollars of volume in it and was right to call that
-   * broken. The filter was never leaking; the screen was simply starting with
-   * it switched off. The terminal has always applied the same floor and has no
-   * control to switch it off, and two screens reading one chain to two unstated
-   * standards is the actual defect.
-   */
-  const [grade, setGrade] = useState<Grade>("floor");
   const [opened, setOpened] = useState<string>();
   const { pairs, births, head, loading, error, refetch } = useScreener();
   const router = useRouter();
@@ -690,8 +653,8 @@ export function Screener() {
   /*
    * Copycats go before the reader's own filters rather than after them. Which
    * contract holds a ticker is decided against everything the screen knows
-   * about, so a band or a grade that happens to exclude the real one cannot
-   * promote a copy into being the only thing wearing the name.
+   * about, so neither the ceiling nor the floor can drop the real holder of a
+   * ticker and leave a copy as the only thing on screen wearing the name.
    */
   const all = useMemo(() => dropCopycats(merge(pairs, launches)), [pairs, launches]);
   /*
@@ -716,9 +679,18 @@ export function Screener() {
       }),
     [all, watch],
   );
+  /*
+   * The day's launches, the ones that can be bought, newest first.
+   *
+   * Three steps where there were five, and both that went were the reader's
+   * own filters. Nothing narrows this list that the reader has to remember
+   * setting, which is the whole reason the controls came off: a screen with a
+   * filter on it has to be read twice, once for the market and once for what
+   * is hiding the rest of it.
+   */
   const listed = useMemo(
-    () => order(scored.filter(({ pair, signal }) => keep(pair, signal.score, band, grade))),
-    [scored, band, grade],
+    () => newest(scored.filter(({ pair }) => launched(pair) && keep(pair))),
+    [scored],
   );
 
   /*
@@ -742,8 +714,8 @@ export function Screener() {
     if (error) {
       return (
         <Empty
-          title={t("memecoin.failed")}
-          hint={t("memecoin.failedHint")}
+          title={t("launches.failed")}
+          hint={t("launches.failedHint")}
           action={
             <button type="button" className="btn btn-sm btn-short" onClick={() => void refetch()}>
               <Icon name="refresh" size={13} />
@@ -754,32 +726,13 @@ export function Screener() {
       );
     }
 
+    /*
+     * One way to be empty, now that nothing the reader sets can empty it. The
+     * screen used to have to tell a quiet chain apart from a filter narrowed
+     * to nothing, and that second failure no longer exists.
+     */
     if (listed.length === 0) {
-      /*
-       * An empty five minutes and an empty filter are different failures, and
-       * a reader who has narrowed the list to nothing should be told that they
-       * did it rather than that the chain went quiet.
-       */
-      return all.length === 0 ? (
-        <Empty title={t("memecoin.empty")} hint={t("memecoin.emptyHint")} />
-      ) : (
-        <Empty
-          title={t("memecoin.noMatch")}
-          hint={t("memecoin.noMatchHint")}
-          action={
-            <button
-              type="button"
-              className="btn btn-sm btn-short"
-              onClick={() => {
-                setBand("all");
-                setGrade("floor");
-              }}
-            >
-              {t("memecoin.clear")}
-            </button>
-          }
-        />
-      );
+      return <Empty title={t("launches.emptyNew")} hint={t("launches.emptyNewHint")} />;
     }
 
     return (
@@ -812,33 +765,52 @@ export function Screener() {
                   pair.age < FRESH &&
                   !coiling(signal.score) &&
                   !filling(drift) && (
-                    <span className="chip chip-xs chip-live ml-1.5">{t("memecoin.fresh")}</span>
+                    <span className="chip chip-xs chip-live ml-1.5">{t("launches.fresh")}</span>
                   )}
                 <SignalChip signal={signal} />
                 <FillingChip signal={signal} drift={drift} />
               </span>
               {/*
-               * A row nobody has traded has no volume and has not moved, so it
-               * says what it does have — how deep it is and how long it has
-               * existed — rather than printing two zeroes that read as a
-               * failed call. Decided per row, since both kinds share one list.
+               * A verdict and one figure, because five of them did not fit.
+               *
+               * This line carried the risk word, volume, depth, age and the
+               * coil score, and on a phone the last two were cut off mid-word
+               * by `truncate` — so the row ended in an ellipsis and the reader
+               * got four facts and a hint that something was missing. Five
+               * facts nobody can read are worth less than two they can.
+               *
+               * The verdict is the one that survives on merit: it is not a
+               * figure competing with the others but the reading of them, and
+               * `risk` already bands depth against size and supply against
+               * supply outright into it. What was cut is not gone either — the
+               * sheet behind the row prints all of it, which is what the sheet
+               * is for.
+               *
+               * The figure beside it is volume where there is volume. A pool
+               * that opened and has not traded has none by construction, and
+               * printing a zero there would read as a failed call rather than
+               * as the silence it is, so it shows the one number it does have:
+               * what is resting in it, in the warning colour when that is thin
+               * for the size it is claiming.
                */}
               <span className="block truncate text-[11px] font-normal text-faint">
                 <RiskWord pair={pair} lock={locks.get(pair.pool.toLowerCase())} drift={drift} />
-                {pair.swaps > 0 && (
+                {pair.swaps > 0 ? (
                   <>
-                    <span className="lbl">{t("memecoin.volShort")}</span>{" "}
+                    <span className="lbl">{t("launches.volShort")}</span>{" "}
                     <Figure className="num" value={usd(pair.volume)} />
-                    {" · "}
+                  </>
+                ) : (
+                  <>
+                    <span className={`lbl ${thin(pair) ? "warn" : ""}`}>
+                      {t("launches.liqShort")}
+                    </span>{" "}
+                    <Figure
+                      className={`num ${thin(pair) ? "warn" : ""}`}
+                      value={usd(pair.liquidity)}
+                    />
                   </>
                 )}
-                <span className={`lbl ${thin(pair) ? "warn" : ""}`}>
-                  {t("memecoin.liqShort")}
-                </span>{" "}
-                <Figure className={`num ${thin(pair) ? "warn" : ""}`} value={usd(pair.liquidity)} />
-                {" · "}
-                <Figure className="num" value={age(pair.age)} />
-                <SignalWord signal={signal} />
               </span>
             </span>
             <span className="shrink-0 text-right">
@@ -849,14 +821,14 @@ export function Screener() {
                   value={signed(pair.change)}
                 />
               ) : (
-                <span className="lbl block">{t("memecoin.mcapShort")}</span>
+                <span className="lbl block">{t("launches.mcapShort")}</span>
               )}
             </span>
           </button>
           <button
             type="button"
             className="tile aim w-[46px] shrink-0 justify-center px-0 text-accent"
-            aria-label={t("memecoin.snipe", { symbol: pair.symbol })}
+            aria-label={t("launches.snipe", { symbol: pair.symbol })}
             onClick={() => snipe(pair)}
           >
             <Icon name="crosshair" size={16} />
@@ -869,56 +841,26 @@ export function Screener() {
 
   return (
     <div className="mx-auto w-full max-w-3xl">
-      <h1 className="sr-only">{t("page.memecoin.title")}</h1>
-
-      {mounted && (
-        <div className="mb-3 flex flex-col gap-1.5">
-          {/*
-           * Asking for a movement narrows the list to rows that have moved,
-           * which is what it has always meant — it also drops the ones that
-           * have not traded at all, because silence is not a direction.
-           *
-           * The first of the three is the odd one and the point of the screen.
-           * It asks for what has not moved yet and has a crowd arriving under
-           * it, which is the only one of these four questions whose answer is
-           * still buyable. It took the place of a band called Flat, which
-           * could not tell a token being accumulated from one nobody had
-           * looked at in five minutes.
-           */}
-          <Segmented
-            options={[
-              { value: "all", label: t("memecoin.bandAll") },
-              { value: "coiling", label: t("memecoin.bandCoil") },
-              { value: "pumping", label: t("memecoin.bandPump") },
-              { value: "dumping", label: t("memecoin.bandDump") },
-            ]}
-            value={band}
-            onChange={setBand}
-          />
-          <Segmented
-            options={[
-              { value: "floor", label: t("memecoin.gradeAll") },
-              { value: "deep", label: t("memecoin.gradeDeep") },
-            ]}
-            value={grade}
-            onChange={setGrade}
-          />
-        </div>
-      )}
+      <h1 className="sr-only">{t("page.launches.title")}</h1>
 
       <Panel
         /*
-         * One list, one header, and it names both windows — they are the whole
-         * of what this screen can see: what traded in the last five minutes,
-         * and what opened since yesterday. The floor is always on, so it is
-         * always said.
+         * The header is the only line of chrome left, so it carries what the
+         * controls used to say. Both bars are still on and neither is
+         * switchable now, which makes naming them more important rather than
+         * less: a reader who cannot see a control cannot infer the rule behind
+         * it, and an unnamed filter is the defect this screen was already
+         * fixed for once.
+         *
+         * What the window is stays off the line. It is the longest fact and
+         * the least surprising one — every row prints its own age in hours and
+         * the empty state says the day outright — and the label is one line on
+         * a phone before it truncates.
          */
-        label={t("memecoin.live", { floor: `$${formatCompact(FLOOR)}` })}
+        label={t("launches.opened", { floor: `$${formatCompact(LAUNCH_FLOOR)}` })}
         meta={
-          mounted && all.length > 0 ? (
-            <span className="lbl">
-              {t("memecoin.showing", { shown: listed.length, total: all.length })}
-            </span>
+          mounted && listed.length > 0 ? (
+            <span className="lbl">{t("launches.count", { shown: listed.length })}</span>
           ) : undefined
         }
       >

@@ -236,10 +236,10 @@ function TargetList({
               <span className="font-normal text-faint">/{pair.quote}</span>
             </span>
             <span className="block truncate text-[11px] font-normal text-faint">
-              <span className="lbl">{t("memecoin.liqShort")}</span>{" "}
+              <span className="lbl">{t("launches.liqShort")}</span>{" "}
               <Figure className="num" value={usd(pair.liquidity)} />
               {" · "}
-              <span className="lbl">{t("memecoin.volShort")}</span>{" "}
+              <span className="lbl">{t("launches.volShort")}</span>{" "}
               <Figure className="num" value={usd(pair.volume)} />
             </span>
           </span>
@@ -959,8 +959,8 @@ export function Terminal() {
       >
         {error ? (
           <Empty
-            title={t("memecoin.failed")}
-            hint={t("memecoin.failedHint")}
+            title={t("launches.failed")}
+            hint={t("launches.failedHint")}
             action={
               <button type="button" className="btn btn-sm btn-short" onClick={() => void refetch()}>
                 <Icon name="refresh" size={13} />
@@ -1001,25 +1001,25 @@ export function Terminal() {
                 <p className="num text-[26px] leading-none">
                   <Figure value={usd(target.marketCap)} />
                 </p>
-                <p className="lbl mt-2">{t("memecoin.mcap")}</p>
+                <p className="lbl mt-2">{t("launches.mcap")}</p>
               </div>
             </div>
 
             <div className="mt-3 grid grid-cols-3 border-t border-line pt-3">
               <div className="min-w-0 pr-3">
-                <p className="lbl">{t("memecoin.liquidity")}</p>
+                <p className="lbl">{t("launches.liquidity")}</p>
                 <p className="num mt-1.5 truncate text-[13px]">
                   <Figure value={usd(target.liquidity)} />
                 </p>
               </div>
               <div className="min-w-0 border-l border-line px-3">
-                <p className="lbl">{t("memecoin.volume")}</p>
+                <p className="lbl">{t("launches.volume")}</p>
                 <p className="num mt-1.5 truncate text-[13px]">
                   <Figure value={usd(target.volume)} />
                 </p>
               </div>
               <div className="min-w-0 border-l border-line pl-3">
-                <p className="lbl">{t("memecoin.trades")}</p>
+                <p className="lbl">{t("launches.trades")}</p>
                 <p className="num mt-1.5 truncate text-[13px]">
                   <Figure value={formatCompact(target.swaps)} />
                 </p>
