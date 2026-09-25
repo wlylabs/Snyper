@@ -44,29 +44,21 @@ const CURRENCY_SYMBOL: Record<Currency, string> = { USD: "$", IDR: "Rp" };
  * A dollar figure, shown as whichever currency the reader picked — or a dash
  * where either the figure or, for anything but USD, the rate to convert it is
  * missing. Nothing here is fetched: the rate is `useMoney`'s to ask for and
- * this stays a plain function so every screen that prints money agrees on
- * what it looks like once it has one.
+ * this stays a plain function so the balance screen's own figures agree on
+ * what money looks like once they have a rate.
  *
- * Compact reads as `Rp586,7Jt`-shaped magnitude — the same K/M/B marks the
- * app already prints for a dollar figure, on purpose: they are the market's
- * notation rather than the language's, and inventing a second scale for one
- * currency would make the two harder to compare, not easier.
- *
- * Rupiah is never shown with cents. It has no subdivision left in ordinary
- * use, and a dollar figure's own two decimals would be false precision here.
+ * This is the wallet's own money, not a quote — see `useMoney` for why
+ * trading figures never call it — so it is always shown in full rather than
+ * abbreviated to a magnitude, and Rupiah is never shown with cents: it has
+ * no subdivision left in ordinary use, and a dollar figure's own two
+ * decimals would be false precision here.
  */
-export function formatMoney(
-  value: number | undefined,
-  currency: Currency,
-  rate: number | undefined,
-  compact: boolean,
-): string {
+export function formatMoney(value: number | undefined, currency: Currency, rate: number | undefined): string {
   if (value === undefined) return "—";
   if (currency !== "USD" && rate === undefined) return "—";
   const converted = currency === "USD" ? value : value * (rate as number);
   const symbol = CURRENCY_SYMBOL[currency];
 
-  if (compact) return `${symbol}${formatCompact(converted)}`;
   if (currency === "IDR") {
     return `${symbol}${Math.round(converted).toLocaleString(numberLocale, { maximumFractionDigits: 0 })}`;
   }
