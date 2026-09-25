@@ -5,16 +5,13 @@ import { Icon } from "@/components/ui/Icon";
 import { Empty, Panel, Skeleton } from "@/components/ui/Panel";
 import { Figure } from "@/components/ui/Figure";
 import { CHAIN_ID, explorerTx } from "@/lib/chains";
-import { formatAmount, formatCompact } from "@/lib/format";
+import { formatAmount } from "@/lib/format";
 import { PER_MINUTE } from "@/lib/screener";
 import { useActivity, type Fill } from "@/hooks/useActivity";
 import { useConnectPrompt } from "@/hooks/useConnectPrompt";
 import { useI18n } from "@/hooks/useI18n";
+import { useMoney } from "@/hooks/useMoney";
 import { useMounted } from "@/hooks/useMounted";
-
-function usd(value: number): string {
-  return `$${formatCompact(value)}`;
-}
 
 /** Same shape as the age readouts on the other screens — see `Screener`. */
 function age(minutes: number): string {
@@ -26,6 +23,7 @@ function age(minutes: number): string {
 
 function Row({ fill, head }: { fill: Fill; head: bigint | undefined }) {
   const { t } = useI18n();
+  const money = useMoney();
   const minutes = head === undefined ? undefined : Number(head - fill.block) / PER_MINUTE;
   const bought = fill.side === "buy";
 
@@ -44,7 +42,7 @@ function Row({ fill, head }: { fill: Fill; head: bigint | undefined }) {
         </span>
       </span>
       <span className="shrink-0 text-right">
-        <Figure className="num block text-[12px]" value={`${bought ? "-" : "+"}${usd(fill.usd)}`} />
+        <Figure className="num block text-[12px]" value={`${bought ? "-" : "+"}${money.compact(fill.usd)}`} />
         <span className="block text-[11px] font-normal text-faint">
           {minutes === undefined ? "—" : age(minutes)}
         </span>

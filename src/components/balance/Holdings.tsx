@@ -6,12 +6,13 @@ import { Icon } from "@/components/ui/Icon";
 import { Empty, Panel, Row, Skeleton } from "@/components/ui/Panel";
 import { Sheet } from "@/components/ui/Sheet";
 import { CHAIN_ID, chainMeta, explorerAddress } from "@/lib/chains";
-import { formatAmount, truncateAddress, usd } from "@/lib/format";
+import { formatAmount, truncateAddress } from "@/lib/format";
 import { useConnectPrompt } from "@/hooks/useConnectPrompt";
 import { useHoldings, type Holding } from "@/hooks/useHoldings";
 import { BalanceCard, COVERED } from "./BalanceCard";
 import { SwapPanel } from "./SwapPanel";
 import { useI18n } from "@/hooks/useI18n";
+import { useMoney } from "@/hooks/useMoney";
 import { useMounted } from "@/hooks/useMounted";
 import { useAppStore } from "@/store/useAppStore";
 
@@ -116,6 +117,7 @@ function TokenSheet({
   onSold: () => void;
 }) {
   const { t } = useI18n();
+  const money = useMoney();
   const setHidden = useAppStore((state) => state.setHidden);
   const covered = useAppStore((state) => Boolean(state.settings.masked));
   const [copied, setCopied] = useState(false);
@@ -128,7 +130,7 @@ function TokenSheet({
    * memecoin is not that — a sheet that covered the amount as well would leave
    * them unable to check the figure they came here to sell against.
    */
-  const worth = covered && row.value !== undefined ? COVERED : usd(row.value);
+  const worth = covered && row.value !== undefined ? COVERED : money.full(row.value);
 
   const copy = async () => {
     try {
@@ -242,6 +244,7 @@ function TokenSheet({
 export function Holdings() {
   const mounted = useMounted();
   const { t } = useI18n();
+  const money = useMoney();
   const prompt = useConnectPrompt();
   const [expanded, setExpanded] = useState(false);
   const [showHidden, setShowHidden] = useState(false);
@@ -323,7 +326,7 @@ export function Holdings() {
             title={native.symbol}
             subtitle={meta?.nativeName ?? t("common.network")}
             amount={formatAmount(Number(native.formatted), 5)}
-            value={covered && nativeValue !== undefined ? COVERED : usd(nativeValue)}
+            value={covered && nativeValue !== undefined ? COVERED : money.full(nativeValue)}
           />
         )}
 
@@ -341,7 +344,7 @@ export function Holdings() {
             flagged={Boolean(row.suspicion)}
             dimmed={row.hidden}
             amount={formatAmount(row.amount)}
-            value={covered && row.value !== undefined ? COVERED : usd(row.value)}
+            value={covered && row.value !== undefined ? COVERED : money.full(row.value)}
             unconfirmed={row.confirmed ? undefined : t("balance.unconfirmed")}
             onClick={() => setOpenedToken(row.address)}
           />
@@ -395,7 +398,6 @@ export function Holdings() {
           nativeValue={nativeValue}
           holdings={holdings}
           verifying={verifying}
-          onRefresh={refetch}
         />
       )}
 

@@ -68,7 +68,7 @@ function caller(request: Request): string {
  * So the bucket is part of the key, and a caller's standing on one relay says
  * nothing about their standing on another.
  */
-export type Bucket = "rpc" | "balances" | "price";
+export type Bucket = "rpc" | "balances" | "price" | "fx";
 
 export type Verdict = {
   /** True when this caller has already spent the window's budget. */

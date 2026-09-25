@@ -35,15 +35,42 @@ export function formatAmount(value: number, maxDecimals = 6): string {
   return formatSignificant(value, 3, numberLocale, 6);
 }
 
+/** A currency this app can show a dollar figure as. The chain still prices everything in USD. */
+export type Currency = "USD" | "IDR";
+
+const CURRENCY_SYMBOL: Record<Currency, string> = { USD: "$", IDR: "Rp" };
+
 /**
- * A dollar figure, or a dash where there is no figure to give.
+ * A dollar figure, shown as whichever currency the reader picked — or a dash
+ * where either the figure or, for anything but USD, the rate to convert it is
+ * missing. Nothing here is fetched: the rate is `useMoney`'s to ask for and
+ * this stays a plain function so every screen that prints money agrees on
+ * what it looks like once it has one.
  *
- * Here rather than on the screen that first needed it, because the balance card
- * and the rows under it have to agree: two spellings of the same money on one
- * screen is the reader checking whether they are the same money.
+ * Compact reads as `Rp586,7Jt`-shaped magnitude — the same K/M/B marks the
+ * app already prints for a dollar figure, on purpose: they are the market's
+ * notation rather than the language's, and inventing a second scale for one
+ * currency would make the two harder to compare, not easier.
+ *
+ * Rupiah is never shown with cents. It has no subdivision left in ordinary
+ * use, and a dollar figure's own two decimals would be false precision here.
  */
-export function usd(value: number | undefined): string {
-  return value === undefined ? "—" : `$${formatSignificant(value, 2)}`;
+export function formatMoney(
+  value: number | undefined,
+  currency: Currency,
+  rate: number | undefined,
+  compact: boolean,
+): string {
+  if (value === undefined) return "—";
+  if (currency !== "USD" && rate === undefined) return "—";
+  const converted = currency === "USD" ? value : value * (rate as number);
+  const symbol = CURRENCY_SYMBOL[currency];
+
+  if (compact) return `${symbol}${formatCompact(converted)}`;
+  if (currency === "IDR") {
+    return `${symbol}${Math.round(converted).toLocaleString(numberLocale, { maximumFractionDigits: 0 })}`;
+  }
+  return `${symbol}${formatSignificant(converted, 2)}`;
 }
 
 /** Where a figure stops being read in full, and what it is marked with. */

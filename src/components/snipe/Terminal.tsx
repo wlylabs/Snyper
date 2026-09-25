@@ -30,10 +30,12 @@ import { useCoinUsd } from "@/hooks/useCoinUsd";
 import { useConnectPrompt } from "@/hooks/useConnectPrompt";
 import { useI18n } from "@/hooks/useI18n";
 import { useLiquidityLock } from "@/hooks/useLiquidityLock";
+import { useMoney } from "@/hooks/useMoney";
 import { useMounted } from "@/hooks/useMounted";
 import { useScreener, type Pair } from "@/hooks/useScreener";
 import { STAKES, stakeIn, useFire, useShot } from "@/hooks/useSnipe";
 import { useRoutes, useSwapAction } from "@/hooks/useSwap";
+import { useTargetDetail } from "@/hooks/useTargetDetail";
 import { basisKey, useAppStore } from "@/store/useAppStore";
 import type { TKey } from "@/lib/i18n";
 
@@ -53,6 +55,9 @@ import type { TKey } from "@/lib/i18n";
  */
 const SHELL = "mx-auto w-full max-w-3xl lg:max-w-[1160px]";
 const SPLIT = "lg:grid lg:grid-cols-[360px_minmax(0,1fr)] lg:items-start lg:gap-3";
+
+/** Where the rest of the market is already looking at a pair. */
+const DEXSCREENER = "https://dexscreener.com/robinhood";
 
 /**
  * What the wallet keeps back for gas when the reader asks for everything.
@@ -110,10 +115,6 @@ function percent(bps: number): string {
   return formatAmount(bps / 100);
 }
 
-function usd(value: number | undefined): string {
-  return value === undefined ? "—" : `$${formatCompact(value)}`;
-}
-
 /**
  * What the terminal will point at.
  *
@@ -164,19 +165,12 @@ function worth(
 }
 
 /**
- * Dollars as money rather than as a measurement.
- *
- * Rounded down to the cent, and down rather than to nearest, because this is
- * used for what a wallet can spend: rounding up would offer a figure the
- * balance cannot cover.
+ * Dollars as a measurement rounded down to the cent, rather than to nearest —
+ * this is used for what a wallet can spend, and rounding up would offer a
+ * figure the balance cannot cover.
  */
-function money(value: number): number {
+function floorCents(value: number): number {
   return Math.floor(value * 100) / 100;
-}
-
-/** A signed dollar figure, for a profit and loss that has to show its sign. */
-function signedUsd(value: number): string {
-  return `${value >= 0 ? "+" : "-"}$${formatCompact(Math.abs(value))}`;
 }
 
 /**
@@ -246,6 +240,7 @@ function TargetList({
   onPick: (pool: string) => void;
 }) {
   const { t } = useI18n();
+  const money = useMoney();
 
   if (loading && pairs.length === 0) {
     return (
@@ -284,14 +279,14 @@ function TargetList({
             </span>
             <span className="block truncate text-[11px] font-normal text-faint">
               <span className="lbl">{t("launches.liqShort")}</span>{" "}
-              <Figure className="num" value={usd(pair.liquidity)} />
+              <Figure className="num" value={money.compact(pair.liquidity)} />
               {" · "}
               <span className="lbl">{t("launches.volShort")}</span>{" "}
-              <Figure className="num" value={usd(pair.volume)} />
+              <Figure className="num" value={money.compact(pair.volume)} />
             </span>
           </span>
           <span className="shrink-0 text-right">
-            <Figure className="num block text-[12px]" value={usd(pair.marketCap)} />
+            <Figure className="num block text-[12px]" value={money.compact(pair.marketCap)} />
             <Figure
               className={`num block text-[11px] font-normal ${pair.change >= 0 ? "long" : "short"}`}
               value={`${pair.change >= 0 ? "+" : ""}${pair.change.toFixed(1)}%`}
@@ -473,6 +468,7 @@ function LockCheck({
  */
 function Exit({ pair, coinUsd }: { pair: Pair; coinUsd: number | undefined }) {
   const { t } = useI18n();
+  const money = useMoney();
   const { address } = useAccount();
   const key = basisKey(address, pair.token);
   const basis = useAppStore((state) => (key ? state.basis[key] : undefined));
@@ -631,7 +627,7 @@ function Exit({ pair, coinUsd }: { pair: Pair; coinUsd: number | undefined }) {
           <Figure
             className="num"
             pending={entire.stale}
-            value={value === undefined ? "—" : `$${formatCompact(value)}`}
+            value={money.compact(value)}
           />
         }
       />
@@ -641,7 +637,7 @@ function Exit({ pair, coinUsd }: { pair: Pair; coinUsd: number | undefined }) {
           v={
             /* Two figures, because the share is set faint beside the money. */
             <span className="num">
-              <Figure pending={entire.stale} value={signedUsd(pnl)} />
+              <Figure pending={entire.stale} value={money.signed(pnl)} />
               <Figure
                 className="text-faint"
                 pending={entire.stale}
@@ -755,6 +751,7 @@ function Exit({ pair, coinUsd }: { pair: Pair; coinUsd: number | undefined }) {
 export function Terminal() {
   const mounted = useMounted();
   const { t } = useI18n();
+  const money = useMoney();
   const prompt = useConnectPrompt();
   const { address } = useAccount();
   const { pairs, loading, error, refetch } = useScreener();
@@ -817,11 +814,16 @@ export function Terminal() {
    * A target picked here, or one handed over from the memecoin screens.
    *
    * The live row wins wherever there is one, so a pair this screen is already
-   * watching keeps describing the pool as it is now rather than as it was at
-   * the tap. A handed pair that this list does not carry is kept anyway rather
-   * than dropped: the terminal can quote anything, and the reason it is missing
-   * is usually that nobody traded it in the last five minutes — which is also
-   * the reason its figures have not moved since they were read.
+   * watching keeps describing itself with the identity it already has. A
+   * handed pair that this list does not carry is kept anyway rather than
+   * dropped: the terminal can quote anything, and the reason it is missing is
+   * usually that nobody traded it in the last five minutes.
+   *
+   * Only the identity travels this way — pool, token, decimals, which side is
+   * which. What the panel shows about it is asked for on its own, below, so a
+   * pool that arrived with no reading at all reads exactly like one that
+   * arrived with a stale one: neither is trusted for figures a fresh read can
+   * answer.
    *
    * A target picked from this screen's own list and then falling out of it is
    * still dropped, because there it means the pool went quiet while the reader
@@ -836,6 +838,13 @@ export function Terminal() {
   const target =
     listed.find((pair) => pair.pool === aimed) ??
     (handed?.pool === aimed ? handed : undefined);
+
+  /*
+   * The four figures on the panel, read fresh for this one pool rather than
+   * carried over from whichever source handed the target across — see
+   * `useTargetDetail` for why that used to disagree with itself.
+   */
+  const { stats, loading: statsLoading } = useTargetDetail(target);
 
   useEffect(() => {
     if (!aimed || handed?.pool === aimed) return;
@@ -1052,15 +1061,16 @@ export function Terminal() {
                   {target.symbol}
                   <span className="text-faint">/{target.quote}</span>
                 </p>
-                <p className={`num mt-1.5 text-[12px] ${target.change >= 0 ? "long" : "short"}`}>
+                <p className={`num mt-1.5 text-[12px] ${(stats?.change ?? 0) >= 0 ? "long" : "short"}`}>
                   <Figure
-                    value={`${target.change >= 0 ? "+" : ""}${target.change.toFixed(1)}%`}
+                    pending={statsLoading}
+                    value={`${(stats?.change ?? 0) >= 0 ? "+" : ""}${(stats?.change ?? 0).toFixed(1)}%`}
                   />
                 </p>
               </div>
               <div className="shrink-0 text-right">
                 <p className="num text-[26px] leading-none">
-                  <Figure value={usd(target.marketCap)} />
+                  <Figure pending={statsLoading} value={money.compact(stats?.marketCap)} />
                 </p>
                 <p className="lbl mt-2">{t("launches.mcap")}</p>
               </div>
@@ -1070,22 +1080,33 @@ export function Terminal() {
               <div className="min-w-0 pr-3">
                 <p className="lbl">{t("launches.liquidity")}</p>
                 <p className="num mt-1.5 truncate text-[13px]">
-                  <Figure value={usd(target.liquidity)} />
+                  <Figure pending={statsLoading} value={money.compact(stats?.liquidity ?? 0)} />
                 </p>
               </div>
               <div className="min-w-0 border-l border-line px-3">
                 <p className="lbl">{t("launches.volume")}</p>
                 <p className="num mt-1.5 truncate text-[13px]">
-                  <Figure value={usd(target.volume)} />
+                  <Figure pending={statsLoading} value={money.compact(stats?.volume ?? 0)} />
                 </p>
               </div>
               <div className="min-w-0 border-l border-line pl-3">
                 <p className="lbl">{t("launches.trades")}</p>
                 <p className="num mt-1.5 truncate text-[13px]">
-                  <Figure value={formatCompact(target.swaps)} />
+                  <Figure pending={statsLoading} value={formatCompact(stats?.swaps ?? 0)} />
                 </p>
               </div>
             </div>
+
+            <a
+              href={`${DEXSCREENER}/${target.pool}`}
+              target="_blank"
+              rel="noreferrer"
+              className="icon-btn mt-3"
+              title={t("snipe.dexscreener")}
+              aria-label={t("snipe.dexscreener")}
+            >
+              <Icon name="external" size={16} />
+            </a>
           </div>
         ) : loading ? (
           <div className="flex flex-col gap-1.5">
@@ -1125,7 +1146,7 @@ export function Terminal() {
             {/* What this wallet could put in, once gas is kept back. */}
             <p className="num text-[11px] text-faint">
               {spendable !== undefined
-                ? t("snipe.spendable", { amount: `$${formatAmount(money(spendable))}` })
+                ? t("snipe.spendable", { amount: `$${formatAmount(floorCents(spendable))}` })
                 : "—"}
             </p>
           </div>
@@ -1187,7 +1208,7 @@ export function Terminal() {
               disabled={spendable === undefined || spendable <= 0}
               onClick={() => {
                 setPreset(undefined);
-                setTyped(spendable ? String(money(spendable)) : "");
+                setTyped(spendable ? String(floorCents(spendable)) : "");
               }}
             >
               {t("swap.max")}
