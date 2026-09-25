@@ -30,7 +30,6 @@ import { useCoinUsd } from "@/hooks/useCoinUsd";
 import { useConnectPrompt } from "@/hooks/useConnectPrompt";
 import { useI18n } from "@/hooks/useI18n";
 import { useLiquidityLock } from "@/hooks/useLiquidityLock";
-import { useMoney } from "@/hooks/useMoney";
 import { useMounted } from "@/hooks/useMounted";
 import { useScreener, type Pair } from "@/hooks/useScreener";
 import { STAKES, stakeIn, useFire, useShot } from "@/hooks/useSnipe";
@@ -113,6 +112,25 @@ const LATCH = 1200;
  */
 function percent(bps: number): string {
   return formatAmount(bps / 100);
+}
+
+/**
+ * Always dollars, never the reader's chosen currency.
+ *
+ * The currency setting is the balance screen's — what the wallet holds is
+ * money the reader keeps, and Rupiah is how they think about that. A quote
+ * against a pool is a different kind of figure: it is denominated in the
+ * chain's own unit before it is anything else, the stake ladder beside it is
+ * priced in dollars, and converting one figure on this screen without the
+ * other would leave a reader comparing a price in two currencies at once.
+ */
+function usd(value: number | undefined): string {
+  return value === undefined ? "—" : `$${formatCompact(value)}`;
+}
+
+/** A signed dollar figure, for a profit and loss that has to show its sign. */
+function signedUsd(value: number): string {
+  return `${value >= 0 ? "+" : "-"}$${formatCompact(Math.abs(value))}`;
 }
 
 /**
@@ -240,7 +258,6 @@ function TargetList({
   onPick: (pool: string) => void;
 }) {
   const { t } = useI18n();
-  const money = useMoney();
 
   if (loading && pairs.length === 0) {
     return (
@@ -279,14 +296,14 @@ function TargetList({
             </span>
             <span className="block truncate text-[11px] font-normal text-faint">
               <span className="lbl">{t("launches.liqShort")}</span>{" "}
-              <Figure className="num" value={money.compact(pair.liquidity)} />
+              <Figure className="num" value={usd(pair.liquidity)} />
               {" · "}
               <span className="lbl">{t("launches.volShort")}</span>{" "}
-              <Figure className="num" value={money.compact(pair.volume)} />
+              <Figure className="num" value={usd(pair.volume)} />
             </span>
           </span>
           <span className="shrink-0 text-right">
-            <Figure className="num block text-[12px]" value={money.compact(pair.marketCap)} />
+            <Figure className="num block text-[12px]" value={usd(pair.marketCap)} />
             <Figure
               className={`num block text-[11px] font-normal ${pair.change >= 0 ? "long" : "short"}`}
               value={`${pair.change >= 0 ? "+" : ""}${pair.change.toFixed(1)}%`}
@@ -468,7 +485,6 @@ function LockCheck({
  */
 function Exit({ pair, coinUsd }: { pair: Pair; coinUsd: number | undefined }) {
   const { t } = useI18n();
-  const money = useMoney();
   const { address } = useAccount();
   const key = basisKey(address, pair.token);
   const basis = useAppStore((state) => (key ? state.basis[key] : undefined));
@@ -627,7 +643,7 @@ function Exit({ pair, coinUsd }: { pair: Pair; coinUsd: number | undefined }) {
           <Figure
             className="num"
             pending={entire.stale}
-            value={money.compact(value)}
+            value={usd(value)}
           />
         }
       />
@@ -637,7 +653,7 @@ function Exit({ pair, coinUsd }: { pair: Pair; coinUsd: number | undefined }) {
           v={
             /* Two figures, because the share is set faint beside the money. */
             <span className="num">
-              <Figure pending={entire.stale} value={money.signed(pnl)} />
+              <Figure pending={entire.stale} value={signedUsd(pnl)} />
               <Figure
                 className="text-faint"
                 pending={entire.stale}
@@ -751,7 +767,6 @@ function Exit({ pair, coinUsd }: { pair: Pair; coinUsd: number | undefined }) {
 export function Terminal() {
   const mounted = useMounted();
   const { t } = useI18n();
-  const money = useMoney();
   const prompt = useConnectPrompt();
   const { address } = useAccount();
   const { pairs, loading, error, refetch } = useScreener();
@@ -1070,7 +1085,7 @@ export function Terminal() {
               </div>
               <div className="shrink-0 text-right">
                 <p className="num text-[26px] leading-none">
-                  <Figure pending={statsLoading} value={money.compact(stats?.marketCap)} />
+                  <Figure pending={statsLoading} value={usd(stats?.marketCap)} />
                 </p>
                 <p className="lbl mt-2">{t("launches.mcap")}</p>
               </div>
@@ -1080,13 +1095,13 @@ export function Terminal() {
               <div className="min-w-0 pr-3">
                 <p className="lbl">{t("launches.liquidity")}</p>
                 <p className="num mt-1.5 truncate text-[13px]">
-                  <Figure pending={statsLoading} value={money.compact(stats?.liquidity ?? 0)} />
+                  <Figure pending={statsLoading} value={usd(stats?.liquidity ?? 0)} />
                 </p>
               </div>
               <div className="min-w-0 border-l border-line px-3">
                 <p className="lbl">{t("launches.volume")}</p>
                 <p className="num mt-1.5 truncate text-[13px]">
-                  <Figure pending={statsLoading} value={money.compact(stats?.volume ?? 0)} />
+                  <Figure pending={statsLoading} value={usd(stats?.volume ?? 0)} />
                 </p>
               </div>
               <div className="min-w-0 border-l border-line pl-3">
