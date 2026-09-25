@@ -20,7 +20,7 @@ export const INTL_LOCALE: Record<Locale, string> = {
 const en = {
   "nav.home": "Snyper",
   "nav.balance": "Balance",
-  "nav.launches": "Launches",
+  "nav.activity": "Activity",
   "nav.settings": "Settings",
 
   "a11y.home": "Snyper home",
@@ -41,7 +41,7 @@ const en = {
 
   "page.balance.title": "Balance",
 
-  "page.launches.title": "Launches",
+  "page.activity.title": "Activity",
 
   "balance.total": "Portfolio value",
   "balance.holdings": "Holdings",
@@ -112,30 +112,30 @@ const en = {
   "balance.unhide": "List it again",
   "balance.hidden": "{count} hidden",
   "balance.hiddenLess": "Put the hidden ones away",
-  "launches.count": "{shown} listed",
-  "launches.opened": "Under $10M · {floor}+ · newest first",
-  "launches.mcapShort": "MCAP",
-  "launches.dexscreener": "DEX Screener",
-  "launches.snipe": "Snyper · buy {symbol}",
-  "launches.noChart": "Not enough trades to draw yet.",
-  "launches.fresh": "NEW",
-  "launches.pair": "Pair",
   "launches.mcap": "Market cap",
-  "launches.fdv": "Fully diluted",
   "launches.volShort": "Vol",
   "launches.liqShort": "Liq",
   "launches.volume": "Volume",
   "launches.liquidity": "Liquidity",
   "launches.trades": "Trades",
-  "launches.age": "Age",
-  "launches.pool": "Pool fee",
-  "launches.token": "Token",
-  "launches.emptyNew": "Nothing has opened in the last day.",
-  "launches.emptyNewHint":
-    "Every pool opened on chain 4663 since yesterday is read here, and the deepest forty of them are priced. An empty screen means nothing opened — or that nothing which opened has anything resting in it yet. It fills again on its own.",
   "launches.failed": "The chain did not answer.",
   "launches.failedHint":
     "Every pair here is built from swap events read straight off chain 4663, and that read did not come back.",
+
+  "activity.title": "Activity",
+  "activity.count": "{shown} trades",
+  "activity.window": "Last 50m · newest first",
+  "activity.buy": "Bought",
+  "activity.sell": "Sold",
+  "activity.noWallet": "No wallet connected.",
+  "activity.noWalletHint":
+    "Connect one and this reads back every buy and sell it has made on Robinhood Chain.",
+  "activity.empty": "Nothing bought or sold in the last fifty minutes.",
+  "activity.emptyHint":
+    "Every row here is a Swap this wallet was the recipient of, read straight off chain 4663 rather than kept anywhere. It fills again the moment there is one.",
+  "activity.failed": "The chain did not answer.",
+  "activity.failedHint":
+    "Every fill here is built from swap events read straight off chain 4663, and that read did not come back.",
 
   "signal.title": "Coil",
   "signal.score": "Score",
@@ -183,6 +183,9 @@ const en = {
   "snipe.empty": "Nothing on this chain is worth a shot right now.",
   "snipe.emptyHint":
     "A target is a pair under $10M with at least $1K resting in its pool and $1K traded through it in the last five minutes. The list fills again on its own.",
+  "snipe.pasteAddress": "Paste a token address",
+  "snipe.pasteAddressHint": "Doesn't look like a contract address.",
+  "snipe.pasteAddressNotFound": "No pool for this token on this venue.",
   "snipe.stake": "Stake",
   "snipe.custom": "Any amount",
   "snipe.spendable": "{amount} spendable",
@@ -342,7 +345,7 @@ export type TKey = keyof typeof en;
 const id: Record<TKey, string> = {
   "nav.home": "Snyper",
   "nav.balance": "Saldo",
-  "nav.launches": "Peluncuran",
+  "nav.activity": "Aktivitas",
   "nav.settings": "Pengaturan",
 
   "a11y.home": "Beranda Snyper",
@@ -362,7 +365,7 @@ const id: Record<TKey, string> = {
 
   "page.balance.title": "Saldo",
 
-  "page.launches.title": "Peluncuran",
+  "page.activity.title": "Aktivitas",
 
   "balance.total": "Nilai portofolio",
   "balance.holdings": "Isi dompet",
@@ -433,30 +436,30 @@ const id: Record<TKey, string> = {
   "balance.unhide": "Tampilkan lagi",
   "balance.hidden": "{count} disembunyikan",
   "balance.hiddenLess": "Simpan lagi yang disembunyikan",
-  "launches.count": "{shown} baris",
-  "launches.opened": "Di bawah $10J · {floor}+ · terbaru dulu",
-  "launches.mcapShort": "MCAP",
-  "launches.dexscreener": "DEX Screener",
-  "launches.snipe": "Snyper · beli {symbol}",
-  "launches.noChart": "Belum cukup transaksi untuk digambar.",
-  "launches.fresh": "BARU",
-  "launches.pair": "Pair",
   "launches.mcap": "Kapitalisasi pasar",
-  "launches.fdv": "Terdilusi penuh",
   "launches.volShort": "Vol",
   "launches.liqShort": "Lik",
   "launches.volume": "Volume",
   "launches.liquidity": "Likuiditas",
   "launches.trades": "Transaksi",
-  "launches.age": "Umur",
-  "launches.pool": "Biaya pool",
-  "launches.token": "Token",
-  "launches.emptyNew": "Belum ada pool yang dibuka sehari terakhir.",
-  "launches.emptyNewHint":
-    "Setiap pool yang dibuka di chain 4663 sejak kemarin dibaca di sini, dan empat puluh yang terdalam diberi harga. Layar kosong berarti memang tidak ada yang dibuka — atau yang dibuka belum ada isinya sama sekali. Nanti terisi sendiri.",
   "launches.failed": "Chain tidak menjawab.",
   "launches.failedHint":
     "Setiap pair di sini dibangun dari event swap yang dibaca langsung dari chain 4663, dan bacaan itu tidak kembali.",
+
+  "activity.title": "Aktivitas",
+  "activity.count": "{shown} transaksi",
+  "activity.window": "50m terakhir · terbaru dulu",
+  "activity.buy": "Beli",
+  "activity.sell": "Jual",
+  "activity.noWallet": "Belum ada wallet yang terhubung.",
+  "activity.noWalletHint":
+    "Hubungkan satu dan layar ini membaca kembali setiap beli dan jual yang pernah dilakukan wallet ini di Robinhood Chain.",
+  "activity.empty": "Belum ada beli atau jual dalam lima puluh menit terakhir.",
+  "activity.emptyHint":
+    "Setiap baris di sini adalah Swap yang penerimanya wallet ini, dibaca langsung dari chain 4663 dan tidak disimpan di mana pun. Terisi lagi begitu ada satu.",
+  "activity.failed": "Chain tidak menjawab.",
+  "activity.failedHint":
+    "Setiap transaksi di sini dibangun dari event swap yang dibaca langsung dari chain 4663, dan bacaan itu tidak kembali.",
 
   "signal.title": "Coil",
   "signal.score": "Skor",
@@ -504,6 +507,9 @@ const id: Record<TKey, string> = {
   "snipe.empty": "Belum ada yang layak ditembak di chain ini.",
   "snipe.emptyHint":
     "Target itu pair di bawah $10J dengan minimal $1R mengendap di pool-nya dan $1R yang lewat dalam lima menit terakhir. Daftarnya terisi lagi sendiri.",
+  "snipe.pasteAddress": "Tempel alamat token",
+  "snipe.pasteAddressHint": "Bukan alamat kontrak yang valid.",
+  "snipe.pasteAddressNotFound": "Tidak ada pool untuk token ini di venue ini.",
   "snipe.stake": "Modal",
   "snipe.custom": "Jumlah bebas",
   "snipe.spendable": "Bisa dipakai {amount}",

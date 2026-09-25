@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { erc20Abi, formatEther, formatUnits, parseUnits } from "viem";
+import { erc20Abi, formatEther, formatUnits, isAddress, parseUnits } from "viem";
 import { useAccount, useBalance, useReadContract } from "wagmi";
 import { Figure } from "@/components/ui/Figure";
 import { Icon, type IconName } from "@/components/ui/Icon";
@@ -25,6 +25,7 @@ import {
   slippageCapped,
   snipeSlippageFor,
 } from "@/lib/venue";
+import { useAimByAddress } from "@/hooks/useAimByAddress";
 import { useCoinUsd } from "@/hooks/useCoinUsd";
 import { useConnectPrompt } from "@/hooks/useConnectPrompt";
 import { useI18n } from "@/hooks/useI18n";
@@ -179,6 +180,52 @@ function signedUsd(value: number): string {
 }
 
 /**
+ * A target that never has to show up in anybody's list to be shot at.
+ *
+ * The venue's whole catalogue is contracts and fee tiers, not names, so any
+ * token with a pool against one of this venue's two quote assets can be
+ * priced the moment its address is known — see `useAimByAddress`, which asks
+ * the factory rather than reading the swap window `useScreener` builds its
+ * own list from. A token minutes old and untraded is exactly the case that
+ * list cannot carry and this can: paste it, and it is the target.
+ */
+function AddressAim({ onAim }: { onAim: (pair: Pair) => void }) {
+  const { t } = useI18n();
+  const [typed, setTyped] = useState("");
+  const trimmed = typed.trim();
+  /* Checksum is not required — a paste in the wrong case is still the same
+     address, and the chain reads take it exactly as typed either way. */
+  const address = isAddress(trimmed, { strict: false }) ? (trimmed as `0x${string}`) : undefined;
+  const { pair, resolving, notFound } = useAimByAddress(address);
+
+  useEffect(() => {
+    if (!pair) return;
+    onAim(pair);
+    setTyped("");
+  }, [pair, onAim]);
+
+  return (
+    <div className="mb-1.5">
+      <div className="tile">
+        <Icon name="search" size={13} className="shrink-0 text-faint" />
+        <input
+          value={typed}
+          onChange={(event) => setTyped(event.target.value)}
+          placeholder={t("snipe.pasteAddress")}
+          spellCheck={false}
+          className="min-w-0 flex-1 bg-transparent text-[12px] outline-none placeholder:text-faint"
+        />
+        {resolving && <Icon name="pulse" size={13} className="shrink-0 text-faint" />}
+      </div>
+      {typed.length > 0 && !address && (
+        <p className="mt-1 px-1 text-[11px] text-faint">{t("snipe.pasteAddressHint")}</p>
+      )}
+      {notFound && <p className="mt-1 px-1 text-[11px] warn">{t("snipe.pasteAddressNotFound")}</p>}
+    </div>
+  );
+}
+
+/**
  * What there is to shoot at.
  *
  * Its own component because the same list is read in two places now: behind a
@@ -262,6 +309,7 @@ function TargetSheet({
   loading,
   chosen,
   onPick,
+  onAim,
   onClose,
 }: {
   open: boolean;
@@ -269,6 +317,7 @@ function TargetSheet({
   loading: boolean;
   chosen: string | undefined;
   onPick: (pool: string) => void;
+  onAim: (pair: Pair) => void;
   onClose: () => void;
 }) {
   const { t } = useI18n();
@@ -276,6 +325,12 @@ function TargetSheet({
   return (
     <Sheet open={open} title={t("snipe.targets")} onClose={onClose}>
       <div className="p-3">
+        <AddressAim
+          onAim={(pair) => {
+            onAim(pair);
+            onClose();
+          }}
+        />
         <TargetList
           pairs={pairs}
           loading={loading}
@@ -930,6 +985,12 @@ export function Terminal() {
           meta={listed.length > 0 && <span className="lbl">{listed.length}</span>}
           bodyClassName="panel-body scroll-thin max-h-[calc(100dvh-var(--shell-top)-var(--shell-strip)-96px)] overflow-y-auto"
         >
+          <AddressAim
+            onAim={(pair) => {
+              aim(pair);
+              setAimed(pair.pool);
+            }}
+          />
           <TargetList
             pairs={listed}
             loading={loading}
@@ -1379,6 +1440,10 @@ export function Terminal() {
         onPick={(pool) => {
           aim(undefined);
           setAimed(pool);
+        }}
+        onAim={(pair) => {
+          aim(pair);
+          setAimed(pair.pool);
         }}
         onClose={() => setPicking(false)}
       />
