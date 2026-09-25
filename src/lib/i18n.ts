@@ -2,7 +2,7 @@ export type Locale = "en" | "id";
 
 export const LOCALES: { value: Locale; label: string }[] = [
   { value: "en", label: "English" },
-  { value: "id", label: "Bahasa Indonesia" },
+  { value: "id", label: "wkwk" },
 ];
 
 /** BCP 47 tag used for number and date formatting. */

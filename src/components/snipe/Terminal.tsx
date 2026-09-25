@@ -1101,10 +1101,11 @@ export function Terminal() {
               href={`${DEXSCREENER}/${target.pool}`}
               target="_blank"
               rel="noreferrer"
-              className="tile mt-3 justify-center"
+              className="icon-btn mt-3"
+              title={t("snipe.dexscreener")}
+              aria-label={t("snipe.dexscreener")}
             >
-              <Icon name="candles" size={14} className="text-dim" />
-              {t("snipe.dexscreener")}
+              <Icon name="external" size={16} />
             </a>
           </div>
         ) : loading ? (
