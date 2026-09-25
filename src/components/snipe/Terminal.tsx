@@ -34,6 +34,7 @@ import { useMounted } from "@/hooks/useMounted";
 import { useScreener, type Pair } from "@/hooks/useScreener";
 import { STAKES, stakeIn, useFire, useShot } from "@/hooks/useSnipe";
 import { useRoutes, useSwapAction } from "@/hooks/useSwap";
+import { useTargetDetail } from "@/hooks/useTargetDetail";
 import { basisKey, useAppStore } from "@/store/useAppStore";
 import type { TKey } from "@/lib/i18n";
 
@@ -53,6 +54,9 @@ import type { TKey } from "@/lib/i18n";
  */
 const SHELL = "mx-auto w-full max-w-3xl lg:max-w-[1160px]";
 const SPLIT = "lg:grid lg:grid-cols-[360px_minmax(0,1fr)] lg:items-start lg:gap-3";
+
+/** Where the rest of the market is already looking at a pair. */
+const DEXSCREENER = "https://dexscreener.com/robinhood";
 
 /**
  * What the wallet keeps back for gas when the reader asks for everything.
@@ -817,11 +821,16 @@ export function Terminal() {
    * A target picked here, or one handed over from the memecoin screens.
    *
    * The live row wins wherever there is one, so a pair this screen is already
-   * watching keeps describing the pool as it is now rather than as it was at
-   * the tap. A handed pair that this list does not carry is kept anyway rather
-   * than dropped: the terminal can quote anything, and the reason it is missing
-   * is usually that nobody traded it in the last five minutes — which is also
-   * the reason its figures have not moved since they were read.
+   * watching keeps describing itself with the identity it already has. A
+   * handed pair that this list does not carry is kept anyway rather than
+   * dropped: the terminal can quote anything, and the reason it is missing is
+   * usually that nobody traded it in the last five minutes.
+   *
+   * Only the identity travels this way — pool, token, decimals, which side is
+   * which. What the panel shows about it is asked for on its own, below, so a
+   * pool that arrived with no reading at all reads exactly like one that
+   * arrived with a stale one: neither is trusted for figures a fresh read can
+   * answer.
    *
    * A target picked from this screen's own list and then falling out of it is
    * still dropped, because there it means the pool went quiet while the reader
@@ -836,6 +845,13 @@ export function Terminal() {
   const target =
     listed.find((pair) => pair.pool === aimed) ??
     (handed?.pool === aimed ? handed : undefined);
+
+  /*
+   * The four figures on the panel, read fresh for this one pool rather than
+   * carried over from whichever source handed the target across — see
+   * `useTargetDetail` for why that used to disagree with itself.
+   */
+  const { stats, loading: statsLoading } = useTargetDetail(target);
 
   useEffect(() => {
     if (!aimed || handed?.pool === aimed) return;
@@ -1052,15 +1068,16 @@ export function Terminal() {
                   {target.symbol}
                   <span className="text-faint">/{target.quote}</span>
                 </p>
-                <p className={`num mt-1.5 text-[12px] ${target.change >= 0 ? "long" : "short"}`}>
+                <p className={`num mt-1.5 text-[12px] ${(stats?.change ?? 0) >= 0 ? "long" : "short"}`}>
                   <Figure
-                    value={`${target.change >= 0 ? "+" : ""}${target.change.toFixed(1)}%`}
+                    pending={statsLoading}
+                    value={`${(stats?.change ?? 0) >= 0 ? "+" : ""}${(stats?.change ?? 0).toFixed(1)}%`}
                   />
                 </p>
               </div>
               <div className="shrink-0 text-right">
                 <p className="num text-[26px] leading-none">
-                  <Figure value={usd(target.marketCap)} />
+                  <Figure pending={statsLoading} value={usd(stats?.marketCap)} />
                 </p>
                 <p className="lbl mt-2">{t("launches.mcap")}</p>
               </div>
@@ -1070,22 +1087,32 @@ export function Terminal() {
               <div className="min-w-0 pr-3">
                 <p className="lbl">{t("launches.liquidity")}</p>
                 <p className="num mt-1.5 truncate text-[13px]">
-                  <Figure value={usd(target.liquidity)} />
+                  <Figure pending={statsLoading} value={usd(stats?.liquidity ?? 0)} />
                 </p>
               </div>
               <div className="min-w-0 border-l border-line px-3">
                 <p className="lbl">{t("launches.volume")}</p>
                 <p className="num mt-1.5 truncate text-[13px]">
-                  <Figure value={usd(target.volume)} />
+                  <Figure pending={statsLoading} value={usd(stats?.volume ?? 0)} />
                 </p>
               </div>
               <div className="min-w-0 border-l border-line pl-3">
                 <p className="lbl">{t("launches.trades")}</p>
                 <p className="num mt-1.5 truncate text-[13px]">
-                  <Figure value={formatCompact(target.swaps)} />
+                  <Figure pending={statsLoading} value={formatCompact(stats?.swaps ?? 0)} />
                 </p>
               </div>
             </div>
+
+            <a
+              href={`${DEXSCREENER}/${target.pool}`}
+              target="_blank"
+              rel="noreferrer"
+              className="tile mt-3 justify-center"
+            >
+              <Icon name="candles" size={14} className="text-dim" />
+              {t("snipe.dexscreener")}
+            </a>
           </div>
         ) : loading ? (
           <div className="flex flex-col gap-1.5">
