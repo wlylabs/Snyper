@@ -2,7 +2,7 @@ export type Locale = "en" | "id";
 
 export const LOCALES: { value: Locale; label: string }[] = [
   { value: "en", label: "English" },
-  { value: "id", label: "Indonesia" },
+  { value: "id", label: "Bahasa Indonesia" },
 ];
 
 /** BCP 47 tag used for number and date formatting. */
@@ -259,6 +259,8 @@ const en = {
   "settings.light": "Light",
   "settings.language": "Language",
   "settings.languageHint": "Interface text, number and date formatting.",
+  "settings.currency": "Currency",
+  "settings.currencyHint": "How a dollar figure is shown. The chain still prices everything in USD.",
 
   "settings.referral": "I just joined Fomo",
   "settings.referralTitle": "Trade with me there",
@@ -584,6 +586,8 @@ const id: Record<TKey, string> = {
   "settings.light": "Terang",
   "settings.language": "Bahasa",
   "settings.languageHint": "Teks antarmuka, format angka, dan tanggal.",
+  "settings.currency": "Mata uang",
+  "settings.currencyHint": "Cara angka dolar ditampilkan. Chain tetap memberi harga dalam USD.",
 
   "settings.referral": "Aku baru gabung Fomo",
   "settings.referralTitle": "Trading bareng di sana",

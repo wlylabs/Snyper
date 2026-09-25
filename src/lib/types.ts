@@ -27,4 +27,6 @@ export type Settings = {
    * migration to carry.
    */
   masked: boolean;
+  /** Which currency a dollar figure is shown as. The chain is still priced in USD underneath. */
+  currency: "USD" | "IDR";
 };

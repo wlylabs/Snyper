@@ -43,6 +43,7 @@ export const DEFAULT_SETTINGS: Settings = {
   localeChosen: false,
   theme: "dark",
   masked: false,
+  currency: "USD",
 };
 
 type AppState = {

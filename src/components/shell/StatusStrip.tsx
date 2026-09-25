@@ -22,6 +22,10 @@ const HEAD_INTERVAL = 4000;
  * own height. It used to carry armed strategies and a price marquee beside
  * them; both went with the surfaces that fed them, and nothing was invented to
  * fill the space they left.
+ *
+ * The network's own name is not repeated here — the header chip above this
+ * strip already names it, and a reader does not need "Robinhood" said twice
+ * in the same glance for one wallet on one chain.
  */
 export function StatusStrip() {
   const mounted = useMounted();
@@ -44,11 +48,8 @@ export function StatusStrip() {
           </span>
         </span>
 
-        <span className="ml-auto flex shrink-0 items-center gap-1.5">
-          <span className="lbl">{meta ? meta.label : t("common.network")}</span>
-          <span className="num text-[11px] text-dim">
-            {mounted && blockNumber ? `#${blockNumber.toString()}` : "—"}
-          </span>
+        <span className="num ml-auto shrink-0 text-[11px] text-dim">
+          {mounted && blockNumber ? `#${blockNumber.toString()}` : "—"}
         </span>
       </div>
     </div>

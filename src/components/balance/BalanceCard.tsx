@@ -6,9 +6,10 @@ import { Icon } from "@/components/ui/Icon";
 import { IconButton } from "@/components/ui/IconButton";
 import { WalletAvatar } from "@/components/ui/WalletAvatar";
 import { CHAIN_ID, chainMeta } from "@/lib/chains";
-import { formatAmount, truncateAddress, usd } from "@/lib/format";
+import { formatAmount, truncateAddress } from "@/lib/format";
 import { useI18n } from "@/hooks/useI18n";
 import type { Holding } from "@/hooks/useHoldings";
+import { useMoney } from "@/hooks/useMoney";
 import { useAppStore } from "@/store/useAppStore";
 
 /**
@@ -53,7 +54,6 @@ export function BalanceCard({
   nativeValue,
   holdings,
   verifying,
-  onRefresh,
 }: {
   address: `0x${string}`;
   /** The priced total, or undefined when nothing on this screen has a price. */
@@ -63,9 +63,9 @@ export function BalanceCard({
   holdings: Holding[];
   /** True while the chain is being asked to confirm what the index reported. */
   verifying: boolean;
-  onRefresh: () => void;
 }) {
   const { t } = useI18n();
+  const money = useMoney();
   const covered = useAppStore((state) => Boolean(state.settings.masked));
   const setSettings = useAppStore((state) => state.setSettings);
   const [copied, setCopied] = useState(false);
@@ -129,15 +129,6 @@ export function BalanceCard({
           title={covered ? t("balance.unmask") : t("balance.mask")}
           aria-label={covered ? t("balance.unmask") : t("balance.mask")}
         />
-        <IconButton
-          icon="refresh"
-          act="spin"
-          size={14}
-          busy={verifying}
-          onClick={onRefresh}
-          title={t("balance.reread")}
-          aria-label={t("balance.reread")}
-        />
       </header>
 
       <div className="saldo-face">
@@ -154,7 +145,7 @@ export function BalanceCard({
            */
           aria-label={covered ? t("balance.covered") : undefined}
         >
-          <Figure value={covered ? COVERED : usd(total)} pending={verifying} />
+          <Figure value={covered ? COVERED : money.full(total)} pending={verifying} />
         </p>
         {/* Not covered with the figure above it. This is a count of contracts,
             which the explorer gives away anyway, and it is the line that says
@@ -187,7 +178,7 @@ export function BalanceCard({
             />
           </p>
           <p className="num mt-1 text-[11px] text-faint">
-            <Figure value={covered && nativeValue !== undefined ? COVERED : usd(nativeValue)} />
+            <Figure value={covered && nativeValue !== undefined ? COVERED : money.full(nativeValue)} />
           </p>
         </div>
 
@@ -201,9 +192,6 @@ export function BalanceCard({
           <p className="lbl">{t("balance.assets")}</p>
           <p className="num mt-1.5 text-[13px]">
             <Figure value={String(assets)} />
-          </p>
-          <p className="mt-1 truncate text-[11px] text-faint">
-            {meta?.label ?? t("common.network")}
           </p>
         </div>
       </div>
