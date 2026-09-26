@@ -177,6 +177,8 @@ const en = {
   "snipe.targets": "Targets",
   "snipe.pick": "Pick one",
   "snipe.change": "Change",
+  "snipe.auto": "Auto",
+  "snipe.autoHint": "Keeps aiming at the top target on its own. Firing still takes a tap.",
   "snipe.noTarget": "Nothing is aimed at yet.",
   "snipe.noTargetHint":
     "Pick a target and this quotes the shot against the pool it trades in — what it fills at, what that costs, and whether it can be sold again.",
@@ -504,6 +506,8 @@ const id: Record<TKey, string> = {
   "snipe.targets": "Target",
   "snipe.pick": "Pilih satu",
   "snipe.change": "Ganti",
+  "snipe.auto": "Auto",
+  "snipe.autoHint": "Terus membidik target teratas sendiri. Menembak tetap harus disentuh manual.",
   "snipe.noTarget": "Belum ada yang dibidik.",
   "snipe.noTargetHint":
     "Pilih target dan tembakannya langsung dihitung ke pool tempat token itu jalan — dapat berapa, biayanya berapa, dan apakah masih bisa dijual lagi.",

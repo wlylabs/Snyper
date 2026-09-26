@@ -773,6 +773,7 @@ export function Terminal() {
 
   const [picking, setPicking] = useState(false);
   const [aimed, setAimed] = useState<string>();
+  const [auto, setAuto] = useState(false);
   const [preset, setPreset] = useState<number | undefined>(STAKES[0]);
   const [typed, setTyped] = useState("");
 
@@ -847,7 +848,10 @@ export function Terminal() {
   const handed = useAppStore((state) => state.aimed);
   const aim = useAppStore((state) => state.aim);
   useEffect(() => {
-    if (handed) setAimed(handed.pool);
+    if (handed) {
+      setAimed(handed.pool);
+      setAuto(false);
+    }
   }, [handed]);
 
   const target =
@@ -865,6 +869,25 @@ export function Terminal() {
     if (!aimed || handed?.pool === aimed) return;
     if (!listed.some((pair) => pair.pool === aimed)) setAimed(undefined);
   }, [aimed, listed, handed]);
+
+  /*
+   * Auto keeps the aim moving to the top of `targets` by itself, so a reader
+   * does not have to be watching the list the instant something worth shooting
+   * appears. It only ever changes which pool is aimed at.
+   *
+   * It never fires. `fire` is still the tap on the button below, still gated
+   * on the same simulation and the same exit check as a shot picked by hand —
+   * this hook has no path to `pull`. What was once armed to trade unattended
+   * is not being rebuilt; this only saves the reader the tap that points the
+   * gun, never the one that pulls it.
+   */
+  useEffect(() => {
+    if (!auto || listed.length === 0) return;
+    const top = listed[0];
+    if (top.pool === aimed) return;
+    aim(undefined);
+    setAimed(top.pool);
+  }, [auto, listed, aimed, aim]);
 
   const { shot, unquotable, loading: quoting } = useShot(target, stake);
   /*
@@ -1022,6 +1045,7 @@ export function Terminal() {
             onPick={(pool) => {
               aim(undefined);
               setAimed(pool);
+              setAuto(false);
             }}
           />
         </Panel>
@@ -1030,16 +1054,33 @@ export function Terminal() {
       <Panel
         label={t("snipe.target")}
         action={
-          listed.length > 0 && (
+          <div className="flex items-center gap-1.5">
+            {/*
+             * A short toggle, not a control that spends the reader's attention:
+             * one word and a state, next to the button that does the same job
+             * by hand. See the effect above for what it does and does not do.
+             */}
             <button
               type="button"
-              className="btn btn-sm btn-short lg:hidden"
-              onClick={() => setPicking(true)}
+              className={`btn btn-sm ${auto ? "btn-accent" : "btn-short"}`}
+              aria-pressed={auto}
+              title={t("snipe.autoHint")}
+              onClick={() => setAuto((value) => !value)}
             >
-              <Icon name="crosshair" size={13} />
-              {target ? t("snipe.change") : t("snipe.pick")}
+              <Icon name="power" size={13} />
+              {t("snipe.auto")}
             </button>
-          )
+            {listed.length > 0 && (
+              <button
+                type="button"
+                className="btn btn-sm btn-short lg:hidden"
+                onClick={() => setPicking(true)}
+              >
+                <Icon name="crosshair" size={13} />
+                {target ? t("snipe.change") : t("snipe.pick")}
+              </button>
+            )}
+          </div>
         }
       >
         {error ? (
@@ -1476,6 +1517,7 @@ export function Terminal() {
         onPick={(pool) => {
           aim(undefined);
           setAimed(pool);
+          setAuto(false);
         }}
         onAim={(pair) => {
           aim(pair);
